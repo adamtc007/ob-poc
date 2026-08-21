@@ -336,7 +336,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &register_event, "(setup-register)", |_, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &register_event, "(setup-register)", |_, _, _| Ok(())).await.unwrap();
 
         let assert_event = IntentEvent::new(
             subject,
@@ -348,7 +348,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_, _, _| Ok(())).await.unwrap();
 
         let evidence_event = IntentEvent::new(
             subject,
@@ -360,7 +360,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_, _, _| Ok(())).await.unwrap();
         scope.commit().await.unwrap();
     }
 
@@ -410,7 +410,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_, _| Ok(()))
+        append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_, _, _| Ok(()))
             .await
             .unwrap();
         scope2.commit().await.unwrap();
@@ -499,7 +499,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
         fixed_ts(),
     )
     .with_lexicon_hash(lexicon.hash);
-    let (expected_control, _) =
+    let (expected_control, _, _) =
         preview(&[], &[register_event, expected_event], &lexicon).unwrap();
     let expected_status = expected_control.edges.get(&EdgeId(edge)).map(|e| e.status);
 
@@ -513,7 +513,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
 
     let mut conn = pool.acquire().await.unwrap();
     let committed = PgKycEventStore::load_events(&mut conn, subject).await.unwrap();
-    let (post_run_control, _) = preview(&committed, &[], &lexicon).unwrap();
+    let (post_run_control, _, _) = preview(&committed, &[], &lexicon).unwrap();
     let post_run_status = post_run_control.edges.get(&EdgeId(edge)).map(|e| e.status);
 
     assert_eq!(

@@ -7,7 +7,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
     AuthorityRef, ControlState, FoldRegistry, Hash, IdemKey, IntentEvent, KycError,
-    ObligationState, Principal, SubjectId, TargetBinding, VerbFqn,
+    ObligationState, Principal, SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
 
@@ -93,7 +93,7 @@ impl IntentEventDraft {
 /// store orchestrates lock/fold/insert; the substrate folds both `ControlState`
 /// and `ObligationState` under the same lock (T6.1(a) unified checker);
 /// `validate` is the precondition policy the caller supplies (typically
-/// `substrate::check_preconditions(entry, control, obligation, event)`, or
+/// `substrate::check_preconditions(entry, control, obligation, type_registry, event)`, or
 /// the `check_control_preconditions` delegate when only the control axis
 /// matters).
 pub async fn append_in_scope<V>(
@@ -104,7 +104,7 @@ pub async fn append_in_scope<V>(
     validate: V,
 ) -> Result<AppendOutcome, StoreError>
 where
-    V: FnOnce(&ControlState, &ObligationState) -> Result<(), KycError>,
+    V: FnOnce(&ControlState, &ObligationState, &TypeRegistryState) -> Result<(), KycError>,
 {
     PgKycEventStore::append(scope.executor(), registry, event, source_text, validate).await
 }

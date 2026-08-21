@@ -56,7 +56,7 @@ use ob_poc_kyc_substrate::{
     FoundationCouncilStrategy, FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy,
     ObligationState, OwnershipProngStrategy, PersonId, Precondition, Principal, Prong,
     StateOwnedStrategy, StructureClass, SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy,
-    V1FoldImpl,
+    TypeRegistryState, V1FoldImpl,
 };
 
 const DSL_KYC_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc.yaml");
@@ -570,16 +570,21 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         vec![Precondition::SubjectNotDecided],
     );
 
-    // D1 (EOP-DD-KYCUBO-TS.1 §3, moves 2/6/7/8): all three lexicon-studded
-    // moves carry EntityRegistered; record-enquiry carries none (row 8:
-    // "group exists" is true by construction).
-    for fqn in [
-        "kyc.subject.assert-type",
-        "kyc.subject.correct-type",
-        "kyc.subject.withdraw-member",
-    ] {
-        expected.insert(fqn.to_string(), vec![Precondition::EntityRegistered]);
-    }
+    // D1 (EOP-DD-KYCUBO-TS.1 §3, moves 2/6/7/8): assert-type carries only
+    // EntityRegistered; withdraw-member/correct-type additionally carry
+    // their Phase 2-promoted positional studs (MembershipActive,
+    // PriorTypeAsserted — tree-cleanup follow-up tranche, EOP-STATE-
+    // KYCUBO-D1 §4/§7); record-enquiry carries none (row 8: "group exists"
+    // is true by construction).
+    expected.insert("kyc.subject.assert-type".to_string(), vec![Precondition::EntityRegistered]);
+    expected.insert(
+        "kyc.subject.correct-type".to_string(),
+        vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],
+    );
+    expected.insert(
+        "kyc.subject.withdraw-member".to_string(),
+        vec![Precondition::EntityRegistered, Precondition::MembershipActive],
+    );
     expected.insert("kyc.subject.record-enquiry".to_string(), vec![]);
 
     assert_eq!(
@@ -1081,6 +1086,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             verify_entry,
             &asserted_only,
             &empty_obligation,
+            &TypeRegistryState::default(),
             &probe("ubo.edge.verify", TargetBinding::for_edge(subject, edge)),
         )
         .is_err(),
@@ -1093,6 +1099,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             verify_entry,
             &evidenced,
             &empty_obligation,
+            &TypeRegistryState::default(),
             &probe("ubo.edge.verify", TargetBinding::for_edge(subject, edge)),
         )
         .is_ok(),
@@ -1140,6 +1147,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
                 select_entry,
                 &supported,
                 &empty_obligation,
+                &TypeRegistryState::default(),
                 &probe(
                     "ubo.determination.select-strategy",
                     TargetBinding::for_subject(subject)
@@ -1162,6 +1170,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             select_entry,
             &unclassified,
             &empty_obligation,
+            &TypeRegistryState::default(),
             &probe(
                 "ubo.determination.select-strategy",
                 TargetBinding::for_subject(subject)
@@ -1181,6 +1190,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         check_control_preconditions(
             compute_fold_entry,
             &not_ready,
+            &TypeRegistryState::default(),
             &probe(
                 "ubo.determination.compute-fold",
                 TargetBinding::for_subject(subject)
@@ -1198,6 +1208,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         check_control_preconditions(
             compute_fold_entry,
             &ready,
+            &TypeRegistryState::default(),
             &probe(
                 "ubo.determination.compute-fold",
                 TargetBinding::for_subject(subject)
@@ -1593,69 +1604,51 @@ fn new_edge_kinds_are_not_traversed_as_control() {
     }
 }
 
-// ── D1 corrective tranche Item 3 — op-layer-only studs ──────────────────────
+// ── D1 corrective tranche Item 3, closed by Phase 2 (tree-cleanup follow-up,
+//    EOP-STATE-KYCUBO-D1 §4/§7) — op-layer-only studs promoted ────────────
 
-/// Two positional studs on the D1 type-registry moves have no `Precondition`
-/// primitive and are enforced as hand-rolled `TypeRegistryState` checks
-/// instead of through the unified `check_preconditions`/`check_control_
-/// preconditions` oracle:
+/// D1's Item 3 pinned TWO op-layer-only studs (`kyc.subject.withdraw-member`'s
+/// "membership must be active", `kyc.subject.correct-type`'s "a type was
+/// already asserted") that had no `Precondition` primitive and were
+/// hand-duplicated in the op layer and the board preview, because the
+/// checker's signature could not see `TypeRegistryState` at all.
 ///
-/// 1. `kyc.subject.withdraw-member` — "membership must be active (not
-///    already withdrawn)" (TS.1 §3 row 6's positional half; `EntityRegistered`
-///    covers "membership exists" but not "and is still active").
-/// 2. `kyc.subject.correct-type` — "a type was already asserted" (TS.1 §3
-///    row 7's implicit positional constraint — "nothing to correct
-///    otherwise, that is assert-type's job").
-///
-/// **Assessed (Item 3b), not acted on:** could either be expressed as a
-/// `Precondition` the unified checker evaluates? NO for both — the checker's
-/// signature, `check_preconditions(entry, &ControlState, &ObligationState,
-/// event)` (T6.1(a)), does not accept `&TypeRegistryState` at all. Both
-/// studs read `TypeRegistryState` (`is_withdrawn`/`type_of`), which is
-/// simply not in scope for the checker as it stands. Promoting either to a
-/// real `Precondition` variant requires widening the checker to a third
-/// state axis — a signature change to a function every existing
-/// lexicon-declared stud already depends on — which is exactly the kind of
-/// checker rewrite the D1 tranche's own discipline (T6.1(a) extended via a
-/// new `ControlState`-only `Precondition::EntityRegistered` variant, NOT a
-/// signature change) chose to avoid and report rather than do silently.
-/// Not a small ratified change to wave through inline; flagged here for a
-/// separate decision, per the instruction not to act on it unilaterally.
-///
-/// **The consequence today:** each stud is duplicated by hand in two
-/// places that must be kept in sync by a human, not by the type system —
-/// the exact defect class `every_precondition_carrying_verb_is_reached_by_
-/// the_checker`/`precondition_carrying_verbs_actually_enforce_their_stud`
-/// exist to prevent for lexicon-declared studs, but cannot reach these two
-/// because they are not lexicon-declared at all:
-/// - the op (`src/domain_ops/kyc_stream_ops.rs`,
-///   `KycSubjectWithdrawMember`/`KycSubjectCorrectType::execute`)
-/// - the board preview (`crates/ob-poc-kyc-substrate/src/placement.rs`,
-///   `type_registry_candidates`)
-///
-/// This tooth pins the exact set (source-scanned in both files, plus the
-/// checker's own signature) so the divergence is visible and load-bearing,
-/// not folklore a future edit can silently break by touching only one side.
+/// Phase 2 widened `check_preconditions`/`check_control_preconditions` to
+/// accept `&TypeRegistryState` (threaded through the real append chokepoint,
+/// `ob-poc-kyc-store::PgKycEventStore::append`, and every other caller),
+/// promoted both studs to real `Precondition` variants
+/// (`MembershipActive`, `PriorTypeAsserted`), and deleted both hand-rolled
+/// copies. This tooth now pins the CLOSED state: the pinned op-layer-only
+/// set is EMPTY, not two. `no_stud_is_duplicated` (below) is the structural
+/// companion — it pins the absence of the deleted hand-rolled markers.
 #[test]
 fn op_layer_only_studs_are_exactly_known() {
-    // (a) Neither verb's lexicon entry declares more than EntityRegistered
-    // — the two positional studs are NOT lexicon/Precondition-declared.
+    // (a) Both lexicon entries now declare the promoted Preconditions — the
+    // studs are lexicon/Precondition-declared, no longer op-layer-only.
     let lexicon = phase1_lexicon();
-    for fqn in ["kyc.subject.withdraw-member", "kyc.subject.correct-type"] {
-        let entry = lexicon.get(fqn).unwrap_or_else(|| panic!("{fqn} must be in phase1_lexicon()"));
-        assert_eq!(
-            entry.preconditions,
-            vec![Precondition::EntityRegistered],
-            "{fqn}: lexicon-declared preconditions changed — if a stud was promoted \
-             into a real Precondition variant here, this tooth's whole premise \
-             (\"two op-layer-only studs\") needs re-deriving, not just re-pinning"
-        );
-    }
+    let withdraw_entry = lexicon
+        .get("kyc.subject.withdraw-member")
+        .expect("kyc.subject.withdraw-member must be in phase1_lexicon()");
+    assert_eq!(
+        withdraw_entry.preconditions,
+        vec![Precondition::EntityRegistered, Precondition::MembershipActive],
+        "withdraw-member must declare the promoted MembershipActive precondition \
+         alongside EntityRegistered — if this reverts to just EntityRegistered, \
+         the stud silently went back to being op-layer-only"
+    );
+    let correct_entry = lexicon
+        .get("kyc.subject.correct-type")
+        .expect("kyc.subject.correct-type must be in phase1_lexicon()");
+    assert_eq!(
+        correct_entry.preconditions,
+        vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],
+        "correct-type must declare the promoted PriorTypeAsserted precondition \
+         alongside EntityRegistered — if this reverts to just EntityRegistered, \
+         the stud silently went back to being op-layer-only"
+    );
 
-    // (b) The checker's own signature does not accept TypeRegistryState —
-    // the structural reason neither stud CAN be expressed as a
-    // Precondition today (Item 3b's "NO" answer, pinned so it can't
-    // silently become stale if the signature is ever widened).
+    // (b) The checker's own signature now DOES accept TypeRegistryState —
+    // the structural precondition for both promotions above.
     let sig_marker = "pub fn check_preconditions(";
     let sig_start = CONTROL_FOLD_SRC
         .find(sig_marker)
@@ -1666,49 +1659,67 @@ fn op_layer_only_studs_are_exactly_known() {
         .expect("check_preconditions signature must close with its return type");
     let signature = &CONTROL_FOLD_SRC[sig_start..sig_end];
     assert!(
-        !signature.contains("TypeRegistryState"),
-        "check_preconditions now accepts TypeRegistryState — Item 3's two op-layer-\
-         only studs may be promotable to real Preconditions; this tooth's \"NO\" \
-         finding is stale and must be re-assessed, not left as dead commentary. \
-         Signature was: {signature}"
+        signature.contains("TypeRegistryState"),
+        "check_preconditions must accept TypeRegistryState now that both former \
+         op-layer-only studs are promoted through it. Signature was: {signature}"
     );
+}
 
-    // (c) Both hand-rolled op-layer checks exist, in both files, doing the
-    // SAME thing — the actual duplication this tooth exists to keep
-    // visible. Textual, not semantic: a rewrite that changes wording but
-    // keeps the TypeRegistryState-direct-check shape should NOT need to
-    // touch this tooth; a rewrite that removes the duplication (e.g. by
-    // deleting one side, or by promoting the stud to a real Precondition)
-    // SHOULD, and will fail here first.
+/// Structural companion to `op_layer_only_studs_are_exactly_known`: pins
+/// that NO hand-rolled `TypeRegistryState` precondition logic for
+/// withdraw-member/correct-type remains in the op layer
+/// (`src/domain_ops/kyc_stream_ops.rs`) or the board preview
+/// (`crates/ob-poc-kyc-substrate/src/placement.rs`) — both now consult the
+/// single `check_preconditions`/`check_control_preconditions` checker only.
+/// Source-scanned, not semantic: if either of these markers reappears
+/// verbatim, the duplication this whole tooth family exists to prevent has
+/// silently come back.
+#[test]
+fn no_stud_is_duplicated() {
     let op_markers = [
-        ("kyc_stream_ops.rs::KycSubjectWithdrawMember", KYC_STREAM_OPS_SRC, "type_registry.is_withdrawn(entity)"),
-        ("kyc_stream_ops.rs::KycSubjectCorrectType", KYC_STREAM_OPS_SRC, "type_registry.type_of(entity).is_none()"),
+        ("kyc_stream_ops.rs", "type_registry.is_withdrawn(entity)"),
+        ("kyc_stream_ops.rs", "type_registry.type_of(entity).is_none()"),
     ];
-    for (label, src, marker) in op_markers {
+    for (label, marker) in op_markers {
         assert!(
-            src.contains(marker),
-            "{label}: expected op-layer hand-rolled check {marker:?} not found — \
-             either the duplication was resolved (update this tooth consciously) \
-             or the check moved/renamed unexpectedly"
+            !KYC_STREAM_OPS_SRC.contains(marker),
+            "{label}: found the deleted hand-rolled check {marker:?} — the \
+             withdraw-member/correct-type stud duplication has come back; both \
+             must be enforced solely by check_preconditions inside stream_append"
         );
     }
 
+    // Scoped to the withdraw-member/correct-type blocks specifically —
+    // `attach-evidence`'s type-scoped half (a legitimate, DIFFERENT,
+    // never-duplicated positional check) uses the same
+    // `type_registry.is_withdrawn`/`type_registry.type_of` calls in its own
+    // right and must not false-positive this tooth.
     let placement_src = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/crates/ob-poc-kyc-substrate/src/placement.rs"
     ))
     .expect("read placement.rs");
-    let placement_markers = [
-        "!type_registry.is_withdrawn(entity)",
-        "type_registry.type_of(entity).is_some()",
-    ];
-    for marker in placement_markers {
-        assert!(
-            placement_src.contains(marker),
-            "placement.rs::type_registry_candidates: expected board-preview \
-             hand-rolled check {marker:?} not found — either the duplication was \
-             resolved (update this tooth consciously) or the check moved/renamed \
-             unexpectedly"
-        );
-    }
+    let withdraw_block_start = placement_src
+        .find("if let Some(entry) = withdraw_member_entry {")
+        .expect("withdraw_member_entry block must exist in placement.rs");
+    let correct_block_start = placement_src
+        .find("if let Some(entry) = correct_type_entry {")
+        .expect("correct_type_entry block must exist in placement.rs");
+    let attach_evidence_start = placement_src
+        .find("// attach-evidence, type-scoped half")
+        .expect("attach-evidence type-scoped comment must exist in placement.rs");
+    let withdraw_block = &placement_src[withdraw_block_start..correct_block_start];
+    let correct_block = &placement_src[correct_block_start..attach_evidence_start];
+    assert!(
+        !withdraw_block.contains("is_withdrawn"),
+        "placement.rs::type_registry_candidates (withdraw-member block): found a \
+         hand-rolled is_withdrawn check — the board-preview side of the stud \
+         duplication has come back; it must consult check_control_preconditions only"
+    );
+    assert!(
+        !correct_block.contains("type_of(entity)"),
+        "placement.rs::type_registry_candidates (correct-type block): found a \
+         hand-rolled type_of check — the board-preview side of the stud \
+         duplication has come back; it must consult check_control_preconditions only"
+    );
 }

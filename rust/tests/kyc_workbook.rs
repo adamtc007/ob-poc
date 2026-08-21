@@ -522,7 +522,7 @@ async fn stale_snapshot_recovers() {
             &registry,
             &assert_event,
             "(setup-assert)",
-            |_, _| Ok(()),
+            |_, _, _| Ok(()),
         )
         .await
         .unwrap();
@@ -542,7 +542,7 @@ async fn stale_snapshot_recovers() {
             &registry,
             &evidence_event,
             "(setup-evidence)",
-            |_, _| Ok(()),
+            |_, _, _| Ok(()),
         )
         .await
         .unwrap();
@@ -587,7 +587,7 @@ async fn stale_snapshot_recovers() {
         // entry declares. The comment below described the pre-T6.2 state; the
         // bypass, not the (now-stale) "no precondition" premise, is why this
         // still succeeds.
-        let outcome = append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_, _| Ok(()))
+        let outcome = append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_, _, _| Ok(()))
             .await
             .expect("concurrent supersede must itself succeed (raw append bypasses the checker, same as the setup events above)");
         scope2.commit().await;

@@ -53,7 +53,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, map_principal};
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_preconditions, enumerate_placement_set, fold_type_registry, phase1_lexicon, preview,
+    check_preconditions, enumerate_placement_set, phase1_lexicon, preview,
     render_intent_event_to_sexpr, AuthorityRef, ControlState, EdgeId, EntityId, FoldRegistry,
     IntentEvent, KycError, LexiconManifest, MoveId, ObligationId, ObligationState, PersonId,
     SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
@@ -246,26 +246,19 @@ fn sexpr_to_parsed_move(
 /// Fold `committed ++ staged` over the pinned kit — the re-run-whole
 /// reconstruction (KIT-4) shared by `validate()` and `stage()`'s frontier
 /// computation. Pure; no store dependency. Returns all three folds
-/// (T6.1(a) extended to the type-registry axis, TS.1 D1 tranche):
-/// `enumerate_placement_set`'s frontier computation now also needs
-/// `TypeRegistryState` for the geometry gate. `check_preconditions` itself
-/// is unchanged — it never reads the type-registry axis, so `preview()`'s
-/// own signature stays untouched; the type-registry fold runs alongside it
-/// here, over the same `committed ++ candidates` slice `preview` already
-/// validated (a total, unconditional fold — TS.1 §3 moves carry no
-/// `check_preconditions`-style stud, only the positional checks
-/// `enumerate_placement_set`'s `type_registry_candidates` already applied
-/// before any of them could have been staged).
+/// (T6.1(a) extended to the type-registry axis, TS.1 D1 tranche;
+/// Phase 2 of the tree-cleanup follow-up tranche, EOP-STATE-KYCUBO-D1 §4,
+/// promoted `MembershipActive`/`PriorTypeAsserted` into real
+/// `Precondition`s, so `check_preconditions` now genuinely reads
+/// `TypeRegistryState` — `preview()` folds and validates against it
+/// directly, so this is a thin pass-through, not a second independent fold).
 fn folded_state(
     committed: &[IntentEvent],
     staged: &[StagedMove],
     kit: &LexiconManifest,
 ) -> Result<(ControlState, ObligationState, TypeRegistryState), KycError> {
     let candidates: Vec<IntentEvent> = staged.iter().map(|m| m.event.clone()).collect();
-    let (control, obligation) = preview(committed, &candidates, kit)?;
-    let all_refs: Vec<&IntentEvent> = committed.iter().chain(candidates.iter()).collect();
-    let type_registry = fold_type_registry(&all_refs);
-    Ok((control, obligation, type_registry))
+    preview(committed, &candidates, kit)
 }
 
 /// Open a workbook: load the committed history and pin the current kit
@@ -405,11 +398,11 @@ impl KycWorkbook {
                 registry,
                 &staged.event,
                 &staged.source_text,
-                |control: &ControlState, obligation: &ObligationState| {
+                |control: &ControlState, obligation: &ObligationState, type_registry: &TypeRegistryState| {
                     let entry = kit.get(staged.event.verb_fqn.as_str()).ok_or_else(|| {
                         KycError::UnknownVerb(staged.event.verb_fqn.clone())
                     })?;
-                    check_preconditions(entry, control, obligation, &staged.event)
+                    check_preconditions(entry, control, obligation, type_registry, &staged.event)
                 },
             )
             .await?;

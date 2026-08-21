@@ -18,6 +18,7 @@ use crate::error::KycError;
 use crate::event::IntentEvent;
 use crate::fold::control::{apply_one_control_event, check_preconditions, fold_control, ControlState};
 use crate::fold::obligation::{apply_one_obligation_event, fold_obligations, ObligationState};
+use crate::fold::type_registry::{fold_type_registry, TypeRegistryState};
 use crate::lexicon::LexiconManifest;
 
 /// Fold `committed ++ candidates` into the resulting `(ControlState,
@@ -32,19 +33,26 @@ pub fn preview(
     committed: &[IntentEvent],
     candidates: &[IntentEvent],
     lexicon: &LexiconManifest,
-) -> Result<(ControlState, ObligationState), KycError> {
+) -> Result<(ControlState, ObligationState, TypeRegistryState), KycError> {
     let committed_refs: Vec<&IntentEvent> = committed.iter().collect();
     let mut control = fold_control(&committed_refs);
     let mut obligation = fold_obligations(&committed_refs);
+    // No incremental `apply_one_type_registry_event` exists — refold the
+    // growing prefix each step, same as T6.1(a)'s obligation threading
+    // pattern for a fold with no incremental applier.
+    let mut refs_so_far: Vec<&IntentEvent> = committed_refs;
+    let mut type_registry = fold_type_registry(&refs_so_far);
 
     for candidate in candidates {
         let entry = lexicon
             .get(candidate.verb_fqn.as_str())
             .ok_or_else(|| KycError::UnknownVerb(candidate.verb_fqn.clone()))?;
-        check_preconditions(entry, &control, &obligation, candidate)?;
+        check_preconditions(entry, &control, &obligation, &type_registry, candidate)?;
         control = apply_one_control_event(control, candidate);
         obligation = apply_one_obligation_event(obligation, candidate);
+        refs_so_far.push(candidate);
+        type_registry = fold_type_registry(&refs_so_far);
     }
 
-    Ok((control, obligation))
+    Ok((control, obligation, type_registry))
 }

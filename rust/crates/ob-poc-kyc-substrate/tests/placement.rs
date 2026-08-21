@@ -184,7 +184,8 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
                 serde_json::Value::Null,
                 chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap(),
             );
-            let oracle_says_legal = check_control_preconditions(entry, state, &probe).is_ok();
+            let oracle_says_legal =
+                check_control_preconditions(entry, state, &empty_type_registry(), &probe).is_ok();
             let set_says_legal = set.admits(fqn, &target);
             assert_eq!(
                 oracle_says_legal, set_says_legal,

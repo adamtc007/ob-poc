@@ -24,7 +24,7 @@ use ob_poc_kyc_substrate::{
     recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
     DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
     IntentEvent, ObligationId, ObligationState, OwnershipProngStrategy, PersonId, Principal, Prong,
-    RecoveryPin, SmoResult, SubjectId, TargetBinding, V1FoldImpl,
+    RecoveryPin, SmoResult, SubjectId, TargetBinding, TypeRegistryState, V1FoldImpl,
 };
 use std::sync::Arc;
 
@@ -467,7 +467,8 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         idem("fold"),
         t,
     );
-    let result = check_control_preconditions(compute_entry, &control, &dummy_event);
+    let result =
+        check_control_preconditions(compute_entry, &control, &TypeRegistryState::default(), &dummy_event);
     assert!(result.is_err(), "compute-fold without reconcile must fail");
 }
 
@@ -543,7 +544,8 @@ fn ec3_verify_without_evidence_is_rejected() {
         idem("verify-attempt"),
         t,
     );
-    let result = check_control_preconditions(verify_entry, &control, &verify_event);
+    let result =
+        check_control_preconditions(verify_entry, &control, &TypeRegistryState::default(), &verify_event);
     assert!(result.is_err(), "verify without evidence must fail (K-11)");
 
     // Verify the error is the right kind.
@@ -616,7 +618,8 @@ fn ec3_verify_after_evidence_succeeds() {
         idem("verify"),
         t,
     );
-    let result = check_control_preconditions(verify_entry, &control, &verify_event);
+    let result =
+        check_control_preconditions(verify_entry, &control, &TypeRegistryState::default(), &verify_event);
     assert!(
         result.is_ok(),
         "verify after evidence must pass: {:?}",

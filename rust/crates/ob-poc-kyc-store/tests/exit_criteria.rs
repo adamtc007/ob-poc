@@ -86,7 +86,7 @@ async fn exit6_replay_no_redispatch() {
 
     // Append one event (which enqueues outbox projection effects).
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, &registry, &register_event(subject, "reg"), "(test-event)", |_, _| {
+    PgKycEventStore::append(&mut tx, &registry, &register_event(subject, "reg"), "(test-event)", |_, _, _| {
         Ok(())
     })
     .await

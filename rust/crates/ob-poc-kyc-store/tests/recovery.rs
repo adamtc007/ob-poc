@@ -78,7 +78,7 @@ fn assert_control(subject: SubjectId, to: Uuid, idem: &str) -> IntentEvent {
 
 async fn append_committed(pool: &PgPool, registry: &FoldRegistry, ev: &IntentEvent) {
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, registry, ev, "(test-event)", |_, _| Ok(()))
+    PgKycEventStore::append(&mut tx, registry, ev, "(test-event)", |_, _, _| Ok(()))
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -208,7 +208,7 @@ async fn committed_at_is_monotonic_with_seq_under_adversarial_begin_order() {
     // tx_a begins later, inserts seq0, commits.
     {
         let mut tx_a = pool.begin().await.unwrap();
-        PgKycEventStore::append(&mut tx_a, &registry, &register(subject), "(test-event)", |_, _| Ok(()))
+        PgKycEventStore::append(&mut tx_a, &registry, &register(subject), "(test-event)", |_, _, _| Ok(()))
             .await
             .unwrap();
         tx_a.commit().await.unwrap();
@@ -220,7 +220,7 @@ async fn committed_at_is_monotonic_with_seq_under_adversarial_begin_order() {
         &registry,
         &assert_control(subject, Uuid::new_v4(), "adversarial"),
         "(test-event)",
-        |_, _| Ok(()),
+        |_, _, _| Ok(()),
     )
     .await
     .unwrap();
@@ -258,14 +258,14 @@ async fn append_captures_source() {
 
     {
         let mut tx = pool.begin().await.unwrap();
-        PgKycEventStore::append(&mut tx, &registry, &reg_event, &reg_source, |_, _| Ok(()))
+        PgKycEventStore::append(&mut tx, &registry, &reg_event, &reg_source, |_, _, _| Ok(()))
             .await
             .unwrap();
         tx.commit().await.unwrap();
     }
     {
         let mut tx = pool.begin().await.unwrap();
-        PgKycEventStore::append(&mut tx, &registry, &ctrl_event, &ctrl_source, |_, _| Ok(()))
+        PgKycEventStore::append(&mut tx, &registry, &ctrl_event, &ctrl_source, |_, _, _| Ok(()))
             .await
             .unwrap();
         tx.commit().await.unwrap();

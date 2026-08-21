@@ -35,7 +35,7 @@ use ob_poc::domain_ops::kyc_stream_ops::{
 use ob_poc::domain_ops::kyc_workbook::KycWorkbook;
 use ob_poc_kyc_substrate::{
     check_preconditions, phase1_lexicon, ControlState, FoldRegistry, ObligationState,
-    StructureClass, SubjectId, V1FoldImpl,
+    StructureClass, SubjectId, TypeRegistryState, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -166,6 +166,7 @@ fn precondition_blocks_illegal_placement() {
         select_entry,
         &unclassified,
         &empty_obligation,
+        &TypeRegistryState::default(),
         &probe(subject, "ubo.determination.select-strategy"),
     );
     assert!(
@@ -190,6 +191,7 @@ fn precondition_blocks_illegal_placement() {
         freeze_entry,
         &unclassified_ready,
         &empty_obligation,
+        &TypeRegistryState::default(),
         &probe(subject, "ubo.determination.freeze"),
     );
     assert!(
@@ -213,6 +215,7 @@ fn precondition_admits_legal_placement() {
             select_entry,
             &pc_state,
             &empty_obligation,
+            &TypeRegistryState::default(),
             &probe(subject, "ubo.determination.select-strategy"),
         )
         .is_ok(),
@@ -226,6 +229,7 @@ fn precondition_admits_legal_placement() {
             freeze_entry,
             &pc_ready,
             &empty_obligation,
+            &TypeRegistryState::default(),
             &probe(subject, "ubo.determination.freeze"),
         )
         .is_ok(),
@@ -258,6 +262,7 @@ fn checker_sees_both_folds() {
             &synthetic_entry,
             &empty_control,
             &not_decided,
+            &TypeRegistryState::default(),
             &probe(subject, "kyc.obligation.create"),
         )
         .is_ok(),
@@ -283,6 +288,7 @@ fn checker_sees_both_folds() {
         &synthetic_entry,
         &empty_control,
         &decided,
+        &TypeRegistryState::default(),
         &probe(subject, "kyc.obligation.create"),
     );
     assert!(

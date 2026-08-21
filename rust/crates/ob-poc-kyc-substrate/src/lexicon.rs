@@ -103,6 +103,22 @@ pub enum Precondition {
     /// generic per-entry probing) is vacuously satisfied, mirroring
     /// `NoDuplicateActiveEdge`/`NotAlreadyRegistered`.
     EntityRegistered,
+
+    // ── D1 tree-cleanup follow-up, Phase 2 (EOP-STATE-KYCUBO-D1 §4/§7) ──────
+    // Promotes the two studs that were hand-duplicated in the op layer
+    // (`src/domain_ops/kyc_stream_ops.rs`) and the board preview
+    // (`placement.rs::type_registry_candidates`) into real `Precondition`
+    // primitives, evaluated by the single `check_preconditions` checker —
+    // `TypeRegistryState`-only, mirroring `EntityRegistered`'s vacuous-when-
+    // probed convention exactly.
+    /// `target.entity_id` must not be withdrawn in `TypeRegistryState`
+    /// (TS.1 §3 row 6 — `withdraw-member`'s "membership must be active").
+    MembershipActive,
+    /// `target.entity_id` must already have a type asserted in
+    /// `TypeRegistryState` (TS.1 §3 row 7 — `correct-type`'s "a type was
+    /// already asserted"; nothing to correct otherwise, that's
+    /// `assert-type`'s job).
+    PriorTypeAsserted,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -578,7 +594,7 @@ pub fn phase1_lexicon() -> LexiconManifest {
              stale; never silently deletes",
             Taxonomy::Subject,
             smallvec![FoldId::TypeRegistry],
-            vec![Precondition::EntityRegistered],
+            vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -588,7 +604,7 @@ pub fn phase1_lexicon() -> LexiconManifest {
              flags membership, never deletes (TS.1 §2c basket-of-references)",
             Taxonomy::Subject,
             smallvec![FoldId::TypeRegistry],
-            vec![Precondition::EntityRegistered],
+            vec![Precondition::EntityRegistered, Precondition::MembershipActive],
             AuthoritySpec::analyst(),
             vec![],
         ),

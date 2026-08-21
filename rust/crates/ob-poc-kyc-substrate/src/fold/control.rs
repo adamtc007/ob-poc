@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::event::IntentEvent;
+use crate::fold::type_registry::TypeRegistryState;
 use crate::types::{EdgeId, EntityId, EventId, PersonId};
 
 // ── Edge kind ─────────────────────────────────────────────────────────────────
@@ -617,6 +618,7 @@ pub fn check_preconditions(
     lexicon_entry: &LexiconEntry,
     control: &ControlState,
     obligation: &ObligationState,
+    type_registry: &TypeRegistryState,
     event: &IntentEvent,
 ) -> Result<(), KycError> {
     for pre in &lexicon_entry.preconditions {
@@ -838,6 +840,39 @@ pub fn check_preconditions(
                     });
                 }
             }
+            Precondition::MembershipActive => {
+                // TS.1 §3 row 6 ("membership must be active" — not already
+                // withdrawn). Vacuous when the probe carries no `entity_id`,
+                // same convention as `EntityRegistered` above.
+                if let Some(EntityId(eid)) = event.target.entity_id {
+                    if type_registry.is_withdrawn(EntityId(eid)) {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!(
+                                "entity {eid:?} is already withdrawn — membership must be \
+                                 active (TS.1 §3 row 6)"
+                            ),
+                        });
+                    }
+                }
+            }
+            Precondition::PriorTypeAsserted => {
+                // TS.1 §3 row 7 ("a type was already asserted" — nothing to
+                // correct otherwise, that's assert-type's job). Vacuous when
+                // the probe carries no `entity_id`, same convention as
+                // `EntityRegistered` above.
+                if let Some(EntityId(eid)) = event.target.entity_id {
+                    if type_registry.type_of(EntityId(eid)).is_none() {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!(
+                                "entity {eid:?} has no prior type assertion to correct — use \
+                                 kyc.subject.assert-type instead (TS.1 §3 row 7)"
+                            ),
+                        });
+                    }
+                }
+            }
         }
     }
     Ok(())
@@ -851,9 +886,10 @@ pub fn check_preconditions(
 pub fn check_control_preconditions(
     lexicon_entry: &LexiconEntry,
     state: &ControlState,
+    type_registry: &TypeRegistryState,
     event: &IntentEvent,
 ) -> Result<(), KycError> {
-    check_preconditions(lexicon_entry, state, &ObligationState::default(), event)
+    check_preconditions(lexicon_entry, state, &ObligationState::default(), type_registry, event)
 }
 
 // ── Economic edge summary (for determination strategy) ────────────────────────

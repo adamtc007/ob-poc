@@ -435,11 +435,11 @@ async fn run_sequential(
             registry,
             &staged.event,
             &staged.source_text,
-            |control, obligation| {
+            |control, obligation, type_registry| {
                 let entry = kit.get(staged.event.verb_fqn.as_str()).ok_or_else(|| {
                     ob_poc_kyc_substrate::KycError::UnknownVerb(staged.event.verb_fqn.clone())
                 })?;
-                check_preconditions(entry, control, obligation, &staged.event)
+                check_preconditions(entry, control, obligation, type_registry, &staged.event)
             },
         )
         .await;

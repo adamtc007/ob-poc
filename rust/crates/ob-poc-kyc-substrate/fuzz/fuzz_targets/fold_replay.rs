@@ -23,9 +23,9 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use ob_poc_kyc_substrate::{
-    check_preconditions, fold_control, fold_obligations, natural_persons_from_events,
-    phase1_lexicon, recover_determination_at, Hash, LexiconManifest, OwnershipProngStrategy,
-    RecoveryPin,
+    check_preconditions, fold_control, fold_obligations, fold_type_registry,
+    natural_persons_from_events, phase1_lexicon, recover_determination_at, Hash, LexiconManifest,
+    OwnershipProngStrategy, RecoveryPin,
 };
 use ob_poc_kyc_substrate_fuzz::{gen_events, Tape};
 use uuid::Uuid;
@@ -61,7 +61,8 @@ fuzz_target!(|data: &[u8]| {
     // its real lexicon entry when the generator picked a known verb FQN.
     if let Some(last) = events.last() {
         if let Some(entry) = lexicon().entries.get(last.verb_fqn.as_str()) {
-            let _ = check_preconditions(entry, &control1, &obligations1, last);
+            let type_registry1 = fold_type_registry(&refs);
+            let _ = check_preconditions(entry, &control1, &obligations1, &type_registry1, last);
         }
     }
 

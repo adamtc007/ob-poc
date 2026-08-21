@@ -236,11 +236,12 @@ fn is_type_registry_move(fqn: &str) -> bool {
 
 /// The four D1 TS.1 §3 moves now in `phase1_lexicon()` (module doc), plus
 /// the type-scoped half of `attach-evidence` — the edge-scoped half stays
-/// handled entirely by the main `lexicon.entries` loop, unchanged.
-/// Lexicon-declared studs (`EntityRegistered`) are checked via the REAL
-/// `check_control_preconditions` oracle; the two studs with no
-/// `Precondition` primitive (membership-active, prior-type-exists) are
-/// checked directly against `TypeRegistryState`, op-layer-style.
+/// handled entirely by the main `lexicon.entries` loop, unchanged. All
+/// lexicon-declared studs — `EntityRegistered`, and (Phase 2 of the
+/// tree-cleanup follow-up tranche, EOP-STATE-KYCUBO-D1 §4/§7)
+/// `MembershipActive`/`PriorTypeAsserted` — are checked via the single REAL
+/// `check_control_preconditions` oracle; no hand-rolled `TypeRegistryState`
+/// check remains here for withdraw-member/correct-type.
 fn type_registry_candidates(
     subject: SubjectId,
     state: &ControlState,
@@ -274,7 +275,7 @@ fn type_registry_candidates(
         // regardless of any prior type.
         if let Some(entry) = assert_type_entry {
             let probe = probe_event(subject, ASSERT_TYPE, target.clone());
-            if check_control_preconditions(entry, state, &probe).is_ok() {
+            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
                 moves.push(LegalMove {
                     move_id: entity_move_id(ASSERT_TYPE, entity),
                     verb_fqn: VerbFqn(ASSERT_TYPE.to_string()),
@@ -284,14 +285,12 @@ fn type_registry_candidates(
         }
 
         // withdraw-member (row 6): "membership exists and is active" —
-        // EntityRegistered via the oracle, plus "not already withdrawn"
-        // (no Precondition primitive; TypeRegistryState-only, checked here
-        // directly, same discipline as pierce-nominee's op-layer kind check).
+        // EntityRegistered + MembershipActive, both via the oracle (Phase 2:
+        // MembershipActive is a real Precondition now, not a hand-rolled
+        // TypeRegistryState check here).
         if let Some(entry) = withdraw_member_entry {
             let probe = probe_event(subject, WITHDRAW_MEMBER, target.clone());
-            if check_control_preconditions(entry, state, &probe).is_ok()
-                && !type_registry.is_withdrawn(entity)
-            {
+            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
                 moves.push(LegalMove {
                     move_id: entity_move_id(WITHDRAW_MEMBER, entity),
                     verb_fqn: VerbFqn(WITHDRAW_MEMBER.to_string()),
@@ -305,9 +304,7 @@ fn type_registry_candidates(
         // to correct otherwise, that is assert-type's job).
         if let Some(entry) = correct_type_entry {
             let probe = probe_event(subject, CORRECT_TYPE, target.clone());
-            if check_control_preconditions(entry, state, &probe).is_ok()
-                && type_registry.type_of(entity).is_some()
-            {
+            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
                 moves.push(LegalMove {
                     move_id: entity_move_id(CORRECT_TYPE, entity),
                     verb_fqn: VerbFqn(CORRECT_TYPE.to_string()),
@@ -376,7 +373,7 @@ pub fn enumerate_placement_set(
 
         for target in targets {
             let probe = probe_event(subject, fqn, target.clone());
-            if check_preconditions(entry, state, obligation, &probe).is_ok() {
+            if check_preconditions(entry, state, obligation, type_registry, &probe).is_ok() {
                 let id = move_id_for(fqn, &target);
                 candidates.insert(
                     id.clone(),

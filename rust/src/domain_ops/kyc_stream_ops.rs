@@ -78,9 +78,9 @@ async fn stream_append(
     .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
     let source_text = render_intent_event_to_sexpr(&event, render_entry);
 
-    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation| {
+    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation, type_registry| {
         if let Some(e) = entry {
-            check_preconditions(e, control, obligation, &event)?;
+            check_preconditions(e, control, obligation, type_registry, &event)?;
         }
         Ok(())
     })
@@ -144,8 +144,8 @@ impl SemOsVerbOp for UboEdgeAssertControl {
         .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
         let source_text = render_intent_event_to_sexpr(&event, Some(entry));
 
-        let outcome = append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation| {
-            check_preconditions(entry, control, obligation, &event)
+        let outcome = append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation, type_registry| {
+            check_preconditions(entry, control, obligation, type_registry, &event)
         })
         .await
         .map_err(|e| anyhow!("ubo.edge.assert-control append failed: {e}"))?;
@@ -539,6 +539,7 @@ impl SemOsVerbOp for UboDeterminationComputeFold {
         let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
         let state = ob_poc_kyc_substrate::fold_control_versioned(&refs, &KYC_REGISTRY)
             .map_err(|e| anyhow!("compute-fold failed: {e}"))?;
+        let type_registry = ob_poc_kyc_substrate::fold_type_registry(&refs);
 
         // T6-tooth fix (2026-08-12, EOP-PLAN-KYCUBO-KIT-001 Part A): compute-fold's
         // lexicon entry declares [ReconciledProjection, StrategySelected] (K-14),
@@ -567,7 +568,7 @@ impl SemOsVerbOp for UboDeterminationComputeFold {
             serde_json::Value::Null,
             ctx.as_of,
         );
-        check_control_preconditions(entry, &state, &probe)
+        check_control_preconditions(entry, &state, &type_registry, &probe)
             .map_err(|e| anyhow!("ubo.determination.compute-fold precondition failed: {e}"))?;
 
         Ok(VerbExecutionOutcome::Record(serde_json::json!({
@@ -1118,14 +1119,12 @@ impl SemOsVerbOp for KycSubjectCorrectType {
         let control = fold_control_versioned(&refs, &KYC_REGISTRY)
             .map_err(|e| anyhow!("correct-type: control fold failed: {e}"))?;
         let type_registry = fold_type_registry(&refs);
-
-        if type_registry.type_of(entity).is_none() {
-            return Err(anyhow!(
-                "kyc.subject.correct-type: entity {} has no prior type assertion to correct — \
-                 use kyc.subject.assert-type instead",
-                entity.0
-            ));
-        }
+        // Phase 2 of the tree-cleanup follow-up tranche (EOP-STATE-KYCUBO-D1
+        // §4/§7): "prior type must exist" is no longer hand-checked here —
+        // it is `Precondition::PriorTypeAsserted`, enforced by the single
+        // `check_preconditions` checker inside `stream_append` below, under
+        // the append lock (TOCTOU-safe, an improvement over this pre-fetch
+        // fold, which could have raced a concurrent correction).
 
         let mut invalidated: std::collections::BTreeSet<EdgeId> = std::collections::BTreeSet::new();
         let mut known_tuples: Vec<(EdgeId, ob_poc_kyc_substrate::Pipe, ob_poc_kyc_substrate::EntityType, bool)> =
@@ -1188,11 +1187,11 @@ impl SemOsVerbOp for KycSubjectCorrectType {
     }
 }
 
-/// `kyc.subject.withdraw-member` — TS.1 move 6. Op-layer duty (no
-/// Precondition primitive exists for "not already withdrawn" —
-/// `TypeRegistryState`-only, same class as `correct-type`'s prior-type
-/// check above): membership must exist (`EntityRegistered`, lexicon-
-/// declared) AND be active (not already withdrawn).
+/// `kyc.subject.withdraw-member` — TS.1 move 6. Membership must exist
+/// (`EntityRegistered`) AND be active (`MembershipActive`, Phase 2 of the
+/// tree-cleanup follow-up tranche, EOP-STATE-KYCUBO-D1 §4/§7 — no longer
+/// hand-checked here; enforced by `check_preconditions` inside
+/// `stream_append` below, under the append lock, TOCTOU-safe).
 pub struct KycSubjectWithdrawMember;
 
 #[async_trait]
@@ -1208,19 +1207,6 @@ impl SemOsVerbOp for KycSubjectWithdrawMember {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let entity = EntityId(json_extract_uuid(args, ctx, "entity-id")?);
-
-        let events = PgKycEventStore::load_events(scope.executor(), subject)
-            .await
-            .map_err(|e| anyhow!("withdraw-member: load events failed: {e}"))?;
-        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-        let type_registry = fold_type_registry(&refs);
-        if type_registry.is_withdrawn(entity) {
-            return Err(anyhow!(
-                "kyc.subject.withdraw-member: entity {} is already withdrawn — membership must \
-                 be active (TS.1 §3 row 6)",
-                entity.0
-            ));
-        }
 
         let payload = serde_json::json!({ "entity_id": entity.0 });
         let outcome = stream_append(

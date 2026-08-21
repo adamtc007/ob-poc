@@ -180,7 +180,7 @@ async fn append_in_scope_commits_and_rolls_back_with_the_scope() {
     // Append inside a scope, then ROLL BACK the scope → the event is gone.
     {
         let mut scope = TestScope::begin(&pool).await;
-        append_in_scope(&mut scope, &registry, &event, "(test-event)", |_, _| Ok(()))
+        append_in_scope(&mut scope, &registry, &event, "(test-event)", |_, _, _| Ok(()))
             .await
             .unwrap();
         scope.rollback().await;
@@ -194,7 +194,7 @@ async fn append_in_scope_commits_and_rolls_back_with_the_scope() {
     // Append inside a scope, then COMMIT the scope → the event persists.
     {
         let mut scope = TestScope::begin(&pool).await;
-        let outcome = append_in_scope(&mut scope, &registry, &event, "(test-event)", |_, _| Ok(()))
+        let outcome = append_in_scope(&mut scope, &registry, &event, "(test-event)", |_, _, _| Ok(()))
             .await
             .unwrap();
         assert_eq!(outcome.seq, 0);
@@ -248,8 +248,10 @@ async fn lexicon_precondition_rejects_through_the_seam() {
         &registry,
         &verify_event,
         "(test-event)",
-        |state: &ControlState, _obligation: &ob_poc_kyc_substrate::ObligationState| {
-            check_control_preconditions(verify_entry, state, &verify_event)
+        |state: &ControlState,
+         _obligation: &ob_poc_kyc_substrate::ObligationState,
+         type_registry: &ob_poc_kyc_substrate::TypeRegistryState| {
+            check_control_preconditions(verify_entry, state, type_registry, &verify_event)
         },
     )
     .await;

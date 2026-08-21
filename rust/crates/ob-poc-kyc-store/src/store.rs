@@ -21,9 +21,9 @@ use sqlx::{PgConnection, Row};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, fold_obligations_versioned, AuthorityRef, CapturedEffect,
-    ControlState, EventId, FoldRegistry, Hash, IdemKey, IntentEvent, KycError, ObligationState,
-    Principal, SubjectId, TargetBinding, VerbFqn,
+    fold_control_versioned, fold_obligations_versioned, fold_type_registry, AuthorityRef,
+    CapturedEffect, ControlState, EventId, FoldRegistry, Hash, IdemKey, IntentEvent, KycError,
+    ObligationState, Principal, SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
 
 use crate::error::StoreError;
@@ -143,7 +143,7 @@ impl PgKycEventStore {
         validate: V,
     ) -> Result<AppendOutcome, StoreError>
     where
-        V: FnOnce(&ControlState, &ObligationState) -> Result<(), KycError>,
+        V: FnOnce(&ControlState, &ObligationState, &TypeRegistryState) -> Result<(), KycError>,
     {
         let subject = event.subject_root;
 
@@ -189,7 +189,8 @@ impl PgKycEventStore {
         let refs: Vec<&IntentEvent> = events.iter().collect();
         let state = fold_control_versioned(&refs, registry)?; // KycError -> StoreError::Rejected
         let obligation_state = fold_obligations_versioned(&refs, registry)?;
-        validate(&state, &obligation_state)?; // precondition failure -> StoreError::Rejected -> caller rolls back
+        let type_registry = fold_type_registry(&refs);
+        validate(&state, &obligation_state, &type_registry)?; // precondition failure -> StoreError::Rejected -> caller rolls back
 
         // 4. Insert at next_seq + bump (same txn: event and seq-bump commit together).
         insert_event(conn, event, next_seq, source_text).await?;
