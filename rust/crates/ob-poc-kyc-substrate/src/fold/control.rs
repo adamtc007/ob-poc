@@ -920,21 +920,57 @@ pub struct ReconciledControlEdge {
     pub originating_event_id: EventId,
 }
 
-/// Extract the reconciled (active, verified) control edges from the control
-/// state — everything that isn't `EconomicInterest` (that's the ownership
-/// prong's job — `reconciled_economic_edges`). Used by `ControlProngStrategy`
-/// (M4).
+/// The exact set of `EdgeKind` variants admitted as "control" by
+/// `reconciled_control_edges` today (EOP-STATE-KYCUBO-D1 §4, Phase 1 of the
+/// tree-cleanup follow-up tranche, 2026-08-21).
 ///
-/// Excludes `EdgeKind::Nominee`: nominee arrangements require piercing (K-8,
-/// `ubo.edge.pierce-nominee`, separately-tracked M2/open work) to find the
-/// true controller. Treating a bare nominee edge as direct control here
-/// would attribute control to the nominee itself — exactly the wrong answer
-/// K-8 exists to prevent.
+/// **This is a SAFETY guard, not a semantics ruling.** Before this function
+/// existed, the filter was an EXCLUSION list — everything except
+/// `EconomicInterest`/`Nominee` passed — which silently admitted every
+/// *future* `EdgeKind` variant as generic control the moment it became
+/// assertable, with no domain ruling behind the admission. The six TS.2
+/// vocabulary-convergence variants (`OfficerAppointment`,
+/// `ManagementMandate`, `MembershipRights`, `StatutoryAuthority`,
+/// `Employment`, `Containment`) became assertable after this filter was
+/// first written and were swept in undifferentiated — a live hazard, not a
+/// latent one. This whitelist freezes TODAY's behaviour deliberately:
+/// admitting one of the six (or any future variant) is a conscious TS
+/// ratification, never a maintenance side-effect of adding an `EdgeKind`
+/// variant elsewhere. `EconomicInterest` is out because that's the
+/// ownership prong's job (`reconciled_economic_edges`); `Nominee` is out
+/// because nominee arrangements require piercing first (K-8,
+/// `ubo.edge.pierce-nominee`) — treating a bare nominee edge as direct
+/// control would attribute control to the nominee itself, exactly the
+/// wrong answer K-8 exists to prevent. The match is exhaustive with NO
+/// catch-all arm: adding a new `EdgeKind` variant anywhere in this enum is
+/// a compile error here, never a silent admission.
+fn is_admitted_as_control(kind: &EdgeKind) -> bool {
+    match kind {
+        EdgeKind::VotingRights
+        | EdgeKind::BoardAppointment
+        | EdgeKind::GpStatutory
+        | EdgeKind::DesignatedMember
+        | EdgeKind::TrustRole(_)
+        | EdgeKind::DominantInfluence => true,
+        EdgeKind::EconomicInterest
+        | EdgeKind::Nominee
+        | EdgeKind::OfficerAppointment
+        | EdgeKind::ManagementMandate
+        | EdgeKind::MembershipRights
+        | EdgeKind::StatutoryAuthority
+        | EdgeKind::Employment
+        | EdgeKind::Containment => false,
+    }
+}
+
+/// Extract the reconciled (active, verified) control edges from the control
+/// state — the whitelisted control-kind edges (see `is_admitted_as_control`),
+/// active. Used by `ControlProngStrategy` (M4) and its delegates/siblings.
 pub fn reconciled_control_edges(state: &ControlState) -> Vec<ReconciledControlEdge> {
     state
         .edges
         .values()
-        .filter(|e| !e.is_economic() && !matches!(e.kind, EdgeKind::Nominee) && e.is_active())
+        .filter(|e| is_admitted_as_control(&e.kind) && e.is_active())
         .map(|e| ReconciledControlEdge {
             id: e.id,
             from: e.from,

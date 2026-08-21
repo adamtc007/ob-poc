@@ -54,8 +54,9 @@ use ob_poc_kyc_substrate::{
     AuthorityRef, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
     DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId, EventId, FoldRegistry,
     FoundationCouncilStrategy, FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy,
-    ObligationState, OwnershipProngStrategy, PersonId, Precondition, Principal, StateOwnedStrategy,
-    StructureClass, SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy, V1FoldImpl,
+    ObligationState, OwnershipProngStrategy, PersonId, Precondition, Principal, Prong,
+    StateOwnedStrategy, StructureClass, SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy,
+    V1FoldImpl,
 };
 
 const DSL_KYC_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc.yaml");
@@ -1329,6 +1330,11 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         }
     }
 
+    // Phase 1 of the tree-cleanup follow-up tranche (EOP-STATE-KYCUBO-D1 §4,
+    // 2026-08-21) converted `reconciled_control_edges` from an exclusion
+    // filter to an explicit whitelist (`is_admitted_as_control`, fold/control.rs).
+    // `broad_control` now pins the whitelisted 9 — the 6 TS.2 vocabulary-
+    // convergence kinds are deliberately excluded, not silently swept in.
     let broad_control: BTreeSet<&str> = [
         "voting_rights",
         "board_appointment",
@@ -1339,12 +1345,6 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         "trust_protector",
         "trust_beneficiary",
         "dominant_influence",
-        "officer_appointment",
-        "management_mandate",
-        "membership_rights",
-        "statutory_authority",
-        "employment",
-        "containment",
     ]
     .into_iter()
     .collect();
@@ -1374,12 +1374,12 @@ fn edge_kind_strategy_admission_is_exactly_known() {
          pin, not a guess (D1 corrective tranche Item 2)"
     );
 
-    // The tranche brief's literal premise, checked directly: is there any
-    // kind that NO strategy traverses (excluding `nominee`, which is
-    // excluded by design, not by gap)? Per the finding above, no — every
-    // one of the 6 new kinds is swept into 4 strategies' generic control
-    // walk. `nominee` is the sole universally-untraversed kind, and it is
-    // NOT one of TS.2's 6 new variants.
+    // Phase 1 flips this assertion's story: before the whitelist, the 6
+    // TS.2 kinds were swept into 4 strategies' generic control walk
+    // undifferentiated (silent over-admission, the corrective tranche's
+    // Item 2 finding). After the whitelist, they join `nominee` as
+    // deliberately, consciously untraversed — pending a TS ratification
+    // that has not happened. This is now a SAFETY property, not a gap.
     let all_traversed_by_someone: BTreeSet<&str> =
         actual.values().flat_map(|s| s.iter().copied()).collect();
     let untraversed_by_anyone: BTreeSet<&str> = kinds
@@ -1389,12 +1389,208 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         .collect();
     assert_eq!(
         untraversed_by_anyone,
-        ["nominee"].into_iter().collect::<BTreeSet<_>>(),
-        "the only EdgeKind traversed by NO strategy must be `nominee` (excluded by \
-         design — K-8 pierce-first, guarded at the freeze dispatch site before any \
-         strategy runs); if this set grew or shrank, the corrective tranche's \
-         Item 2 finding needs re-reporting, not silently re-absorbing"
+        [
+            "nominee",
+            "officer_appointment",
+            "management_mandate",
+            "membership_rights",
+            "statutory_authority",
+            "employment",
+            "containment",
+        ]
+        .into_iter()
+        .collect::<BTreeSet<_>>(),
+        "the whitelist (fold/control.rs::is_admitted_as_control) must exclude \
+         exactly these 7 kinds — `nominee` by K-8 design, the 6 TS.2 variants \
+         pending a TS ratification that has not happened; if this set grew or \
+         shrank, that is a real admission-boundary change and must be reported, \
+         not silently re-absorbed"
     );
+}
+
+// ── Phase 1 (whitelist tranche, EOP-STATE-KYCUBO-D1 §4, 2026-08-21) ────────
+
+/// SAFETY proof, not a semantics ruling: for every `EdgeKind` the exclusion
+/// filter admitted BEFORE this tranche and the new whitelist
+/// (`is_admitted_as_control`, fold/control.rs) still admits AFTER it, the
+/// full `ProngCandidate` a lone edge produces — person, prong, effective
+/// ownership %, chain — is bit-identical. The four strategies checked here
+/// (`control_prong_strategy` directly; `fund_control_strategy` and
+/// `nominee_pierce_strategy`, which thin-delegate to it; `state_owned_strategy`,
+/// which re-implements the identical full-admission walk) are exactly the
+/// ones whose behaviour Phase 1 COULD have changed — they carried no
+/// kind-filter of their own before this tranche, unlike
+/// `foundation_council_strategy`/`cooperative_member_strategy`, which are
+/// unaffected by construction (checked separately, structurally, in
+/// `edge_kind_strategy_admission_is_exactly_known`).
+///
+/// The pin below is re-derived BY RUNNING against the (already whitelisted)
+/// production code — its value is proving today's determinations are
+/// unchanged, not in guessing the numbers by hand.
+///
+/// **Bite proof (perturb the whitelist, observe red, restore, observe
+/// green — pasted in the tranche receipt, not just asserted here):**
+/// temporarily move any one of `is_admitted_as_control`'s 9 true-arm kinds
+/// into the false arm. This test goes red immediately — the perturbed
+/// kind's candidate list drops from one person to empty, failing the
+/// equality assertion below. Every one of the 9 kinds is load-bearing to
+/// this test, not decorative coverage.
+#[test]
+fn determination_is_unchanged_by_whitelisting() {
+    let subject_entity = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0001));
+    let person = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0002));
+    let natural_persons: BTreeSet<PersonId> = [PersonId(person.0)].into_iter().collect();
+    let fixed_event = EventId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_00E1));
+
+    // The 9 kinds admitted both before (exclusion filter) and after
+    // (whitelist) Phase 1 — everything `edge_kind_strategy_admission_is_-
+    // exactly_known`'s `broad_control` set pins today.
+    let admitted_kinds: &[(&str, EdgeKind)] = &[
+        ("voting_rights", EdgeKind::VotingRights),
+        ("board_appointment", EdgeKind::BoardAppointment),
+        ("gp_statutory", EdgeKind::GpStatutory),
+        ("designated_member", EdgeKind::DesignatedMember),
+        ("trust_settlor", EdgeKind::TrustRole(TrustRoleKind::Settlor)),
+        ("trust_trustee", EdgeKind::TrustRole(TrustRoleKind::Trustee)),
+        ("trust_protector", EdgeKind::TrustRole(TrustRoleKind::Protector)),
+        ("trust_beneficiary", EdgeKind::TrustRole(TrustRoleKind::Beneficiary)),
+        ("dominant_influence", EdgeKind::DominantInfluence),
+    ];
+
+    let strategies: &[(&str, &dyn DeterminationStrategy)] = &[
+        ("control_prong_strategy", &ControlProngStrategy),
+        ("fund_control_strategy", &FundControlStrategy),
+        ("state_owned_strategy", &StateOwnedStrategy),
+        ("nominee_pierce_strategy", &NomineePierceStrategy),
+    ];
+
+    let mut actual: BTreeMap<(&str, &str), Vec<(PersonId, Prong, Option<u64>, Vec<EntityId>, EventId)>> =
+        BTreeMap::new();
+    for (kind_name, kind) in admitted_kinds {
+        let mut state = ControlState::default();
+        let edge_id = EdgeId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0003));
+        state.edges.insert(
+            edge_id,
+            ob_poc_kyc_substrate::EdgeState {
+                id: edge_id,
+                kind: kind.clone(),
+                from: person,
+                to: subject_entity,
+                percentage: None,
+                status: EdgeStatus::Asserted,
+                evidence_event_id: None,
+                originating_event_id: fixed_event,
+                trust_revocable: None,
+                superseded_by: None,
+                pierced_from: None,
+            },
+        );
+        for (strategy_name, strategy) in strategies {
+            let candidates = strategy.resolve(&state, subject_entity, &natural_persons, 25.0);
+            let summary = candidates
+                .into_iter()
+                .map(|c| {
+                    (
+                        c.person_id,
+                        c.prong,
+                        c.effective_ownership_pct.map(|p| p.to_bits()),
+                        c.ownership_chain,
+                        c.originating_event_id,
+                    )
+                })
+                .collect();
+            actual.insert((kind_name, strategy_name), summary);
+        }
+    }
+
+    let candidate = vec![(
+        PersonId(person.0),
+        Prong::ControlByOtherMeans,
+        None,
+        vec![subject_entity],
+        fixed_event,
+    )];
+    let mut expected: BTreeMap<(&str, &str), Vec<(PersonId, Prong, Option<u64>, Vec<EntityId>, EventId)>> =
+        BTreeMap::new();
+    for (kind_name, _) in admitted_kinds {
+        for (strategy_name, _) in strategies {
+            expected.insert((kind_name, strategy_name), candidate.clone());
+        }
+    }
+
+    assert_eq!(
+        actual, expected,
+        "determination_is_unchanged_by_whitelisting: a still-admitted kind's \
+         determination diverged from the pre-Phase-1 golden baseline — the \
+         whitelist must change ONLY which kinds count as control, never the \
+         resolved candidate for a kind it still admits"
+    );
+}
+
+/// Companion to `determination_is_unchanged_by_whitelisting`: pins that the
+/// six TS.2 kinds are provably excluded from EVERY strategy's walk, with
+/// the reason recorded inline rather than left to be rediscovered —
+/// awaiting a TS ratification (which structure classes, if any, should
+/// treat officer/mandate/membership/statutory/employment/containment edges
+/// as control), not forgotten or silently dropped.
+#[test]
+fn new_edge_kinds_are_not_traversed_as_control() {
+    let subject_entity = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0004));
+    let person = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0005));
+    let natural_persons: BTreeSet<PersonId> = [PersonId(person.0)].into_iter().collect();
+
+    // The six TS.2 vocabulary-convergence kinds (EOP-DD-KYCUBO-TS.2 §5) —
+    // assertable on the wire (K-30 lexicon coverage), but no TS ratification
+    // has yet judged any of them to BE control. `is_admitted_as_control`
+    // (fold/control.rs) excludes all six deliberately, pending that ruling.
+    let excluded_kinds: &[(&str, EdgeKind)] = &[
+        ("officer_appointment", EdgeKind::OfficerAppointment),
+        ("management_mandate", EdgeKind::ManagementMandate),
+        ("membership_rights", EdgeKind::MembershipRights),
+        ("statutory_authority", EdgeKind::StatutoryAuthority),
+        ("employment", EdgeKind::Employment),
+        ("containment", EdgeKind::Containment),
+    ];
+
+    let strategies: &[(&str, &dyn DeterminationStrategy)] = &[
+        ("ownership_prong_strategy", &OwnershipProngStrategy),
+        ("control_prong_strategy", &ControlProngStrategy),
+        ("trust_role_strategy", &TrustRoleStrategy),
+        ("fund_control_strategy", &FundControlStrategy),
+        ("foundation_council_strategy", &FoundationCouncilStrategy),
+        ("state_owned_strategy", &StateOwnedStrategy),
+        ("cooperative_member_strategy", &CooperativeMemberStrategy),
+        ("nominee_pierce_strategy", &NomineePierceStrategy),
+    ];
+
+    for (kind_name, kind) in excluded_kinds {
+        let mut state = ControlState::default();
+        let edge_id = EdgeId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0006));
+        state.edges.insert(
+            edge_id,
+            ob_poc_kyc_substrate::EdgeState {
+                id: edge_id,
+                kind: kind.clone(),
+                from: person,
+                to: subject_entity,
+                percentage: None,
+                status: EdgeStatus::Asserted,
+                evidence_event_id: None,
+                originating_event_id: EventId::new(),
+                trust_revocable: None,
+                superseded_by: None,
+                pierced_from: None,
+            },
+        );
+        for (strategy_name, strategy) in strategies {
+            let candidates = strategy.resolve(&state, subject_entity, &natural_persons, 25.0);
+            assert!(
+                candidates.is_empty(),
+                "{kind_name} must not be traversed as control by {strategy_name} \
+                 (excluded pending a TS ratification, not forgotten): got {candidates:#?}"
+            );
+        }
+    }
 }
 
 // ── D1 corrective tranche Item 3 — op-layer-only studs ──────────────────────
