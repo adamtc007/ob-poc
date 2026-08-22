@@ -417,7 +417,11 @@ fn structure_class_valid_values() -> Vec<String> {
 /// Pin (K-G5): as of the T6 row-9 fix (2026-08-17) the map is fully studded —
 /// every one of the 21 dsl.kyc verbs, including `kyc.subject.register`, now
 /// carries a stud — and ALL 11 structure classes have a strategy behind them
-/// (the guard set is total).
+/// (the guard set is total). **Updated by TS.5 (2026-08-22):** `ubo.edge.
+/// assert-control`/`assert-economic-interest`/`pierce-nominee` each gain
+/// `Precondition::TypeGeometryPermits` — TS.1 §1's type-geometry layer was
+/// declared but never actually reachable from this checker until TS.5; this
+/// pin's widening records that, not a drift.
 /// Authoring a precondition, or a new `DeterminationStrategy`, is a CONSCIOUS
 /// edit here, not a silent pass or a silent break.
 #[test]
@@ -472,11 +476,16 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // the same two (edge exists + active); row 5 is registration alone,
     // deliberately WITHOUT the optional "≥1 active economic edge" amendment
     // (kept callable early, per the ratified matrix note).
+    // TS.5 R1 (2026-08-22): `TypeGeometryPermits` added to both
+    // edge-asserting verbs — TS.1 §1's FIRST constraint layer (the type
+    // geometry) was never actually reachable from this checker before TS.5;
+    // it is now, and this is a conscious widening of the pin, not a drift.
     expected.insert(
         "ubo.edge.assert-control".to_string(),
         vec![
             Precondition::SubjectRegistered,
             Precondition::NoDuplicateActiveEdge,
+            Precondition::TypeGeometryPermits,
         ],
     );
     expected.insert(
@@ -484,6 +493,7 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         vec![
             Precondition::SubjectRegistered,
             Precondition::NoDuplicateActiveEdge,
+            Precondition::TypeGeometryPermits,
         ],
     );
     expected.insert(
@@ -503,12 +513,16 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // target edge exists + active (matrix rows 3/4 vocabulary). The "target
     // is actually a nominee edge" check has NO precondition primitive; it is
     // enforced op-layer, fail-closed (kyc_stream_ops.rs, per the §2.6 note).
+    // TS.5 §6 Q2 (2026-08-22): pierce-nominee also asserts a NEW (nominator,
+    // kind, pierced-edge's-`to`) triple — the same geometry gate as the two
+    // verbs above, added to this pin at the same time.
     expected.insert(
         "ubo.edge.pierce-nominee".to_string(),
         vec![
             Precondition::SubjectRegistered,
             Precondition::EdgeExists,
             Precondition::EdgeActive,
+            Precondition::TypeGeometryPermits,
         ],
     );
 
