@@ -1,6 +1,6 @@
 //! Cross-stream emission contract (EOP-DD-KYCUBO-002 §3.4 — B2, B3).
 //!
-//! When `ubo.determination.freeze` runs on subject A's stream, it must emit
+//! When `kyc_ubo.decide.determination.freeze` runs on subject A's stream, it must emit
 //! obligation-create (or obligation-supersede for retraction) events onto each
 //! resolved person's subject stream via the outbox. Three rules:
 //!

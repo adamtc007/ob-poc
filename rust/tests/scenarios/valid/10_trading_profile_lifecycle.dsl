@@ -6,8 +6,7 @@
 ;; 2. Import trading profile from YAML (single source of truth)
 ;; 3. Validate the profile
 ;; 4. Activate the profile
-;; 5. Materialize to operational tables (SSIs, booking rules, universe)
-;; 6. Verify materialization results
+;; 5. Verify using read operations
 ;;
 ;; Uses DSL verbs only - no direct database access
 ;; =============================================================================
@@ -70,29 +69,7 @@
   :activated-by "test-harness")
 
 ;; =============================================================================
-;; STEP 5: Materialize to Operational Tables
-;;
-;; Converts the YAML document to operational database records:
-;; - custody.cbu_instrument_universe (from universe section)
-;; - custody.cbu_ssi (from standing_instructions section)
-;; - custody.ssi_booking_rules (from booking_rules section)
-;; - custody.isda_agreements + csa_agreements (from isda_agreements section)
-;;
-;; This is idempotent - running twice produces the same result
-;; =============================================================================
-
-;; First, do a dry run to see what would be created
-(trading-profile.materialize
-  :profile-id @profile
-  :dry-run true)
-
-;; Now actually materialize all sections
-(trading-profile.materialize
-  :profile-id @profile
-  :force false)
-
-;; =============================================================================
-;; STEP 6: Verify using read operations
+;; STEP 5: Verify using read operations
 ;; =============================================================================
 
 ;; Read back the active profile
@@ -139,7 +116,7 @@
   :settlement-type "DVP")
 
 ;; =============================================================================
-;; STEP 7: Test version management
+;; STEP 6: Test version management
 ;; =============================================================================
 
 ;; List all profile versions

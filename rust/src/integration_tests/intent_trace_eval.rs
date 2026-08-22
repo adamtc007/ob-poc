@@ -184,11 +184,12 @@ fn get_simulated_allowed_verbs(expected_verb: &str) -> HashSet<String> {
             }
         }
         "document" | "doc-request" => {
+            // document.upload-version/verify/reject removed 2026-08-20
+            // (EOP-PLAN-MANDATE-FIX-001 F4) -- targeted the absent
+            // "ob-poc".document_versions table. document.list-pending/
+            // approve/archive were already fictional, not re-litigated here.
             for v in &[
                 "document.solicit",
-                "document.upload-version",
-                "document.verify",
-                "document.reject",
                 "document.extract",
                 "document.solicit-batch",
                 "document.list-pending",

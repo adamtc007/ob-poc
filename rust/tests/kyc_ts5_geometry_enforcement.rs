@@ -1,6 +1,6 @@
 //! EOP-DD-KYCUBO-TS.5 §5 gate suite — the headline live-op gate, plus the
 //! §4 tooth. Live-DB harness, same pattern as `kyc_ts4_pierce_traversal.rs`:
-//! drives the REAL governed `ubo.edge.assert-control` op end-to-end, not a
+//! drives the REAL governed `kyc_ubo.assert.edge.control` op end-to-end, not a
 //! direct call to `geometry::check_type_geometry`.
 //!
 //! Everything else in TS.5 §5 (target-side, preview/append agreement,
@@ -136,7 +136,7 @@ async fn illegal_source_type_is_refused_at_the_op() {
 
 /// §4's tooth: `every_geometry_rule_is_reachable_from_the_write_path` — one
 /// illegal triple per §2a source restriction, driven through the REAL
-/// `ubo.edge.assert-control` op, asserting refusal. RED before R1 landed
+/// `kyc_ubo.assert.edge.control` op, asserting refusal. RED before R1 landed
 /// (proven in P0); green now; stays as the permanent guard against the
 /// wiring being lost again.
 #[tokio::test]

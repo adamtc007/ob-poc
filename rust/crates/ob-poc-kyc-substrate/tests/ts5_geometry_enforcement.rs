@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     check_preconditions, compute_assurance, enumerate_placement_set, fold_control,
-    fold_type_registry, phase1_lexicon, AuthorityRef, EdgeId, EntityId, IntentEvent,
+    fold_type_registry, assembly_lexicon, AuthorityRef, EdgeId, EntityId, IntentEvent,
     KycError, ObligationState, PersonId, Principal, ProngCandidate, ProvisionalityReason, Prong,
     SubjectId, TargetBinding,
 };
@@ -30,7 +30,7 @@ fn as_of() -> DateTime<Utc> {
 fn register_event(subject: SubjectId, entity: EntityId) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding::for_subject(subject),
@@ -42,7 +42,7 @@ fn register_event(subject: SubjectId, entity: EntityId) -> IntentEvent {
 fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc.subject.assert-type",
+        "kyc_ubo.assert.subject.type",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -54,7 +54,7 @@ fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> Intent
 fn assert_control_event(subject: SubjectId, from: EntityId, to: EntityId, kind: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding::for_edge(subject, EdgeId(Uuid::new_v4())),
@@ -70,7 +70,7 @@ fn assert_control_event(subject: SubjectId, from: EntityId, to: EntityId, kind: 
 fn correct_type_event(subject: SubjectId, entity: EntityId, wire: &str, invalidated: &[EdgeId]) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc.subject.correct-type",
+        "kyc_ubo.assert.subject.type-correction",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -100,14 +100,14 @@ fn illegal_target_type_is_refused() {
     let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
     let obligation = ObligationState::default();
 
-    let lexicon = phase1_lexicon();
-    let entry = lexicon.get("ubo.edge.assert-control").unwrap();
+    let lexicon = assembly_lexicon();
+    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
     let event = assert_control_event(subject, person, trust, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
     assert!(matches!(verdict, Err(KycError::GeometryRefused { .. })), "got {verdict:?}");
 }
 
-/// TS.5 R2 — property: the board offers `ubo.edge.assert-control` iff at
+/// TS.5 R2 — property: the board offers `kyc_ubo.assert.edge.control` iff at
 /// least one real (from, kind, to) triple among registered/typed members
 /// would be admitted by `check_preconditions` (the identical function). Two
 /// halves: a board with NO legal pair anywhere hides the verb AND refuses a
@@ -115,8 +115,8 @@ fn illegal_target_type_is_refused() {
 /// the verb AND admits that specific real submission.
 #[test]
 fn preview_and_append_agree() {
-    let lexicon = phase1_lexicon();
-    let entry = lexicon.get("ubo.edge.assert-control").unwrap();
+    let lexicon = assembly_lexicon();
+    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
 
     // Half 1 — no legal pair: two NaturalPerson-typed members. A person is
     // NEVER a target (TS.1 §2), so no pipe can land on either as `to`.
@@ -133,7 +133,7 @@ fn preview_and_append_agree() {
         let obligation = ObligationState::default();
 
         let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
-        let offered = board.moves.iter().any(|m| m.verb_fqn.0 == "ubo.edge.assert-control");
+        let offered = board.moves.iter().any(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control");
         assert!(!offered, "board should NOT offer assert-control — no legal pair exists");
 
         let event = assert_control_event(subject, a, b, "voting_rights");
@@ -155,7 +155,7 @@ fn preview_and_append_agree() {
         let obligation = ObligationState::default();
 
         let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
-        let offered = board.moves.iter().any(|m| m.verb_fqn.0 == "ubo.edge.assert-control");
+        let offered = board.moves.iter().any(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control");
         assert!(offered, "board SHOULD offer assert-control — a legal pair exists");
 
         let event = assert_control_event(subject, person, corp, "voting_rights");
@@ -179,8 +179,8 @@ fn untyped_endpoint_admits_provisionally() {
     let type_registry = fold_type_registry(&[&reg1, &reg2]);
     let obligation = ObligationState::default();
 
-    let lexicon = phase1_lexicon();
-    let entry = lexicon.get("ubo.edge.assert-control").unwrap();
+    let lexicon = assembly_lexicon();
+    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
     let assert_event = assert_control_event(subject, a, b, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
     assert!(verdict.is_ok(), "untyped endpoint must ADMIT, not refuse: {verdict:?}");
@@ -224,8 +224,8 @@ fn alleged_type_admits_provisionally() {
     let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
     let obligation = ObligationState::default();
 
-    let lexicon = phase1_lexicon();
-    let entry = lexicon.get("ubo.edge.assert-control").unwrap();
+    let lexicon = assembly_lexicon();
+    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
     let assert_event = assert_control_event(subject, person, corp, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
     assert!(verdict.is_ok(), "alleged-typed endpoint must ADMIT: {verdict:?}");
@@ -251,8 +251,8 @@ fn alleged_type_admits_provisionally() {
 /// errors: "not a move" (geometry) versus "not legal here" (a stud).
 #[test]
 fn geometry_refusal_is_distinguishable_from_stud_refusal() {
-    let lexicon = phase1_lexicon();
-    let entry = lexicon.get("ubo.edge.assert-control").unwrap();
+    let lexicon = assembly_lexicon();
+    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
 
     // Geometry violation: ManagementMandate sourced from a natural person.
     let subject = subject();

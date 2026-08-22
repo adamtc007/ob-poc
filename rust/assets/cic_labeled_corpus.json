@@ -322,7 +322,7 @@
   },
   {
     "utterance": "add an ownership stake -- Vanguard holds 25% of this entity",
-    "expected_verb": "ubo.edge.assert-economic-interest",
+    "expected_verb": "kyc_ubo.assert.edge.economic-interest",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -348,7 +348,7 @@
   },
   {
     "utterance": "add a control relationship -- board appointment",
-    "expected_verb": "ubo.edge.assert-control",
+    "expected_verb": "kyc_ubo.assert.edge.control",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4374,7 +4374,7 @@
   },
   {
     "utterance": "allege this person is a beneficial owner",
-    "expected_verb": "ubo.edge.assert-economic-interest",
+    "expected_verb": "kyc_ubo.assert.edge.economic-interest",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4387,7 +4387,7 @@
   },
   {
     "utterance": "record a beneficial ownership allegation for the director",
-    "expected_verb": "ubo.edge.assert-economic-interest",
+    "expected_verb": "kyc_ubo.assert.edge.economic-interest",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
@@ -4400,7 +4400,7 @@
   },
   {
     "utterance": "verify the UBO evidence is sufficient",
-    "expected_verb": "ubo.edge.verify",
+    "expected_verb": "kyc_ubo.assert.edge.verification",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4413,7 +4413,7 @@
   },
   {
     "utterance": "approve the beneficial ownership determination",
-    "expected_verb": "ubo.determination.freeze",
+    "expected_verb": "kyc_ubo.decide.determination.freeze",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4424,7 +4424,7 @@
   },
   {
     "utterance": "reject this UBO allegation as unsubstantiated",
-    "expected_verb": "ubo.edge.supersede",
+    "expected_verb": "kyc_ubo.assert.edge.supersession",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4435,7 +4435,7 @@
   },
   {
     "utterance": "expire the UBO entry that has not been renewed",
-    "expected_verb": "ubo.edge.supersede",
+    "expected_verb": "kyc_ubo.assert.edge.supersession",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
@@ -5023,7 +5023,7 @@
   },
   {
     "utterance": "link this individual to the corporate structure tree",
-    "expected_verb": "kyc.subject.register",
+    "expected_verb": "kyc_ubo.assert.subject.register",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",

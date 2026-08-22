@@ -7,7 +7,7 @@
 //! WAIVED. Shared runner functions + thin alias ops.
 //!
 //! Superseded-by-obligation-projection (state-graph remediation Phase 6b):
-//! the dsl.kyc stream (`ubo.edge.attach-evidence`, `kyc_obligation_projection`
+//! the dsl.kyc stream (`kyc_ubo.assert.edge.evidence`, `kyc_obligation_projection`
 //! identity/screening/risk tracks) is the determination-path evidence
 //! model going forward. This module is retained only for case-level
 //! outreach (evidence requests/uploads scoped to a case, not yet folded

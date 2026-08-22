@@ -15,7 +15,7 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, map_principal, IntentEventDraft};
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, phase1_lexicon, AuthorityRef, ControlState, FoldRegistry,
+    check_control_preconditions, assembly_lexicon, AuthorityRef, ControlState, FoldRegistry,
     IdemKey, SubjectId, TargetBinding, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -40,12 +40,12 @@ fn into_event_maps_identity_deterministically() {
     let p = runtime_principal("alice", &["analyst", "admin"]);
 
     let draft = || IntentEventDraft {
-        verb_fqn: "kyc.subject.register".into(),
+        verb_fqn: "kyc_ubo.assert.subject.register".into(),
         subject_root: subject,
         target: TargetBinding::for_subject(subject),
         payload: serde_json::json!({ "k": "v" }),
         authority: AuthorityRef("analyst.register".into()),
-        lexicon_hash: phase1_lexicon().hash,
+        lexicon_hash: assembly_lexicon().hash,
         as_of: chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
             .unwrap()
             .with_timezone(&chrono::Utc),
@@ -87,7 +87,7 @@ fn database_url() -> String {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -129,12 +129,12 @@ impl TransactionScope for TestScope {
 
 fn register_event(subject: SubjectId, idem: &str) -> ob_poc_kyc_substrate::IntentEvent {
     IntentEventDraft {
-        verb_fqn: "kyc.subject.register".into(),
+        verb_fqn: "kyc_ubo.assert.subject.register".into(),
         subject_root: subject,
         target: TargetBinding::for_subject(subject),
         payload: serde_json::json!({ "is_natural_person": false }),
         authority: AuthorityRef("analyst.register".into()),
-        lexicon_hash: phase1_lexicon().hash,
+        lexicon_hash: assembly_lexicon().hash,
         as_of: chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
             .unwrap()
             .with_timezone(&chrono::Utc),
@@ -218,15 +218,15 @@ async fn lexicon_precondition_rejects_through_the_seam() {
         .expect("connect to test DB");
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let verify_entry = lexicon
-        .get("ubo.edge.verify")
+        .get("kyc_ubo.assert.edge.verification")
         .expect("verify entry in lexicon");
 
     // A verify event for an edge with no prior evidence in the (empty) stream.
     let edge = Uuid::new_v4();
     let verify_event = IntentEventDraft {
-        verb_fqn: "ubo.edge.verify".into(),
+        verb_fqn: "kyc_ubo.assert.edge.verification".into(),
         subject_root: subject,
         target: TargetBinding::for_edge(subject, ob_poc_kyc_substrate::EdgeId(edge)),
         payload: serde_json::json!({}),

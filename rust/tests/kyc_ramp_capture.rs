@@ -35,7 +35,7 @@ async fn capture_records_accepted_proposal_roundtrip() {
     let record = CaptureRecord {
         utterance_text: "register the new subject as a natural person".to_string(),
         placement_set_hash: "test-board-hash-abc123".to_string(),
-        proposal: "(kyc.subject.register :subject <uuid>)".to_string(),
+        proposal: "(kyc_ubo.assert.subject.register :subject <uuid>)".to_string(),
         disposition: Disposition::Select,
         user_action: MoveAttemptOutcome::Applied,
         staged_move_id: Some(staged_move_id),

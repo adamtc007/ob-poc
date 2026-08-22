@@ -19,7 +19,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_workbook::{open_workbook, StagedMove};
 use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, render_intent_event_to_sexpr, AuthorityRef, EdgeId, FoldRegistry, IntentEvent,
+    assembly_lexicon, render_intent_event_to_sexpr, AuthorityRef, EdgeId, FoldRegistry, IntentEvent,
     LexiconManifest, MoveId, Principal, SubjectId, TargetBinding, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -41,7 +41,7 @@ async fn connect() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -151,7 +151,7 @@ async fn session_roundtrip() {
     let registry = v1_registry();
     let principal = runtime_principal("analyst-1");
     let as_of = fixed_ts();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
 
     let edge = Uuid::new_v4();
     let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
@@ -162,7 +162,7 @@ async fn session_roundtrip() {
     drop(conn);
     assert!(workbook.committed.is_empty());
 
-    // T6.2 (2026-08-12): `ubo.edge.assert-control` now carries
+    // T6.2 (2026-08-12): `kyc_ubo.assert.edge.control` now carries
     // `SubjectRegistered` (matrix row 1) — this fixture predates that stud
     // and staged assert-control straight against an unregistered subject,
     // which now correctly fails frontier recognition. Register first, same
@@ -171,7 +171,7 @@ async fn session_roundtrip() {
     // now has a realistic 4th predecessor move instead of 3.
     workbook
         .stage(
-            "(kyc.subject.register)",
+            "(kyc_ubo.assert.subject.register)",
             &principal,
             AuthorityRef("analyst.register".into()),
             as_of,
@@ -207,7 +207,7 @@ async fn session_roundtrip() {
     // the payload-blind probe.
     workbook.staged.push(manual_staged_move(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({
             "edge_id": edge, "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"
@@ -218,7 +218,7 @@ async fn session_roundtrip() {
 
     workbook
         .stage(
-            &format!(r#"(ubo.edge.attach-evidence :edge-id "{edge}" :doc_id "{doc_id}")"#),
+            &format!(r#"(kyc_ubo.assert.edge.evidence :edge-id "{edge}" :doc_id "{doc_id}")"#),
             &principal,
             AuthorityRef("analyst.attach-evidence".into()),
             as_of,
@@ -230,7 +230,7 @@ async fn session_roundtrip() {
 
     workbook
         .stage(
-            &format!(r#"(ubo.edge.verify :edge-id "{edge}")"#),
+            &format!(r#"(kyc_ubo.assert.edge.verification :edge-id "{edge}")"#),
             &principal,
             AuthorityRef("analyst.verify".into()),
             as_of,
@@ -308,7 +308,7 @@ async fn new_ubo_from_baseplate() {
     drop(conn);
     workbook
         .stage(
-            "(kyc.subject.register)",
+            "(kyc_ubo.assert.subject.register)",
             &principal,
             AuthorityRef("analyst.register".into()),
             as_of,
@@ -337,7 +337,7 @@ async fn invalid_workbook_blocks_commit() {
     let pool = connect().await;
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let as_of = fixed_ts();
 
     let edge = Uuid::new_v4();
@@ -351,7 +351,7 @@ async fn invalid_workbook_blocks_commit() {
     // K-11 proof ratchet). Move 3: would-be-legal, never gets the chance.
     workbook.staged.push(manual_staged_move(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         TargetBinding::for_subject(subject),
         serde_json::json!({"edge_id": edge, "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"}),
         as_of,
@@ -359,7 +359,7 @@ async fn invalid_workbook_blocks_commit() {
     ));
     workbook.staged.push(manual_staged_move(
         subject,
-        "ubo.edge.verify",
+        "kyc_ubo.assert.edge.verification",
         TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({}),
         as_of,
@@ -367,7 +367,7 @@ async fn invalid_workbook_blocks_commit() {
     ));
     workbook.staged.push(manual_staged_move(
         subject,
-        "ubo.edge.attach-evidence",
+        "kyc_ubo.assert.edge.evidence",
         TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({"doc_id": Uuid::new_v4()}),
         as_of,
@@ -500,7 +500,7 @@ async fn stale_snapshot_recovers() {
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
     let principal = runtime_principal("analyst-1");
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let as_of = fixed_ts();
     let edge = Uuid::new_v4();
 
@@ -509,7 +509,7 @@ async fn stale_snapshot_recovers() {
         let mut scope = TestScope::begin(&pool).await;
         let assert_event = IntentEvent::new(
             subject,
-            "ubo.edge.assert-control",
+            "kyc_ubo.assert.edge.control",
             Principal::test_analyst(),
             AuthorityRef("setup.assert-control".into()),
             TargetBinding::for_subject(subject),
@@ -529,7 +529,7 @@ async fn stale_snapshot_recovers() {
 
         let evidence_event = IntentEvent::new(
             subject,
-            "ubo.edge.attach-evidence",
+            "kyc_ubo.assert.edge.evidence",
             Principal::test_analyst(),
             AuthorityRef("setup.attach-evidence".into()),
             TargetBinding::for_edge(subject, EdgeId(edge)),
@@ -556,7 +556,7 @@ async fn stale_snapshot_recovers() {
     drop(conn);
     workbook
         .stage(
-            &format!(r#"(ubo.edge.verify :edge-id "{edge}")"#),
+            &format!(r#"(kyc_ubo.assert.edge.verification :edge-id "{edge}")"#),
             &principal,
             AuthorityRef("analyst.verify".into()),
             as_of,
@@ -571,7 +571,7 @@ async fn stale_snapshot_recovers() {
         let mut scope2 = TestScope::begin(&pool).await;
         let supersede_event = IntentEvent::new(
             subject,
-            "ubo.edge.supersede",
+            "kyc_ubo.assert.edge.supersession",
             Principal::test_analyst(),
             AuthorityRef("concurrent.supersede".into()),
             TargetBinding::for_edge(subject, EdgeId(edge)),

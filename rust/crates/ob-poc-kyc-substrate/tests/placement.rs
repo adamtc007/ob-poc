@@ -10,9 +10,9 @@ use std::time::Instant;
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, enumerate_placement_set, phase1_lexicon, ControlState, EdgeId,
+    check_control_preconditions, enumerate_placement_set, assembly_lexicon, ControlState, EdgeId,
     EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, LexiconManifest, ObligationState,
-    PlacementSet, SubjectId, TargetBinding, TypeRegistryState,
+    PlacementSet, StructureClass, SubjectId, TargetBinding, TypeRegistryState,
 };
 
 fn subject() -> SubjectId {
@@ -56,10 +56,13 @@ fn state_with_edge(status: EdgeStatus) -> ControlState {
 }
 
 fn reconciled_and_strategized_state() -> ControlState {
+    // TS.6 P2: strategy is derived from `structure_class`
+    // (`select-strategy` retired) — `PrivateCompany` maps to
+    // `ownership_prong_strategy` (`strategy_for_structure_class`).
     ControlState {
         reconciliation_event_id: Some(EventId::new()),
-        selected_strategy: Some("ownership_prong_strategy".to_string()),
-        strategy_event_id: Some(EventId::new()),
+        structure_class: Some(StructureClass::PrivateCompany),
+        classify_event_id: Some(EventId::new()),
         ..Default::default()
     }
 }
@@ -69,7 +72,7 @@ fn reconciled_and_strategized_state() -> ControlState {
 #[test]
 fn abstain_always_present() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
 
     for state in [
         empty_state(),
@@ -92,7 +95,7 @@ fn abstain_always_present() {
 #[test]
 fn placement_set_deterministic() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let state = state_with_edge(EdgeStatus::Verified);
 
     let a = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
@@ -112,7 +115,7 @@ fn placement_set_deterministic() {
 #[test]
 fn canonical_order_stable() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     // Multiple edges inserted in an arbitrary order — BTreeMap<EdgeId, _> and
     // the placement set's own BTreeMap<MoveId, _> must still emit sorted output.
     let mut state = ControlState::default();
@@ -150,19 +153,19 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
         // `ts1_assembly_board.rs`'s dedicated entity-scoped test instead.
         if matches!(
             fqn,
-            "kyc.subject.assert-type"
-                | "kyc.subject.correct-type"
-                | "kyc.subject.withdraw-member"
-                | "kyc.subject.record-enquiry"
+            "kyc_ubo.assert.subject.type"
+                | "kyc_ubo.assert.subject.type-correction"
+                | "kyc_ubo.assert.subject.member-withdrawal"
+                | "kyc_ubo.assert.subject.enquiry"
         ) {
             continue;
         }
+        // `kyc_ubo.assert.edge.nominee-piercing` dropped TS.6 P2 (K-G7) — retired,
+        // folded into a macro; the loop this runs in only visits real
+        // lexicon entries, so it never reaches that fqn.
         let is_edge_scoped = matches!(
             fqn,
-            "ubo.edge.verify"
-                | "ubo.edge.attach-evidence"
-                | "ubo.edge.supersede"
-                | "ubo.edge.pierce-nominee"
+            "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.supersession"
         );
         let targets: Vec<TargetBinding> = if is_edge_scoped {
             state
@@ -197,7 +200,7 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
 
 #[test]
 fn placement_iff_precondition_empty_state() {
-    assert_matches_oracle(subject(), &empty_state(), &phase1_lexicon());
+    assert_matches_oracle(subject(), &empty_state(), &assembly_lexicon());
 }
 
 #[test]
@@ -205,7 +208,7 @@ fn placement_iff_precondition_asserted_edge() {
     assert_matches_oracle(
         subject(),
         &state_with_edge(EdgeStatus::Asserted),
-        &phase1_lexicon(),
+        &assembly_lexicon(),
     );
 }
 
@@ -214,7 +217,7 @@ fn placement_iff_precondition_evidenced_edge() {
     assert_matches_oracle(
         subject(),
         &state_with_edge(EdgeStatus::Evidenced),
-        &phase1_lexicon(),
+        &assembly_lexicon(),
     );
 }
 
@@ -223,7 +226,7 @@ fn placement_iff_precondition_verified_edge() {
     assert_matches_oracle(
         subject(),
         &state_with_edge(EdgeStatus::Verified),
-        &phase1_lexicon(),
+        &assembly_lexicon(),
     );
 }
 
@@ -232,7 +235,7 @@ fn placement_iff_precondition_reconciled_and_strategized() {
     assert_matches_oracle(
         subject(),
         &reconciled_and_strategized_state(),
-        &phase1_lexicon(),
+        &assembly_lexicon(),
     );
 }
 
@@ -241,7 +244,7 @@ fn placement_iff_precondition_reconciled_strategized_with_verified_edge() {
     let mut state = reconciled_and_strategized_state();
     let e = edge(EdgeStatus::Verified);
     state.edges.insert(e.id, e);
-    assert_matches_oracle(subject(), &state, &phase1_lexicon());
+    assert_matches_oracle(subject(), &state, &assembly_lexicon());
 }
 
 // ── verify specifically requires evidence (the one non-trivial edge precondition) ──
@@ -249,13 +252,13 @@ fn placement_iff_precondition_reconciled_strategized_with_verified_edge() {
 #[test]
 fn verify_only_admitted_for_evidenced_or_verified_edges() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
 
     let asserted = state_with_edge(EdgeStatus::Asserted);
     let set = enumerate_placement_set(subj, &asserted, &empty_obligation(), &empty_type_registry(), &lexicon);
     let target = TargetBinding::for_edge(subj, *asserted.edges.keys().next().unwrap());
     assert!(
-        !set.admits("ubo.edge.verify", &target),
+        !set.admits("kyc_ubo.assert.edge.verification", &target),
         "verify must be refused for an edge with no evidence attached"
     );
 
@@ -263,7 +266,7 @@ fn verify_only_admitted_for_evidenced_or_verified_edges() {
     let set = enumerate_placement_set(subj, &evidenced, &empty_obligation(), &empty_type_registry(), &lexicon);
     let target = TargetBinding::for_edge(subj, *evidenced.edges.keys().next().unwrap());
     assert!(
-        set.admits("ubo.edge.verify", &target),
+        set.admits("kyc_ubo.assert.edge.verification", &target),
         "verify must be admitted once evidence is cited"
     );
 }
@@ -277,7 +280,7 @@ fn verify_only_admitted_for_evidenced_or_verified_edges() {
 #[test]
 fn enumerate_placement_set_scales_to_200_edges() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let mut state = ControlState::default();
     for i in 0..200 {
         let mut e = edge(EdgeStatus::Verified);

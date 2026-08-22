@@ -61,7 +61,7 @@ fn base(
 fn register(subject: SubjectId) -> IntentEvent {
     base(
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         TargetBinding::for_subject(subject),
         serde_json::json!({ "is_natural_person": false }),
         "reg",
@@ -71,7 +71,7 @@ fn register(subject: SubjectId) -> IntentEvent {
 fn assert_control(subject: SubjectId, edge: Uuid, idem: &str) -> IntentEvent {
     base(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({
             "from_entity_id": Uuid::new_v4(),
@@ -201,7 +201,7 @@ async fn projection_tracks_derived_edge_status() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "ubo.edge.attach-evidence", edge, "ev"),
+        &edge_op(subject, "kyc_ubo.assert.edge.evidence", edge, "ev"),
     )
     .await;
     rebuild(&pool, &registry, subject).await;
@@ -210,7 +210,7 @@ async fn projection_tracks_derived_edge_status() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "ubo.edge.verify", edge, "vf"),
+        &edge_op(subject, "kyc_ubo.assert.edge.verification", edge, "vf"),
     )
     .await;
     rebuild(&pool, &registry, subject).await;
@@ -220,7 +220,7 @@ async fn projection_tracks_derived_edge_status() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "ubo.edge.supersede", edge, "sup"),
+        &edge_op(subject, "kyc_ubo.assert.edge.supersession", edge, "sup"),
     )
     .await;
     rebuild(&pool, &registry, subject).await;
@@ -241,7 +241,7 @@ async fn projection_is_disposable_and_rebuilds_from_stream() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "ubo.edge.attach-evidence", a, "ev"),
+        &edge_op(subject, "kyc_ubo.assert.edge.evidence", a, "ev"),
     )
     .await;
     append(&pool, &registry, &assert_control(subject, b, "b")).await;
@@ -298,7 +298,7 @@ async fn append_does_not_enqueue_projection_effects() {
     append(&pool, &registry, &register(subject)).await;
     let e1 = Uuid::new_v4();
     append(&pool, &registry, &assert_control(subject, e1, "e1")).await;
-    append(&pool, &registry, &edge_op(subject, "ubo.edge.verify", e1, "v1")).await;
+    append(&pool, &registry, &edge_op(subject, "kyc_ubo.assert.edge.verification", e1, "v1")).await;
 
     // Keyed `{subject}:{seq}` by the removed fan-out.
     let outbox_rows: i64 = sqlx::query_scalar(
@@ -345,14 +345,14 @@ async fn projector_rebuilds_from_a_multi_event_stream() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "ubo.edge.attach-evidence", e1, "ev1"),
+        &edge_op(subject, "kyc_ubo.assert.edge.evidence", e1, "ev1"),
     )
     .await;
-    append(&pool, &registry, &edge_op(subject, "ubo.edge.verify", e1, "v1")).await;
+    append(&pool, &registry, &edge_op(subject, "kyc_ubo.assert.edge.verification", e1, "v1")).await;
     append(
         &pool,
         &registry,
-        &edge_op(subject, "ubo.edge.supersede", e2, "s2"),
+        &edge_op(subject, "kyc_ubo.assert.edge.supersession", e2, "s2"),
     )
     .await;
     assert_eq!(rebuild(&pool, &registry, subject).await, 2);

@@ -28,30 +28,4 @@
   :ssi-id @ca-ssi
   :as @ca-ssi-link)
 
-(pricing-config.set-valuation-schedule
-  :cbu-id @fund
-  :frequency "EOD"
-  :valuation-time "16:00"
-  :timezone "America/New_York"
-  :as @val-schedule)
-
-(pricing-config.set-fallback-chain
-  :cbu-id @fund
-  :fallback-sources ["BLOOMBERG" "REUTERS" "MARKIT"]
-  :fallback-trigger "STALE"
-  :as @fallback)
-
-(pricing-config.set-stale-policy
-  :cbu-id @fund
-  :max-age-hours 24
-  :stale-action "USE_FALLBACK"
-  :as @stale-policy)
-
-(pricing-config.set-nav-threshold
-  :cbu-id @fund
-  :threshold-pct 5.0
-  :action "ALERT"
-  :as @nav-threshold)
-
 (corporate-action.validate-ca-config :cbu-id @fund)
-(pricing-config.validate-pricing-config :cbu-id @fund)

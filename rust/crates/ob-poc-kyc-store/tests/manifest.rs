@@ -127,7 +127,7 @@ async fn w2_manifest_publishing() {
     // ── Assembly pack ────────────────────────────────────────────────────
     let assembly = assembly_lexicon();
     // Universe pin: 19 `assembly_lexicon()` entries (TS.6 P1/P2 — 22 minus
-    // decide.approve/decide.reject, moved to evaluation_lexicon(); minus
+    // kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject, moved to evaluation_lexicon(); minus
     // ubo.determination.apply-smo-fallback, retired TS.6 §5). This
     // counts `LexiconEntry::build()` calls in lexicon.rs — NOT the same
     // number as `declared_verb_universe()` (22, YAML-scanned across BOTH
@@ -144,9 +144,9 @@ async fn w2_manifest_publishing() {
 
     // ── Evaluation pack ──────────────────────────────────────────────────
     let evaluation = evaluation_lexicon();
-    // Universe pin: 2 `evaluation_lexicon()` entries (decide.approve,
-    // decide.reject — TS.6 P1/P2). decide.waive is NOT here yet — see
-    // `assembly_lexicon()`'s own note on why `kyc.obligation.waive` stays
+    // Universe pin: 2 `evaluation_lexicon()` entries (kyc_ubo.decide.subject.approve,
+    // kyc_ubo.decide.subject.reject — TS.6 P1/P2). decide.waive is NOT here yet — see
+    // `assembly_lexicon()`'s own note on why `kyc_ubo.assert.obligation.waiver` stays
     // in Assembly pending obligation dissolution (D2.0).
     assert_eq!(evaluation.entries.len(), 2, "evaluation_lexicon universe (see kyc_pack_closure)");
     clear_prior_state(&pool, &evaluation).await;

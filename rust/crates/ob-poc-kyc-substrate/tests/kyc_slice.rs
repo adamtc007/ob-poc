@@ -137,7 +137,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -150,7 +150,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             1,
             subject,
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             h,
             analyst(),
             authority(),
@@ -163,7 +163,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             2,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -175,7 +175,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             3,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -187,7 +187,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             4,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -201,7 +201,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             5,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -219,7 +219,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             6,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -237,7 +237,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             7,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -255,7 +255,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             8,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -273,7 +273,7 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             9,
             subject,
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             h,
             analyst(),
             authority(),
@@ -393,7 +393,7 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -405,7 +405,7 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         te(
             1,
             subject,
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             h,
             analyst(),
             authority(),
@@ -417,7 +417,7 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         te(
             2,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -430,7 +430,7 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         te(
             3,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -457,12 +457,12 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
     // (`ubo.determination.compute-fold` retired TS.6 P2 — freeze already
     // independently declares the identical precondition pair.)
     let freeze_entry = lexicon
-        .get("ubo.determination.freeze")
+        .get("kyc_ubo.decide.determination.freeze")
         .expect("freeze in lexicon");
     let dummy_event = te(
         4,
         subject,
-        "ubo.determination.freeze",
+        "kyc_ubo.decide.determination.freeze",
         h,
         analyst(),
         authority(),
@@ -494,7 +494,7 @@ fn ec2_reconciled_edges_do_not_exceed_100_percent() {
 
 // ── Exit criterion 3: Proof ratchet ───────────────────────────────────────────
 //
-// "`ubo.edge.verify` without a cited-evidence event is rejected; status is
+// "`kyc_ubo.assert.edge.verification` without a cited-evidence event is rejected; status is
 // never settable" (K-11, gap-report Test 3).
 
 #[test]
@@ -511,7 +511,7 @@ fn ec3_verify_without_evidence_is_rejected() {
         te(
             0,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -535,11 +535,11 @@ fn ec3_verify_without_evidence_is_rejected() {
     );
 
     // Attempting verify must fail the precondition.
-    let verify_entry = lexicon.get("ubo.edge.verify").expect("verify in lexicon");
+    let verify_entry = lexicon.get("kyc_ubo.assert.edge.verification").expect("verify in lexicon");
     let verify_event = te(
         1,
         subject,
-        "ubo.edge.verify",
+        "kyc_ubo.assert.edge.verification",
         h,
         analyst(),
         authority(),
@@ -574,7 +574,7 @@ fn ec3_verify_after_evidence_succeeds() {
         te(
             0,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -588,7 +588,7 @@ fn ec3_verify_after_evidence_succeeds() {
         te(
             1,
             subject,
-            "ubo.edge.attach-evidence",
+            "kyc_ubo.assert.edge.evidence",
             h,
             analyst(),
             authority(),
@@ -609,11 +609,11 @@ fn ec3_verify_after_evidence_succeeds() {
     );
 
     // Verify must now pass the precondition.
-    let verify_entry = lexicon.get("ubo.edge.verify").expect("verify in lexicon");
+    let verify_entry = lexicon.get("kyc_ubo.assert.edge.verification").expect("verify in lexicon");
     let verify_event = te(
         2,
         subject,
-        "ubo.edge.verify",
+        "kyc_ubo.assert.edge.verification",
         h,
         analyst(),
         authority(),
@@ -672,7 +672,7 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -684,7 +684,7 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
         te(
             1,
             subject,
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             h,
             analyst(),
             authority(),
@@ -708,7 +708,7 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
         te(
             3,
             subject,
-            "ubo.determination.freeze",
+            "kyc_ubo.decide.determination.freeze",
             h,
             analyst(),
             authority(),
@@ -775,7 +775,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -787,7 +787,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             1,
             subject,
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             h,
             analyst(),
             authority(),
@@ -799,7 +799,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             2,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -812,7 +812,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             3,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -826,7 +826,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             4,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -839,7 +839,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             5,
             subject,
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             h,
             analyst(),
             authority(),
@@ -864,7 +864,7 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             7,
             subject,
-            "ubo.determination.freeze",
+            "kyc_ubo.decide.determination.freeze",
             h,
             analyst(),
             authority(),
@@ -905,7 +905,7 @@ fn ec5_replay_determinism_after_supersede() {
     events.push(te(
         8,
         subject,
-        "ubo.edge.supersede",
+        "kyc_ubo.assert.edge.supersession",
         h,
         analyst(),
         authority(),
@@ -917,7 +917,7 @@ fn ec5_replay_determinism_after_supersede() {
     events.push(te(
         9,
         subject,
-        "ubo.edge.reconcile-conflict",
+        "kyc_ubo.assert.edge.reconciliation",
         h,
         analyst(),
         authority(),
@@ -939,7 +939,7 @@ fn ec5_replay_determinism_after_supersede() {
     events.push(te(
         10,
         subject,
-        "ubo.determination.freeze",
+        "kyc_ubo.decide.determination.freeze",
         h,
         analyst(),
         authority(),
@@ -1055,7 +1055,7 @@ fn ec7_multi_role_person_one_subject_two_obligations() {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -1071,7 +1071,7 @@ fn ec7_multi_role_person_one_subject_two_obligations() {
         te(
             1,
             subject,
-            "kyc.obligation.create",
+            "kyc_ubo.assert.obligation.creation",
             h,
             analyst(),
             authority(),
@@ -1093,7 +1093,7 @@ fn ec7_multi_role_person_one_subject_two_obligations() {
         te(
             2,
             subject,
-            "kyc.obligation.create",
+            "kyc_ubo.assert.obligation.creation",
             h,
             analyst(),
             authority(),
@@ -1189,7 +1189,7 @@ fn k13_superseded_edges_remain_in_fold() {
         te(
             0,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -1202,7 +1202,7 @@ fn k13_superseded_edges_remain_in_fold() {
         te(
             1,
             subject,
-            "ubo.edge.supersede",
+            "kyc_ubo.assert.edge.supersession",
             h,
             analyst(),
             authority(),
@@ -1320,7 +1320,7 @@ fn phase1_fold_determinism_stress_determination_hash() {
     base_events.push(te(
         11,
         subject,
-        "ubo.determination.freeze",
+        "kyc_ubo.decide.determination.freeze",
         h,
         analyst(),
         authority(),
@@ -1379,7 +1379,7 @@ fn d2_phase2_unregistered_hash_is_hard_error_not_silent_fold() {
     let event = te(
         0,
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         unknown_hash,
         analyst(),
         authority(),
@@ -1417,7 +1417,7 @@ fn d2_phase2_obligation_unregistered_hash_is_hard_error() {
     let event = te(
         0,
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         unknown_hash,
         analyst(),
         authority(),
@@ -1486,7 +1486,7 @@ fn d2_phase3a_two_versions_dispatch_to_different_impls() {
     let v1_event = te(
         0,
         subject,
-        "ubo.edge.assert-economic-interest",
+        "kyc_ubo.assert.edge.economic-interest",
         v1_hash,
         analyst(),
         authority(),
@@ -1505,7 +1505,7 @@ fn d2_phase3a_two_versions_dispatch_to_different_impls() {
     let v2_event = te(
         0,
         subject,
-        "ubo.edge.assert-economic-interest",
+        "kyc_ubo.assert.edge.economic-interest",
         v2_hash,
         analyst(),
         authority(),
@@ -1615,7 +1615,7 @@ fn axes_diverge_on_correction() {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -1627,7 +1627,7 @@ fn axes_diverge_on_correction() {
         te(
             1,
             subject,
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             h,
             analyst(),
             authority(),
@@ -1639,7 +1639,7 @@ fn axes_diverge_on_correction() {
         te(
             2,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -1651,7 +1651,7 @@ fn axes_diverge_on_correction() {
         te(
             3,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -1664,7 +1664,7 @@ fn axes_diverge_on_correction() {
         te(
             4,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -1678,7 +1678,7 @@ fn axes_diverge_on_correction() {
         te(
             5,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -1691,7 +1691,7 @@ fn axes_diverge_on_correction() {
         te(
             6,
             subject,
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             h,
             analyst(),
             authority(),
@@ -1716,7 +1716,7 @@ fn axes_diverge_on_correction() {
         te(
             8,
             subject,
-            "ubo.determination.freeze",
+            "kyc_ubo.decide.determination.freeze",
             h,
             analyst(),
             authority(),
@@ -1733,7 +1733,7 @@ fn axes_diverge_on_correction() {
         te(
             9,
             subject,
-            "ubo.edge.supersede",
+            "kyc_ubo.assert.edge.supersession",
             h,
             analyst(),
             authority(),
@@ -1748,7 +1748,7 @@ fn axes_diverge_on_correction() {
         te(
             10,
             subject,
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             h,
             analyst(),
             authority(),
@@ -1764,7 +1764,7 @@ fn axes_diverge_on_correction() {
         te(
             11,
             subject,
-            "ubo.determination.freeze",
+            "kyc_ubo.decide.determination.freeze",
             h,
             analyst(),
             authority(),
@@ -1848,7 +1848,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             0,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -1860,7 +1860,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             1,
             subject,
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             h,
             analyst(),
             authority(),
@@ -1872,7 +1872,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             2,
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             h,
             analyst(),
             authority(),
@@ -1885,7 +1885,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             3,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -1899,7 +1899,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             4,
             subject,
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             h,
             analyst(),
             authority(),
@@ -1912,7 +1912,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             5,
             subject,
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             h,
             analyst(),
             authority(),
@@ -1936,7 +1936,7 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             7,
             subject,
-            "ubo.determination.freeze",
+            "kyc_ubo.decide.determination.freeze",
             h,
             analyst(),
             authority(),
@@ -2004,37 +2004,37 @@ fn r4_legal_set_at_past_time_is_reproducible() {
 
     let events: Vec<IntentEvent> = vec![
         te(
-            0, subject, "kyc.subject.register", h, analyst(), authority(),
+            0, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
             idem("r4-reg-a"), t1,
         ),
         te(
-            1, subject, "kyc.subject.classify-structure", h, analyst(), authority(),
+            1, subject, "kyc_ubo.assert.subject.structure-class", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
             idem("r4-cls"), t1,
         ),
         te(
-            2, subject, "kyc.subject.register", h, analyst(), authority(),
+            2, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
             idem("r4-reg-p1"), t1,
         ),
         te(
-            3, subject, "ubo.edge.assert-economic-interest", h, analyst(), authority(),
+            3, subject, "kyc_ubo.assert.edge.economic-interest", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"edge_id": edge_b_a.0, "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
             idem("r4-edge-b-a"), t1,
         ),
         te(
-            4, subject, "ubo.edge.assert-economic-interest", h, analyst(), authority(),
+            4, subject, "kyc_ubo.assert.edge.economic-interest", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"edge_id": eid("r4_p1_b").0, "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
             idem("r4-edge-p1-b"), t1,
         ),
         te(
-            5, subject, "ubo.edge.reconcile-conflict", h, analyst(), authority(),
+            5, subject, "kyc_ubo.assert.edge.reconciliation", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({}), idem("r4-reconcile1"), t1,
         ),
@@ -2045,7 +2045,7 @@ fn r4_legal_set_at_past_time_is_reproducible() {
             idem("r4-strategy"), t1,
         ),
         te(
-            7, subject, "ubo.determination.freeze", h, analyst(), authority(),
+            7, subject, "kyc_ubo.decide.determination.freeze", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({}), idem("r4-freeze1"), t1,
         ),
@@ -2102,31 +2102,31 @@ fn r4_legality_pins_its_ruleset() {
 
     let events: Vec<IntentEvent> = vec![
         te(
-            0, subject, "kyc.subject.register", h, analyst(), authority(),
+            0, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
             idem("r4b-reg-a"), t1,
         ),
         te(
-            1, subject, "kyc.subject.classify-structure", h, analyst(), authority(),
+            1, subject, "kyc_ubo.assert.subject.structure-class", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
             idem("r4b-cls"), t1,
         ),
         te(
-            2, subject, "kyc.subject.register", h, analyst(), authority(),
+            2, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
             idem("r4b-reg-p1"), t1,
         ),
         te(
-            3, subject, "ubo.edge.assert-economic-interest", h, analyst(), authority(),
+            3, subject, "kyc_ubo.assert.edge.economic-interest", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"edge_id": eid("r4b_p1_a").0, "from_entity_id": p1.0, "to_entity_id": a.0, "percentage": 100.0}),
             idem("r4b-edge"), t1,
         ),
         te(
-            4, subject, "ubo.edge.reconcile-conflict", h, analyst(), authority(),
+            4, subject, "kyc_ubo.assert.edge.reconciliation", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({}), idem("r4b-reconcile"), t1,
         ),
@@ -2137,7 +2137,7 @@ fn r4_legality_pins_its_ruleset() {
             idem("r4b-strategy"), t1,
         ),
         te(
-            6, subject, "ubo.determination.freeze", h, analyst(), authority(),
+            6, subject, "kyc_ubo.decide.determination.freeze", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({}), idem("r4b-freeze"), t1,
         ),

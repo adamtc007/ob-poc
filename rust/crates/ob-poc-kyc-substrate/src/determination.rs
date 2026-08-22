@@ -142,7 +142,7 @@ pub struct PierceRecord {
     pub underlying_holder: EntityId,
     /// The original (now-superseded) `EdgeKind::Nominee` edge.
     pub nominee_edge_id: EdgeId,
-    /// The replacement edge asserted by `ubo.edge.pierce-nominee`, carrying
+    /// The replacement edge asserted by `kyc_ubo.assert.edge.nominee-piercing`, carrying
     /// the real underlying kind.
     pub replacement_edge_id: EdgeId,
 }
@@ -896,7 +896,7 @@ impl DeterminationStrategy for CooperativeMemberStrategy {
 
 /// Resolves natural persons controlling a Nominee-classified subject — but
 /// ONLY once every nominee arrangement has been pierced
-/// (`ubo.edge.pierce-nominee`: the nominee edge is superseded and the
+/// (`kyc_ubo.assert.edge.nominee-piercing`: the nominee edge is superseded and the
 /// disclosed nominator's underlying edge is asserted in one governed event —
 /// EOP-DD-KYCUBO-KIT-TS0 §2.6, ratified 2026-08-12; K-8: attributing control
 /// to the nominee itself is exactly the wrong answer piercing exists to
@@ -1406,7 +1406,7 @@ impl DeterminationPin {
 
 // ── Frozen determination artifact ─────────────────────────────────────────────
 
-/// The immutable determination artifact produced by `ubo.determination.freeze`.
+/// The immutable determination artifact produced by `kyc_ubo.decide.determination.freeze`.
 /// Contains the pin + the resolved persons with their prong/basis (K-1).
 /// K-35: every candidate has `originating_event_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1462,7 +1462,7 @@ pub struct DeterminationInProgress {
 
 // ── freeze_determination ──────────────────────────────────────────────────────
 
-/// Execute `ubo.determination.freeze`:
+/// Execute `kyc_ubo.decide.determination.freeze`:
 /// - Requires `state.is_reconciled()` and `state.has_strategy()` (pre-checked).
 /// - Pins policy + lexicon + reference + import runs + graph hash + as_of.
 /// - Returns `FrozenDetermination` (immutable).
@@ -1596,7 +1596,7 @@ pub fn recover_determination_at(
     let freeze_event = events
         .iter()
         .rev()
-        .find(|e| e.verb_fqn.as_str() == "ubo.determination.freeze")?;
+        .find(|e| e.verb_fqn.as_str() == "kyc_ubo.decide.determination.freeze")?;
 
     // TS.6 P2: strategy is derived from `structure_class`, never asserted
     // (`select-strategy` retired). `classify_event_id` — the event that
@@ -1671,14 +1671,14 @@ pub fn recover_determination_bitemporal(
     recover_determination_at(&filtered, strategy, natural_persons, threshold_pct, pin)
 }
 
-/// Find the subject's own `EntityId`, recorded on `kyc.subject.classify-structure`
+/// Find the subject's own `EntityId`, recorded on `kyc_ubo.assert.subject.structure-class`
 /// (payload field `entity_id`). Shared by `recover_determination_at` (replay) and
-/// the live `ubo.determination.freeze` verb (EOP-DD-KYCUBO-003 remediation) so
+/// the live `kyc_ubo.decide.determination.freeze` verb (EOP-DD-KYCUBO-003 remediation) so
 /// both paths resolve the subject entity identically.
 pub fn find_subject_entity(events: &[&IntentEvent]) -> Option<EntityId> {
     events
         .iter()
-        .find(|e| e.verb_fqn.as_str() == "kyc.subject.classify-structure")
+        .find(|e| e.verb_fqn.as_str() == "kyc_ubo.assert.subject.structure-class")
         .and_then(|e| {
             e.payload
                 .get("entity_id")

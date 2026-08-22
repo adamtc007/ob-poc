@@ -17,7 +17,7 @@ use ob_poc::domain_ops::kyc_stream_ops::{
     UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAssertEconomicInterest, UboEdgeReconcileConflict,
 };
-// kyc.person.approve renamed decide.approve TS.6 P2 — moved to ob-poc-kyc-decide.
+// kyc.person.approve renamed kyc_ubo.decide.subject.approve TS.6 P2 — moved to ob-poc-kyc-decide.
 use ob_poc_kyc_decide::DecideApprove;
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{
@@ -129,7 +129,7 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 // ── M3.1 — Differential: freeze must match OwnershipProngStrategy (R1) ────────
 //
 // Mirrors the private-company fixture in `kyc_slice.rs` / `kyc_w7_oracle.rs`
-// but drives it through the REAL `ubo.determination.freeze` verb (not the
+// but drives it through the REAL `kyc_ubo.decide.determination.freeze` verb (not the
 // substrate directly). Before the R1 fix, freeze's proxy resolved every
 // distinct edge-source as a "candidate" with no threshold and no basis —
 // it would have surfaced P2 (12%, below threshold) and recorded no percentage.
@@ -384,7 +384,7 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
 // as `ownership_prong_strategy` (`ob_poc::domain_ops::kyc_stream_ops`).
 //
 // Fixture: an LP fund (subject) whose GP-statutory control edge points to a
-// natural person P1 directly. `ubo.edge.assert-control` with `kind:
+// natural person P1 directly. `kyc_ubo.assert.edge.control` with `kind:
 // gp_statutory` — the same verb `ownership_prong_strategy` fixtures use for
 // `assert-economic-interest`, just the control counterpart.
 

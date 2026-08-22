@@ -419,21 +419,31 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     use std::sync::Arc;
 
     // dsl.kyc stream-backed determination verbs (EOP-DD-KYCUBO-002 rip-and-replace R1/R2).
-    // Domain: ubo.edge.* (6), ubo.determination.* (4), kyc.subject.* (2).
+    // Domain: ubo.edge.* (5), ubo.determination.* (4), kyc.subject.* (2).
     // YAML: config/verbs/kyc/dsl-kyc.yaml.
     registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertControl));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertEconomicInterest));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeAttachEvidence));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeVerify));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeSupersede));
-    registry.register(Arc::new(kyc_stream_ops::UboEdgePierceNominee));
+    // `UboEdgePierceNominee` retired TS.6 P2 (K-G7) — folded into the
+    // `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/macros/ubo.yaml)
+    // composing `UboEdgeAssertControl` (extended with an optional
+    // `pierced-from` arg) + `UboEdgeSupersede`, both already registered
+    // above/below.
     registry.register(Arc::new(kyc_stream_ops::UboEdgeReconcileConflict));
-    registry.register(Arc::new(kyc_stream_ops::UboDeterminationSelectStrategy));
-    registry.register(Arc::new(kyc_stream_ops::UboDeterminationComputeFold));
-    registry.register(Arc::new(kyc_stream_ops::UboDeterminationApplySmoFallback));
+    // `UboDeterminationSelectStrategy` retired TS.6 P2 (K-G7) — strategy is
+    // now derived from `structure_class`, never separately asserted.
+    // `UboDeterminationComputeFold` retired TS.6 P2 (K-G7) — a pure read
+    // dressed as a verb; `freeze` already independently declares the same
+    // precondition pair it existed to demonstrate.
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectAssertType));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectCorrectType));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectWithdrawMember));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectRecordEnquiry));
     // W3: role-basis recording — KycRoleAssign/KycRoleWithdraw retired
     // 2026-08-12 (T0.3 K-G7 fold-blind write; see kyc_stream_ops.rs).
     // W5: obligation lifecycle
@@ -443,10 +453,14 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateRisk));
     registry.register(Arc::new(kyc_stream_ops::KycObligationSatisfy));
     registry.register(Arc::new(kyc_stream_ops::KycObligationWaive));
-    registry.register(Arc::new(kyc_stream_ops::KycPersonApprove));
-    registry.register(Arc::new(kyc_stream_ops::KycPersonReject));
+    // KycPersonApprove/KycPersonReject retired from this file TS.6 P2 (K-G7)
+    // — renamed kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject and moved to ob-poc-kyc-decide
+    // (structural Evaluation-pack split: that crate has no dependency on
+    // ob-poc-kyc-seam, so it cannot write to the fact stream). Registered
+    // below via `ob_poc_kyc_decide::register`.
     registry.register(Arc::new(kyc_stream_ops::ScreeningComplete));
     registry.register(Arc::new(kyc_stream_ops::ScreeningReviewHit));
+    ob_poc_kyc_decide::register(registry);
 
     // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
     // crate::database::derive_semantic_state + ob_poc_ontology::SemanticStageRegistry
@@ -547,15 +561,21 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(gleif_ops::GleifImportToClientGroup));
     registry.register(Arc::new(gleif_ops::GleifLookup));
 
-    // Phase B Pattern B slice #79: trading-profile.* (36 verbs — full
-    // draft→submit→approve→activate→materialize→archive lifecycle,
-    // component CRUD dispatchers, ISDA/CSA/SSI/IM config, validation).
-    // Bridges to ob_poc_trading_profile::{ast_db, document_ops}.
+    // Phase B Pattern B slice #79: trading-profile.* (35 verbs — full
+    // draft→submit→approve→activate→archive lifecycle, component CRUD
+    // dispatchers, ISDA/CSA/SSI/IM config, validation). Bridges to
+    // ob_poc_trading_profile::{ast_db, document_ops}.
+    //
+    // trading-profile.materialize removed (EOP-PLAN-MANDATE-FIX-001 F3,
+    // B2): parsed the document as TradingProfileDocument (flat), which
+    // requires `universe` -- every real tree-shaped document lacks it,
+    // and trading_profile_materializations recorded 0 rows ever. The
+    // shared materialize_* helpers stay: trading-profile.approve inlines
+    // the same materialization step and still uses them.
     registry.register(Arc::new(trading_profile::TradingProfileImportVerb));
     registry.register(Arc::new(trading_profile::TradingProfileGetActive));
     registry.register(Arc::new(trading_profile::TradingProfileActivate));
     registry.register(Arc::new(trading_profile::InstrumentMatrixAttachOp));
-    registry.register(Arc::new(trading_profile::TradingProfileMaterialize));
     registry.register(Arc::new(trading_profile::TradingProfileCreateDraft));
     registry.register(Arc::new(trading_profile::TradingProfileAddComponent));
     registry.register(Arc::new(trading_profile::TradingProfileRemoveComponent));

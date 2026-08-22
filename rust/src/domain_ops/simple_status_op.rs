@@ -865,25 +865,6 @@ pub(super) const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         entity_arg: "chain",
         timestamp: None,
     },
-    // ── trade-gateway.* (2 lifecycle) ────────────────────────────────────────
-    SimpleStatusConfig {
-        fqn: "trade-gateway.reactivate-gateway",
-        table: "cbu_gateway_connectivity",
-        pk_col: "connectivity_id",
-        state_col: "status",
-        target_state: "ACTIVE",
-        entity_arg: "connectivity-id",
-        timestamp: None,
-    },
-    SimpleStatusConfig {
-        fqn: "trade-gateway.retire-gateway",
-        table: "cbu_gateway_connectivity",
-        pk_col: "connectivity_id",
-        state_col: "status",
-        target_state: "DECOMMISSIONED",
-        entity_arg: "connectivity-id",
-        timestamp: None,
-    },
     // ── trading-profile.* lifecycle subset (5) ───────────────────────────────
     SimpleStatusConfig {
         fqn: "trading-profile.enter-parallel-run",

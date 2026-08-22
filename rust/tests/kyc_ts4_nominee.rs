@@ -1,4 +1,4 @@
-//! TS.4 gate tests — EOP-DD-KYCUBO-KIT-TS0 §2.6 (`ubo.edge.pierce-nominee` +
+//! TS.4 gate tests — EOP-DD-KYCUBO-KIT-TS0 §2.6 (`kyc_ubo.assert.edge.nominee-piercing` +
 //! `nominee_pierce_strategy`), ratified 2026-08-12 ACCEPT ALL. TS.4 = K-8:
 //! the LAST TS tranche — the only class needing a NEW verb, exercised with
 //! full kit citizenship (the K-G7 reintroduction discipline).
@@ -35,7 +35,7 @@
 //!
 //! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
 //! (`render_value` omits nulls at every depth), so test (e)'s final
-//! determination leg now drives `ubo.determination.freeze` LIVE to SUCCESS
+//! determination leg now drives `kyc_ubo.decide.determination.freeze` LIVE to SUCCESS
 //! and reads the candidates + recorded strategy off the freeze outcome.
 //! Tests (d)/(f) drive the real freeze op's error paths as before.
 //!
@@ -47,12 +47,12 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze,
-    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgePierceNominee,
-    UboEdgeReconcileConflict, UboEdgeSupersede,
+    KycSubjectClassifyStructure, KycSubjectRegister,
+    UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeReconcileConflict,
+    UboEdgeSupersede,
 };
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, EdgeKind, EdgeStatus, FoldRegistry, IntentEvent,
+    fold_control_versioned, assembly_lexicon, EdgeKind, EdgeStatus, FoldRegistry, IntentEvent,
     SubjectId, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -194,7 +194,7 @@ async fn fold_subject(pool: &PgPool, subject: SubjectId) -> ob_poc_kyc_substrate
         .expect("load events");
     let refs: Vec<&IntentEvent> = events.iter().collect();
     let mut reg = FoldRegistry::new();
-    reg.register(phase1_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
+    reg.register(assembly_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
     fold_control_versioned(&refs, &reg).expect("fold ok")
 }
 
@@ -251,16 +251,28 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
     )
     .await;
 
-    let out = run(
-        &UboEdgePierceNominee,
+    // TS.6 P2 (K-G7): `kyc_ubo.assert.edge.nominee-piercing` is now a macro composing
+    // `kyc_ubo.assert.edge.control` (pierced-from) + `kyc_ubo.assert.edge.supersession` — TWO
+    // governed events, not one; the macro's two steps commit atomically
+    // under the Sequencer's one-scope-per-runbook model, driven here as the
+    // real two ops in the same order.
+    let assert_out = run(
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": nominee_edge,
-            "nominator-id": nominator, "kind": "voting_rights",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "voting_rights", "pierced-from": nominee_edge,
         }),
         &pool,
     )
     .await;
-    assert!(out.get("seq").is_some(), "pierce must append: {out:?}");
+    assert!(assert_out.get("seq").is_some(), "pierce's assert-control step must append: {assert_out:?}");
+    let supersede_out = run(
+        &UboEdgeSupersede,
+        serde_json::json!({ "subject-id": subject.0, "edge-id": nominee_edge }),
+        &pool,
+    )
+    .await;
+    assert!(supersede_out.get("seq").is_some(), "pierce's supersede step must append: {supersede_out:?}");
 
     let state = fold_subject(&pool, subject).await;
     let old = state
@@ -274,7 +286,7 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
     );
     assert!(
         old.superseded_by.is_some(),
-        "effect (a): superseded_by must point at the pierce event (K-35)"
+        "effect (a): superseded_by must point at the supersede event (K-35)"
     );
 
     let new_edge = state
@@ -296,10 +308,15 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
         Some(ob_poc_kyc_substrate::EdgeId(nominee_edge)),
         "the new edge carries pierced_from provenance (§2.6)"
     );
-    assert_eq!(
+    // TS.6 P2: the two effects now originate from TWO SEPARATE governed
+    // events (assert-control's, then supersede's) — the macro composition
+    // trades the old single-event atomicity-of-record for scope-level
+    // transactional atomicity (both commit or both roll back together);
+    // neither event id equals the other's by construction.
+    assert_ne!(
         new_edge.originating_event_id,
         old.superseded_by.unwrap(),
-        "both effects originate from the SAME governed pierce event"
+        "post-redesign, the assert-control and supersede steps are distinct events"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -326,18 +343,22 @@ async fn b_pierce_refuses_non_nominee_target_edge() {
     )
     .await;
 
+    // TS.6 P2 (K-G7): the "target is actually EdgeKind::Nominee" check moved
+    // to `kyc_ubo.assert.edge.control`'s op layer, gated on `pierced-from` —
+    // exercised directly rather than via the retired standalone verb.
     let result = run_fallible(
-        &UboEdgePierceNominee,
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": edge,
-            "nominator-id": nominator, "kind": "voting_rights",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "voting_rights", "pierced-from": edge,
         }),
         &pool,
     )
     .await;
     assert!(
         result.is_err(),
-        "pierce must refuse a target edge that is not EdgeKind::Nominee"
+        "assert-control's pierced-from check must refuse a target edge that is not \
+         EdgeKind::Nominee"
     );
     let msg = result.unwrap_err().to_string();
     assert!(
@@ -369,12 +390,15 @@ async fn b2_pierce_normalizer_rejects_nominee_and_unknown_kinds() {
     )
     .await;
 
+    // TS.6 P2 (K-G7): both checks moved to `kyc_ubo.assert.edge.control`'s
+    // normalizer, gated on `pierced-from` — exercised directly.
+    //
     // A pierce cannot produce another nominee edge (fail-closed, §2.6).
     let nominee_kind = run_fallible(
-        &UboEdgePierceNominee,
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": edge,
-            "nominator-id": nominator, "kind": "nominee",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "nominee", "pierced-from": edge,
         }),
         &pool,
     )
@@ -388,10 +412,10 @@ async fn b2_pierce_normalizer_rejects_nominee_and_unknown_kinds() {
 
     // Unknown kind — the TS.1 §1b wire-normalizer discipline, fail-closed.
     let unknown = run_fallible(
-        &UboEdgePierceNominee,
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": edge,
-            "nominator-id": nominator, "kind": "votng_rights",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "votng_rights", "pierced-from": edge,
         }),
         &pool,
     )
@@ -436,12 +460,15 @@ async fn c_pierce_refuses_superseded_and_missing_targets() {
     )
     .await;
 
+    // TS.6 P2 (K-G7): both checks moved to `kyc_ubo.assert.edge.control`'s
+    // pierced-from pre-fold check — exercised directly.
+    //
     // Superseded target — the EdgeActive stud (matrix rows 3/4) refuses.
     let inactive = run_fallible(
-        &UboEdgePierceNominee,
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": edge,
-            "nominator-id": nominator, "kind": "voting_rights",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "voting_rights", "pierced-from": edge,
         }),
         &pool,
     )
@@ -453,10 +480,10 @@ async fn c_pierce_refuses_superseded_and_missing_targets() {
 
     // Non-existent target — refused before anything appends.
     let missing = run_fallible(
-        &UboEdgePierceNominee,
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": Uuid::new_v4(),
-            "nominator-id": nominator, "kind": "voting_rights",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "voting_rights", "pierced-from": Uuid::new_v4(),
         }),
         &pool,
     )
@@ -499,21 +526,14 @@ async fn d_freeze_hard_errors_while_unpierced_nominee_edge_active() {
     )
     .await;
 
-    // The gate widening proven at the REAL op: select-strategy on a
-    // Nominee-classified subject is now ADMITTED (StructureClassSupported
-    // widened at TS.4) — pre-TS.4 this call fails-closed.
-    let select = run_fallible(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "nominee_pierce_strategy" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        select.is_ok(),
-        "select-strategy on a Nominee-classified subject must be admitted \
-         post-TS.4 (StructureClassSupported widened): {select:?}"
-    );
-
+    // The gate widening proven at the REAL op (StructureClassSupported
+    // widened at TS.4). Previously probed via `apply-smo-fallback`, which
+    // shared the identical [ReconciledProjection, StructureClassSupported]
+    // pair — retired TS.6 §5 (SMO is pulled on exhaustion, never asserted).
+    // No separate probe is needed: the `freeze` call below must PASS both
+    // preconditions to reach its K-8 unpierced-nominee guard at all, so the
+    // "unpierced" error asserted there is itself the proof that
+    // StructureClassSupported admitted a Nominee-classified subject.
     let result = run_fallible(
         &UboDeterminationFreeze,
         serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
@@ -554,12 +574,19 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
         &pool,
     )
     .await;
+    // TS.6 P2 (K-G7): pierce via the two real composed ops (macro-equivalent).
     run(
-        &UboEdgePierceNominee,
+        &UboEdgeAssertControl,
         serde_json::json!({
-            "subject-id": subject.0, "edge-id": nominee_edge,
-            "nominator-id": nominator, "kind": "voting_rights",
+            "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
+            "kind": "voting_rights", "pierced-from": nominee_edge,
         }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeSupersede,
+        serde_json::json!({ "subject-id": subject.0, "edge-id": nominee_edge }),
         &pool,
     )
     .await;
@@ -569,17 +596,10 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
         &pool,
     )
     .await;
-    let select = run_fallible(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "nominee_pierce_strategy" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        select.is_ok(),
-        "select-strategy must be admitted post-TS.4: {select:?}"
-    );
-
+    // `freeze_candidates` succeeding below proves StructureClassSupported
+    // admits this post-pierce Nominee subject (`compute-fold`'s standalone
+    // probe of the identical precondition pair was retired TS.6 P2 as
+    // redundant with this call).
     let candidates = freeze_candidates(&pool, subject, "nominee_pierce_strategy").await;
 
     assert_eq!(
@@ -608,72 +628,14 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
     cleanup(&pool, &[subject]).await;
 }
 
-// ── (f) freeze unknown-strategy arm errors, listing all 8 ───────────────────
-
-#[tokio::test]
-async fn f_freeze_rejects_unknown_strategy_listing_all_eight() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let chair = Uuid::new_v4();
-
-    setup_subject(&pool, subject, &[chair], "cooperative").await;
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject.0, "from_entity_id": chair, "to_entity_id": subject.0,
-            "kind": "board_appointment",
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    // TS.4 fixture fix: nominee_pierce_strategy gained a real dispatch arm
-    // (NomineePierceStrategy) — the unknown-arm exemplar is now a
-    // never-will-exist string.
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "no_such_strategy" }),
-        &pool,
-    )
-    .await;
-
-    let result = run_fallible(
-        &UboDeterminationFreeze,
-        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        result.is_err(),
-        "freeze must refuse an unimplemented strategy rather than silently \
-         substituting a registered one"
-    );
-    let msg = result.unwrap_err().to_string();
-    assert!(
-        msg.contains("no_such_strategy") && msg.contains("no DeterminationStrategy"),
-        "error should name the missing strategy; got: {msg}"
-    );
-    for implemented in [
-        "ownership_prong_strategy",
-        "control_prong_strategy",
-        "trust_role_strategy",
-        "fund_control_strategy",
-        "foundation_council_strategy",
-        "state_owned_strategy",
-        "cooperative_member_strategy",
-        "nominee_pierce_strategy",
-    ] {
-        assert!(
-            msg.contains(implemented),
-            "the rejection must list all 8 implemented strategies (expected \
-             {implemented} in: {msg})"
-        );
-    }
-
-    cleanup(&pool, &[subject]).await;
-}
+// ── (f) freeze unknown-strategy arm — RETIRED (TS.6 P2) ─────────────────────
+//
+// `f_freeze_rejects_unknown_strategy_listing_all_eight` drove
+// `select-strategy` with a `"no_such_strategy"` string to prove freeze's
+// catch-all arm. That entry point is gone: the strategy is now DERIVED
+// from `structure_class`, a TOTAL function over all 11 `StructureClass`
+// variants (pinned by
+// `kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`),
+// so there is no governed way left to hand freeze an arbitrary strategy
+// name — see the identical note on `kyc_ts1_trust.rs`'s deleted
+// `f_freeze_still_rejects_unknown_strategy_after_trust_widening`.

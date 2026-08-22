@@ -193,7 +193,9 @@ fn get_test_scenarios() -> Vec<ClarificationScenario> {
         ClarificationScenario {
             description: "Vague approval request",
             user_input: "approve it",
-            expected_verbs: &["kyc-case.approve", "document.verify"],
+            // document.verify removed 2026-08-20 (EOP-PLAN-MANDATE-FIX-001
+            // F4) -- targeted the absent "ob-poc".document_versions table.
+            expected_verbs: &["kyc-case.approve"],
             user_selection: "kyc-case.approve",
             category: "document",
         },

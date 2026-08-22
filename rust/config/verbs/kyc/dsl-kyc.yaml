@@ -5,18 +5,25 @@
 # kyc_intent_events stream; current state is a fold/projection of that stream — never a
 # direct table write. Ops live in domain_ops::kyc_stream_ops.
 #
-# The domain split: ubo.edge.* (6 edge lifecycle; pierce-nominee retired TS.6 P2 —
-# folded into a macro composing assert-control's pierced-from arg + supersede, K-8),
-# ubo.determination.* (1: freeze — select-strategy/compute-fold/apply-smo-fallback
-# both retired TS.6 P2), kyc.subject.* (6 subject/entity lifecycle). All are
-# covered by phase1_lexicon() in the ob-poc-kyc-substrate crate.
+# The domain split (four-segment scheme `kyc_ubo.<capability>.<domain>.<intent>`,
+# RATIFIED 2026-08-22): kyc_ubo.assert.edge.* (6 edge lifecycle; nominee-piercing
+# retired as a standalone verb TS.6 P2 — folded into a macro composing
+# assert.edge.control's pierced-from arg + assert.edge.supersession, K-8),
+# kyc_ubo.decide.determination.* (1: freeze — the single Assembly verdict;
+# select-strategy/compute-fold/apply-smo-fallback all retired), and
+# kyc_ubo.assert.subject.* (6 subject/entity lifecycle). All are covered by
+# assembly_lexicon() in the ob-poc-kyc-substrate crate.
+#
+# Capability follows pack membership: Assembly verbs are `assert` except the
+# pinned verdict set {freeze}; Evaluation verbs are `decide`. `assess` has no
+# members yet. The intent segment is a NOUN, never a repeat of the capability.
 
 domains:
-  ubo:
-    description: "UBO determination — durable stream-backed verb primitives (dsl.kyc lexicon)"
+  kyc_ubo.assert.edge:
+    description: "UBO edge assertions — durable stream-backed verb primitives (dsl.kyc lexicon, Assembly pack)"
 
     verbs:
-      edge.assert-control:
+      control:
         flavour: instance_adding
         description: Claim a control edge (voting rights, board appointment, GP statutory, trust role, etc.)
         effect_class: append_fact
@@ -78,7 +85,7 @@ domains:
           - name: pierced-from
             type: uuid
             required: false
-            description: "TS.6 P2 (K-G7): set ONLY by the `ubo.edge.pierce-nominee` macro (config/verb_schemas/macros/ubo.yaml), which composes this verb with edge.supersede to replace the retired standalone pierce-nominee verb. The referenced edge id — the nominee edge this assertion pierces. Op-layer fail-closed check (no precondition primitive expresses \"edge is of kind X\"): the referenced edge must exist, be EdgeKind::Nominee, and be active. `kind` above may not be `nominee` when this is set (a pierce cannot produce another nominee edge). Fold-side: stamps EdgeState.pierced_from (K-8 traceability)."
+            description: "TS.6 P2 (K-G7): set ONLY by the `kyc_ubo.assert.edge.nominee-piercing` macro (config/verb_schemas/macros/ubo.yaml), which composes this verb with edge.supersede to replace the retired standalone pierce-nominee verb. The referenced edge id — the nominee edge this assertion pierces. Op-layer fail-closed check (no precondition primitive expresses \"edge is of kind X\"): the referenced edge must exist, be EdgeKind::Nominee, and be active. `kind` above may not be `nominee` when this is set (a pierce cannot produce another nominee edge). Fold-side: stamps EdgeState.pierced_from (K-8 traceability)."
         returns:
           type: record
           fields:
@@ -94,7 +101,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      edge.assert-economic-interest:
+      economic-interest:
         flavour: instance_adding
         description: Claim an economic-interest edge (shareholding percentage)
         effect_class: append_fact
@@ -152,7 +159,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      edge.attach-evidence:
+      evidence:
         flavour: attribute_mutating
         description: Cite evidence for an asserted edge (moves edge from Asserted → Evidenced)
         effect_class: append_fact
@@ -196,7 +203,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      edge.verify:
+      verification:
         flavour: attribute_mutating
         description: Verify an evidenced edge (moves Evidenced → Verified; requires evidence first)
         effect_class: append_fact
@@ -243,7 +250,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      edge.supersede:
+      supersession:
         flavour: attribute_mutating
         description: Supersede an edge (K-13 supersede-never-delete — edge stays, status flips)
         effect_class: append_fact
@@ -292,7 +299,7 @@ domains:
             baseline: reviewable
 
       # edge.pierce-nominee RETIRED (TS.6 P2, K-G7, 2026-08-22): folded into
-      # the `ubo.edge.pierce-nominee` MACRO (config/verb_schemas/macros/
+      # the `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/macros/
       # ubo.yaml) composing `edge.assert-control` (with its new optional
       # `pierced-from` arg, below) + `edge.supersede`. Piercing records a
       # real handed-over fact, so it wasn't deleted outright (unlike
@@ -300,7 +307,7 @@ domains:
       # shape was a bespoke single-purpose verb doing two governed effects
       # in one hand-rolled fold arm, with no reusable composition mechanism.
 
-      edge.reconcile-conflict:
+      reconciliation:
         flavour: attribute_mutating
         description: Record a conflict-reconciliation event on the subject stream
         effect_class: append_fact
@@ -357,62 +364,11 @@ domains:
       # may END with a colon. `kyc_pack_closure.rs::extract_verb_fqns` is a
       # naive 6-space-indent line scan and would read it as a verb key.
 
-      determination.freeze:
-        flavour: attribute_mutating
-        description: Freeze (pin) the current determination — seals the K-18 DeterminationPin
-        effect_class: append_fact
-        invocation_phrases:
-          - "freeze determination"
-          - "pin determination"
-          - "seal determination"
-          - "freeze the UBO determination"
-          - "pin the ownership determination"
-          - "lock the determination"
-          - "freeze and seal"
-          - "commit determination"
-          - "seal the UBO pin"
-          - "freeze the result"
-          - "approve the beneficial ownership determination"
-          - "approve the UBO determination"
-          - "approve this ownership determination"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: determination
-          tags: [ubo, freeze, pin, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root to freeze
-          - name: policy-version
-            type: string
-            required: true
-            description: Policy version at freeze time
-          - name: threshold-pct
-            type: decimal
-            required: false
-            description: "UBO threshold in percentage points (K-6); defaults to 25.0 pending a governed per-jurisdiction reference-plane table (EOP-DD-KYCUBO-003 M1.4)"
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-
-  kyc:
-    description: "KYC subject stream operations (dsl.kyc lexicon)"
+  kyc_ubo.assert.subject:
+    description: "KYC subject stream assertions (dsl.kyc lexicon, Assembly pack)"
 
     verbs:
-      subject.register:
+      register:
         flavour: instance_adding
         description: Register a subject on the KYC determination stream
         effect_class: append_fact
@@ -460,7 +416,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      subject.classify-structure:
+      structure-class:
         flavour: attribute_mutating
         description: Classify the entity structure for determination purposes (simple, complex, fund, etc.)
         effect_class: append_fact
@@ -492,7 +448,7 @@ domains:
           - name: structure-class
             type: string
             required: true
-            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4); trust pairs with trust_role_strategy (trust_settlor/trust_trustee/trust_protector/trust_beneficiary wire values, TS.1); investment_fund pairs with fund_control_strategy (manager control, TS.2); foundation pairs with foundation_council_strategy (council control, TS.2); state_owned pairs with state_owned_strategy (rare natural-person controller, else the SMO route, TS.3); cooperative pairs with cooperative_member_strategy (office-based control, never membership per se, TS.3); nominee pairs with nominee_pierce_strategy (pierce via ubo.edge.pierce-nominee first, then the underlying structure resolves — freeze fail-closes while unpierced nominee edges remain, TS.4 = K-8). The taxonomy is fully served: all 11 classes have an implemented strategy."
+            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4); trust pairs with trust_role_strategy (trust_settlor/trust_trustee/trust_protector/trust_beneficiary wire values, TS.1); investment_fund pairs with fund_control_strategy (manager control, TS.2); foundation pairs with foundation_council_strategy (council control, TS.2); state_owned pairs with state_owned_strategy (rare natural-person controller, else the SMO route, TS.3); cooperative pairs with cooperative_member_strategy (office-based control, never membership per se, TS.3); nominee pairs with nominee_pierce_strategy (pierce via kyc_ubo.assert.edge.nominee-piercing first, then the underlying structure resolves — freeze fail-closes while unpierced nominee edges remain, TS.4 = K-8). The taxonomy is fully served: all 11 classes have an implemented strategy."
             valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
           - name: entity-id
             type: uuid
@@ -509,7 +465,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      subject.assert-type:
+      type:
         flavour: attribute_mutating
         description: Assert this entity is of this type (EOP-DD-KYCUBO-TS.1 §3 move 2) — always Alleged; supersedes any prior type assertion
         effect_class: append_fact
@@ -541,7 +497,7 @@ domains:
           - name: entity-id
             type: uuid
             required: true
-            description: The group member entity being typed (must already be registered via kyc.subject.register)
+            description: The group member entity being typed (must already be registered via kyc_ubo.assert.subject.register)
           - name: entity-type
             type: string
             required: true
@@ -558,7 +514,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      subject.correct-type:
+      type-correction:
         flavour: attribute_mutating
         description: Correct a wrongly-asserted entity type (EOP-DD-KYCUBO-TS.1 §3 move 7) — triggers the §4 cascade, demoting affected linkages for re-assertion rather than deleting them
         effect_class: append_fact
@@ -607,7 +563,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      subject.withdraw-member:
+      member-withdrawal:
         flavour: attribute_mutating
         description: This entity is not, or is no longer, a group member (EOP-DD-KYCUBO-TS.1 §3 move 6) — flags membership, never deletes (TS.1 §2c basket-of-references)
         effect_class: append_fact
@@ -647,7 +603,7 @@ domains:
           consequence:
             baseline: reviewable
 
-      subject.record-enquiry:
+      enquiry:
         flavour: attribute_mutating
         description: Record sources consulted and searches run (EOP-DD-KYCUBO-TS.1 §3 move 8) — completeness is a diligence assertion, never a proof (TS.0 §6.3)
         effect_class: append_fact
@@ -680,6 +636,61 @@ domains:
             type: string_list
             required: false
             description: Searches run during the enquiry
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+  kyc_ubo.decide.determination:
+    description: "Determination disposition — freeze commits to the computed answer as the one of record (Assembly pack; the one Assembly verdict, TS.6 rename ruling 2026-08-22)"
+
+    verbs:
+      freeze:
+        flavour: attribute_mutating
+        description: Freeze (pin) the current determination — seals the K-18 DeterminationPin
+        effect_class: append_fact
+        invocation_phrases:
+          - "freeze determination"
+          - "pin determination"
+          - "seal determination"
+          - "freeze the UBO determination"
+          - "pin the ownership determination"
+          - "lock the determination"
+          - "freeze and seal"
+          - "commit determination"
+          - "seal the UBO pin"
+          - "freeze the result"
+          - "approve the beneficial ownership determination"
+          - "approve the UBO determination"
+          - "approve this ownership determination"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: determination
+          tags: [ubo, freeze, pin, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root to freeze
+          - name: policy-version
+            type: string
+            required: true
+            description: Policy version at freeze time
+          - name: threshold-pct
+            type: decimal
+            required: false
+            description: "UBO threshold in percentage points (K-6); defaults to 25.0 pending a governed per-jurisdiction reference-plane table (EOP-DD-KYCUBO-003 M1.4)"
         returns:
           type: record
           fields:

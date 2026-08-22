@@ -236,7 +236,7 @@ mod e2e_tests {
     /// whenever Strategy 1's constrained search came back empty, and its
     /// results were returned with no re-application of `allowed_verbs`. This
     /// is how `entity-workstream.set-ubo` (admitted by zero packs) won a live
-    /// proposal over `kyc.subject.register` inside an active `kyc-case`
+    /// proposal over `kyc_ubo.assert.subject.register` inside an active `kyc-case`
     /// pack session. Proves both halves of the fix: `search()` now honours
     /// `allowed_verbs` even on the fallback path, and the new
     /// `find_out_of_scope_match` diagnostic still surfaces the same
@@ -260,11 +260,11 @@ mod e2e_tests {
         // does NOT include entity-workstream.set-ubo, which is admitted by
         // zero packs anywhere in the system.
         let allowed_verbs: std::collections::HashSet<String> = [
-            "kyc.subject.register",
-            "kyc.subject.classify-structure",
-            "ubo.edge.assert-control",
-            "ubo.edge.assert-economic-interest",
-            "ubo.determination.freeze",
+            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.structure-class",
+            "kyc_ubo.assert.edge.control",
+            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.decide.determination.freeze",
             "kyc-case.create",
             "kyc-case.update-status",
         ]

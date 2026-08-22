@@ -2,7 +2,7 @@
 //! `mandate_pivot_without_evidence_computes_but_cannot_freeze`.
 //!
 //! Live-DB harness, same pattern as `kyc_ts4_nominee.rs`'s (d) test: drives
-//! the REAL `ubo.determination.freeze` op end-to-end. A governing-mandate
+//! the REAL `kyc_ubo.decide.determination.freeze` op end-to-end. A governing-mandate
 //! pivot with no contract evidence attached must COMPUTE (candidates
 //! resolve, `fund_control_strategy` runs) but the freeze itself must
 //! HARD-ERROR — "record freely, conclude carefully". Attaching evidence to
@@ -14,9 +14,8 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze,
-    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAttachEvidence,
-    UboEdgeReconcileConflict,
+    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    UboEdgeAttachEvidence, UboEdgeReconcileConflict,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -160,12 +159,6 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     )
     .await;
     run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject, "strategy": "fund_control_strategy" }),
-        &pool,
-    )
-    .await;
 
     // Freeze must REFUSE — the pivot computed, but the mandate is unevidenced.
     let refused = run_fallible(

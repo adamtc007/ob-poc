@@ -69,7 +69,7 @@ ob-poc-kyc-substrate = { path = "crates/ob-poc-kyc-substrate" }
 ob-poc-kyc-store = { path = "crates/ob-poc-kyc-store" }
 ob-poc-kyc-read = { path = "crates/ob-poc-kyc-read" }
 ob-poc-kyc-seam = { path = "crates/ob-poc-kyc-seam" }
-# TS.6 P1/P2: Evaluation-pack verdicts (decide.approve, decide.reject) — no
+# TS.6 P1/P2: Evaluation-pack verdicts (kyc_ubo.decide.subject.approve, kyc_ubo.decide.subject.reject) — no
 # dependency on ob-poc-kyc-seam, by construction (see the crate's own doc
 # comment and scripts/check_kyc_decide_deps.sh).
 ob-poc-kyc-decide = { path = "crates/ob-poc-kyc-decide" }

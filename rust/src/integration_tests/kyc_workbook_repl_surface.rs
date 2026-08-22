@@ -16,7 +16,7 @@ use uuid::Uuid;
 use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, preview, AuthorityRef, EdgeId, FoldRegistry, IntentEvent,
+    assembly_lexicon, preview, AuthorityRef, EdgeId, FoldRegistry, IntentEvent,
     Principal as SubstratePrincipal, SubjectId, TargetBinding, V1FoldImpl,
 };
 
@@ -47,7 +47,7 @@ fn orchestrator(pool: PgPool) -> ReplOrchestratorV2 {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -116,7 +116,7 @@ async fn resolver_resolves_exact() {
     insert_entity(&pool, entity_id, type_id, &name).await;
 
     let mut conn = pool.acquire().await.unwrap();
-    let text = format!(r#"(kyc.subject.register :subject-id "@{name}")"#);
+    let text = format!(r#"(kyc_ubo.assert.subject.register :subject-id "@{name}")"#);
     let resolved = resolve_handles(&mut conn, &text).await.expect("exact match must resolve");
     assert!(
         resolved.contains(&entity_id.to_string()),
@@ -132,7 +132,7 @@ async fn resolver_resolves_exact() {
 async fn resolver_rejects_unknown() {
     let pool = connect().await;
     let mut conn = pool.acquire().await.unwrap();
-    let text = r#"(kyc.subject.register :subject-id "@DefinitelyNotARealEntityHandle12345")"#;
+    let text = r#"(kyc_ubo.assert.subject.register :subject-id "@DefinitelyNotARealEntityHandle12345")"#;
     let err = resolve_handles(&mut conn, text).await.expect_err("unknown handle must error");
     assert!(matches!(err, ResolverError::Unknown { .. }), "got: {err:?}");
 }
@@ -148,7 +148,7 @@ async fn resolver_rejects_ambiguous() {
     insert_entity(&pool, id_b, type_b, &shared_name).await;
 
     let mut conn = pool.acquire().await.unwrap();
-    let text = format!(r#"(kyc.subject.register :subject-id "@{shared_name}")"#);
+    let text = format!(r#"(kyc_ubo.assert.subject.register :subject-id "@{shared_name}")"#);
     let err = resolve_handles(&mut conn, &text).await.expect_err("ambiguous handle must error");
     match err {
         ResolverError::Ambiguous { candidates, .. } => {
@@ -204,7 +204,7 @@ async fn surface_session_end_to_end() {
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: format!(r#"kyc-workbook.stage (kyc.subject.register :subject-id "@{handle_name}")"#),
+            content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.subject.register :subject-id "@{handle_name}")"#),
         },
     )
     .await
@@ -218,7 +218,7 @@ async fn surface_session_end_to_end() {
             session_id,
             UserInputV2::Message {
                 content: format!(
-                    r#"kyc-workbook.stage (ubo.edge.assert-control :subject-id "@{handle_name}" :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
+                    r#"kyc-workbook.stage (kyc_ubo.assert.edge.control :subject-id "@{handle_name}" :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
                 ),
             },
         )
@@ -237,7 +237,7 @@ async fn surface_session_end_to_end() {
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: format!(r#"kyc-workbook.stage (ubo.edge.attach-evidence :edge-id "{edge}" :doc_id "{doc_id}")"#),
+            content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.evidence :edge-id "{edge}" :doc_id "{doc_id}")"#),
         },
     )
     .await
@@ -299,7 +299,7 @@ async fn surface_rejection_shows_placement_listing() {
         .process(
             session_id,
             UserInputV2::Message {
-                content: format!(r#"kyc-workbook.stage (ubo.edge.verify :edge-id "{}")"#, Uuid::new_v4()),
+                content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.verification :edge-id "{}")"#, Uuid::new_v4()),
             },
         )
         .await
@@ -317,7 +317,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
     let pool = connect().await;
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let as_of = fixed_ts();
     let edge1 = Uuid::new_v4();
 
@@ -328,7 +328,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
         let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool).await.unwrap();
         let register_event = IntentEvent::new(
             subject,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             SubstratePrincipal::test_analyst(),
             AuthorityRef("setup.register".into()),
             TargetBinding::for_subject(subject),
@@ -340,7 +340,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
 
         let assert_event = IntentEvent::new(
             subject,
-            "ubo.edge.assert-control",
+            "kyc_ubo.assert.edge.control",
             SubstratePrincipal::test_analyst(),
             AuthorityRef("setup.assert-control".into()),
             TargetBinding::for_subject(subject),
@@ -352,7 +352,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
 
         let evidence_event = IntentEvent::new(
             subject,
-            "ubo.edge.attach-evidence",
+            "kyc_ubo.assert.edge.evidence",
             SubstratePrincipal::test_analyst(),
             AuthorityRef("setup.attach-evidence".into()),
             TargetBinding::for_edge(subject, EdgeId(edge1)),
@@ -378,7 +378,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
         session_id,
         UserInputV2::Message {
             content: format!(
-                r#"kyc-workbook.stage (ubo.edge.assert-control :edge_id "{edge2}" :from_entity_id "{from2}" :to_entity_id "{to2}" :kind "voting_rights")"#
+                r#"kyc-workbook.stage (kyc_ubo.assert.edge.control :edge_id "{edge2}" :from_entity_id "{from2}" :to_entity_id "{to2}" :kind "voting_rights")"#
             ),
         },
     )
@@ -390,7 +390,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: format!(r#"kyc-workbook.stage (ubo.edge.verify :edge-id "{edge1}")"#),
+            content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.verification :edge-id "{edge1}")"#),
         },
     )
     .await
@@ -402,7 +402,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
         let mut scope2 = crate::sequencer_tx::PgTransactionScope::begin(&pool).await.unwrap();
         let supersede_event = IntentEvent::new(
             subject,
-            "ubo.edge.supersede",
+            "kyc_ubo.assert.edge.supersession",
             SubstratePrincipal::test_analyst(),
             AuthorityRef("concurrent.supersede".into()),
             TargetBinding::for_edge(subject, EdgeId(edge1)),
@@ -421,8 +421,8 @@ async fn run_stops_at_first_failure_prefix_stands() {
         .await
         .expect("run dispatch itself must not error at the transport level");
     let run_msg = expect_info(&run_resp.kind);
-    assert!(run_msg.contains("LANDED ubo.edge.assert-control"), "got: {run_msg}");
-    assert!(run_msg.contains("FAILED ubo.edge.verify"), "got: {run_msg}");
+    assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.control"), "got: {run_msg}");
+    assert!(run_msg.contains("FAILED kyc_ubo.assert.edge.verification"), "got: {run_msg}");
     assert!(run_msg.contains("1 move(s) remain staged"), "got: {run_msg}");
 
     // Prefix stands: move A's append is a real, separate, already-committed
@@ -458,7 +458,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
     // `session_roundtrip` fixture.
     orch.process(
         session_id,
-        UserInputV2::Message { content: "kyc-workbook.stage (kyc.subject.register)".to_string() },
+        UserInputV2::Message { content: "kyc-workbook.stage (kyc_ubo.assert.subject.register)".to_string() },
     )
     .await
     .unwrap();
@@ -467,7 +467,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
         session_id,
         UserInputV2::Message {
             content: format!(
-                r#"kyc-workbook.stage (ubo.edge.assert-control :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
+                r#"kyc-workbook.stage (kyc_ubo.assert.edge.control :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
             ),
         },
     )
@@ -478,10 +478,10 @@ async fn run_prefix_state_matches_intermediate_preview() {
     // assert-control move]) — computed independently via the substrate's
     // own `preview`, exactly what staging-time validate() would have shown
     // after these two moves.
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let register_event = IntentEvent::new(
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         SubstratePrincipal::test_analyst(),
         AuthorityRef("preview-only".into()),
         TargetBinding::for_subject(subject),
@@ -491,7 +491,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
     .with_lexicon_hash(lexicon.hash);
     let expected_event = IntentEvent::new(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         SubstratePrincipal::test_analyst(),
         AuthorityRef("preview-only".into()),
         TargetBinding::for_subject(subject),
@@ -508,8 +508,8 @@ async fn run_prefix_state_matches_intermediate_preview() {
         .await
         .expect("run must succeed");
     let run_msg = expect_info(&run_resp.kind);
-    assert!(run_msg.contains("LANDED kyc.subject.register"), "got: {run_msg}");
-    assert!(run_msg.contains("LANDED ubo.edge.assert-control"), "got: {run_msg}");
+    assert!(run_msg.contains("LANDED kyc_ubo.assert.subject.register"), "got: {run_msg}");
+    assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.control"), "got: {run_msg}");
 
     let mut conn = pool.acquire().await.unwrap();
     let committed = PgKycEventStore::load_events(&mut conn, subject).await.unwrap();

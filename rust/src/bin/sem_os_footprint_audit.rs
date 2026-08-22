@@ -1967,10 +1967,8 @@ fn run_extract_plugin_core(repo: &Path, output: &Path) -> Result<()> {
             &["document-id/doc-id"],
             &["extraction_status set to IN_PROGRESS on document_catalog", "downstream OCR/extraction remains TODO in current implementation"],
             "Current extract implementation only marks extraction_status on document_catalog"),
-        plugin_core_entry(&ctx, "document.upload-version", &["documents"], &["document_versions"],
-            &["document-id", "content-type", "either blob-ref or structured-data is required"],
-            &["document version inserted", "cargo_ref URI returned", "version bound into context"],
-            "Upload-version verifies the parent document, computes next version number, and inserts document_versions"),
+        // document.upload-version removed 2026-08-20 (EOP-PLAN-MANDATE-FIX-001
+        // F4) -- targeted the absent "ob-poc".document_versions table.
         plugin_core_entry(&ctx, "kyc-case.state", &["cases", "cbus", "entity_workstreams", "entities", "cbu_entity_roles", "roles", "outstanding_requests"], &[],
             &["case-id"],
             &["case state snapshot returned with workstreams, awaiting requests, and attention summary"],

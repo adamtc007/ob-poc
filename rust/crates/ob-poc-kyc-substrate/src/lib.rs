@@ -40,10 +40,10 @@ pub use fold::control::{
     check_control_preconditions, check_preconditions, control_admission, edges_of_kind_into,
     fold_control, governing_mandate_edges_into, natural_persons_from_events,
     reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges,
-    unpierced_nominee_edges, ControlAdmission, ControlState, EdgeKind, EdgeState, EdgeStatus,
-    ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge, StructureClass,
-    TrustRoleKind, EDGE_KIND_WIRE_VALUES, IMPLEMENTED_STRATEGY_CLASSES,
-    STRUCTURE_CLASS_WIRE_VALUES,
+    strategy_for_structure_class, unpierced_nominee_edges, ControlAdmission, ControlState,
+    EdgeKind, EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge,
+    ReconciledTrustEdge, StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
+    IMPLEMENTED_STRATEGY_CLASSES, STRUCTURE_CLASS_WIRE_VALUES,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
@@ -61,7 +61,10 @@ pub use geometry::{
     check_type_geometry, pipe_of, EntityType, GeometryError, LinkageSource, Pipe,
     PipeClassification, ALL_ENTITY_TYPES, ALL_PIPES,
 };
-pub use lexicon::{phase1_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition, Taxonomy};
+pub use lexicon::{
+    assembly_lexicon, evaluation_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition,
+    Taxonomy,
+};
 pub use placement::{enumerate_placement_set, LegalMove, MoveId, PlacementSet, NONE_OF_THE_ABOVE};
 pub use preview::preview;
 pub use render::render_intent_event_to_sexpr;

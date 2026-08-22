@@ -48,7 +48,7 @@ impl Default for EventId {
 
 // ── Verb ──────────────────────────────────────────────────────────────────────
 
-/// Fully-qualified verb name, e.g. `"ubo.edge.verify"`.
+/// Fully-qualified verb name, e.g. `"kyc_ubo.assert.edge.verification"`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerbFqn(pub String);
 

@@ -57,8 +57,6 @@ fn yaml_files_recursive(dir: &PathBuf) -> Vec<PathBuf> {
 fn manual_target_overrides() -> BTreeMap<&'static str, (&'static str, &'static str)> {
     [
         ("cbu.add-product", ("cbu", "cbu")),
-        ("trade-gateway.activate-gateway", ("instrument_matrix", "trade_gateway")),
-        ("trade-gateway.suspend-gateway", ("instrument_matrix", "trade_gateway")),
         // entity-workstream.update-status: no longer has a `lifecycle` block
         // at all (removed 2026-08-19 — states move back/forth freely, no
         // restriction applies), so it no longer needs a target override.

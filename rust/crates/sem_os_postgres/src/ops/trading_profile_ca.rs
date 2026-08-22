@@ -5,7 +5,7 @@
 //! Persistence is delegated to the host via the
 //! [`TradingProfileDocument`] service trait — these ops modify the
 //! trading matrix JSONB document (source of truth). Operational table
-//! writes happen at `trading-profile.materialize` time, not here.
+//! writes happen at `trading-profile.approve` time, not here.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;

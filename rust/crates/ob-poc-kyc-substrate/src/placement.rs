@@ -29,7 +29,7 @@
 //! path uses). Verbs with an empty precondition list are therefore always
 //! admitted — the K-G5 "geometry-free" gap from T0.3's pack-closure audit.
 //! Likewise the universe enumerated here is `lexicon.entries` — the 21
-//! verbs `phase1_lexicon()` declares — not the full dsl.kyc pack; the K-G6
+//! verbs `assembly_lexicon()` declares — not the full dsl.kyc pack; the K-G6
 //! declaration-drift gap is a lexicon-closure problem, not a placement-set
 //! problem, and is out of this module's scope.
 //!
@@ -45,8 +45,11 @@
 //! appended through the real governed op). **EOP-DD-KYCUBO-TS.5 (RATIFIED
 //! 2026-08-22) closes it for real:** `Precondition::TypeGeometryPermits`
 //! (R1) is now a genuine `check_preconditions` arm — attached to
-//! `ubo.edge.assert-control`, `ubo.edge.assert-economic-interest`, and
-//! `ubo.edge.pierce-nominee` (TS.5 §6 Q1/Q2) — so both this generator and
+//! `kyc_ubo.assert.edge.control` and `kyc_ubo.assert.edge.economic-interest`
+//! (TS.5 §6 Q1/Q2; a piercing-mode `assert-control` call reaches it too,
+//! same entry, since `kyc_ubo.assert.edge.nominee-piercing`'s own `LexiconEntry` was
+//! retired TS.6 P2, folded into a macro composing the two) — so both this
+//! generator and
 //! the real append path are covered BY CONSTRUCTION, through the one
 //! function both already called. `geometrically_possible` (R2) now calls
 //! the identical evaluation helper (`fold::control::evaluate_type_geometry`)
@@ -60,7 +63,7 @@
 //!
 //! **The four genuinely new TS.1 §3 moves** (`assert-type`, `correct-type`,
 //! `withdraw-member`, `record-enquiry` — moves 2, 7, 6, 8) NOW join the
-//! governed 25-verb `phase1_lexicon()` pack (D1 Part A, EOP-DD-KYCUBO-TS.1) —
+//! governed 25-verb `assembly_lexicon()` pack (D1 Part A, EOP-DD-KYCUBO-TS.1) —
 //! YAML declaration, op registration, and DB persistence all wired; see
 //! `kyc_stream_ops.rs`. They are still enumerated here via
 //! `type_registry_candidates` rather than the main per-entry loop below,
@@ -73,11 +76,12 @@
 //! primitive (membership-active for `withdraw-member`; a prior type
 //! assertion for `correct-type`) directly against `TypeRegistryState` —
 //! the same "no primitive exists, enforced op-layer" pattern
-//! `ubo.edge.pierce-nominee`'s nominee-kind check already uses, applied
+//! `kyc_ubo.assert.edge.control`'s pierced-from nominee-kind check (the
+//! `pierce-nominee` macro's admission gate, TS.6 P2) already uses, applied
 //! here at the enumeration layer instead of an op's `execute()`.
 //! Moves 1 (`admit-member`), 4 (`attach-evidence`), 9 (`construct`) needed
 //! no new machinery — P1 recon found them already satisfied by
-//! `kyc.subject.register`, the existing `ubo.edge.attach-evidence` (now
+//! `kyc_ubo.assert.subject.register`, the existing `kyc_ubo.assert.edge.evidence` (now
 //! also type-scoped, `fold/type_registry.rs`), and `preview()` respectively.
 
 use std::collections::BTreeMap;
@@ -156,13 +160,14 @@ impl PlacementSet {
 /// dispatch handler actually reads (`ob-poc/src/domain_ops/kyc_stream_ops.rs`);
 /// duplicated here (not derived from `LexiconEntry`, which carries no arg
 /// schema — CLAUDE.md's documented K-G6-adjacent gap) rather than guessed.
+/// `kyc_ubo.assert.edge.nominee-piercing` dropped TS.6 P2 (K-G7) — its `LexiconEntry`
+/// (and the verb it enumerated) no longer exists; this generator only
+/// iterates real lexicon entries, so it never reaches this function for
+/// that fqn.
 fn is_edge_scoped(verb_fqn: &str) -> bool {
     matches!(
         verb_fqn,
-        "ubo.edge.verify"
-            | "ubo.edge.attach-evidence"
-            | "ubo.edge.supersede"
-            | "ubo.edge.pierce-nominee"
+        "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.supersession"
     )
 }
 
@@ -195,7 +200,7 @@ fn board_content_hash(moves: &[LegalMove]) -> Hash {
 /// `check_preconditions`, and only for these two. Every other verb's
 /// admission is unchanged from before this tranche.
 fn is_geometry_gated(verb_fqn: &str) -> bool {
-    matches!(verb_fqn, "ubo.edge.assert-control" | "ubo.edge.assert-economic-interest")
+    matches!(verb_fqn, "kyc_ubo.assert.edge.control" | "kyc_ubo.assert.edge.economic-interest")
 }
 
 /// TS.1 §1's FIRST constraint layer, as an existence check: does there
@@ -244,11 +249,11 @@ fn entity_move_id(verb_fqn: &str, entity: EntityId) -> MoveId {
     MoveId(format!("{verb_fqn}::entity:{}", entity.0))
 }
 
-const ASSERT_TYPE: &str = "kyc.subject.assert-type";
-const CORRECT_TYPE: &str = "kyc.subject.correct-type";
-const WITHDRAW_MEMBER: &str = "kyc.subject.withdraw-member";
-const RECORD_ENQUIRY: &str = "kyc.subject.record-enquiry";
-const TYPE_SCOPED_ATTACH_EVIDENCE: &str = "ubo.edge.attach-evidence";
+const ASSERT_TYPE: &str = "kyc_ubo.assert.subject.type";
+const CORRECT_TYPE: &str = "kyc_ubo.assert.subject.type-correction";
+const WITHDRAW_MEMBER: &str = "kyc_ubo.assert.subject.member-withdrawal";
+const RECORD_ENQUIRY: &str = "kyc_ubo.assert.subject.enquiry";
+const TYPE_SCOPED_ATTACH_EVIDENCE: &str = "kyc_ubo.assert.edge.evidence";
 
 /// Entity-scoped verbs (`TargetBinding.entity_id`) that the main
 /// `enumerate_placement_set` loop below must NOT probe with its generic
@@ -261,7 +266,7 @@ fn is_type_registry_move(fqn: &str) -> bool {
     matches!(fqn, ASSERT_TYPE | CORRECT_TYPE | WITHDRAW_MEMBER | RECORD_ENQUIRY)
 }
 
-/// The four D1 TS.1 §3 moves now in `phase1_lexicon()` (module doc), plus
+/// The four D1 TS.1 §3 moves now in `assembly_lexicon()` (module doc), plus
 /// the type-scoped half of `attach-evidence` — the edge-scoped half stays
 /// handled entirely by the main `lexicon.entries` loop, unchanged. All
 /// lexicon-declared studs — `EntityRegistered`, and (Phase 2 of the

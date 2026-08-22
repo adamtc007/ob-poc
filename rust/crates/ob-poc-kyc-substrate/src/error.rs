@@ -36,7 +36,7 @@ pub enum KycError {
     #[error("verb {0:?} not in lexicon")]
     UnknownVerb(VerbFqn),
 
-    #[error("determination not present; run compute-fold before freeze")]
+    #[error("determination not present; reconcile-conflict and structure classification must fire before freeze")]
     DeterminationNotReady,
 
     #[error("edge {0:?} has status {1}; cannot verify without prior evidence")]

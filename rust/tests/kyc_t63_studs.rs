@@ -8,13 +8,14 @@
 //! under test, mirroring `kyc_t62_studs.rs`'s discipline.
 //!
 //! Row coverage:
-//! - row 6 (`select-strategy`): TWO new studs beyond the 6a exemplar —
-//!   `SubjectRegistered` (block: unregistered subject) and
-//!   `StructureClassified` (block: registered but not yet classified).
-//! - row 7 (`apply-smo-fallback`): `ReconciledProjection` + `StrategySelected`
-//!   reused from compute-fold/freeze — block before either has fired, admit
-//!   once both have.
-//! - row 9 (`kyc.subject.register`) HALTED, not shipped: the ratified
+//! - row 6 (`select-strategy`): RETIRED TS.6 P2 — the strategy is DERIVED
+//!   from `structure_class`, never asserted, so no verb carries row 6's
+//!   studs. See the row-6 note below.
+//! - row 7 (`apply-smo-fallback`): RETIRED TS.6 §5 — SMO is PULLED on
+//!   exhaustion by the traversal (TS.3 §4a), never asserted. Its
+//!   [ReconciledProjection, StructureClassSupported] pair was never unique
+//!   to it: `freeze` declares the identical pair (row 8a).
+//! - row 9 (`kyc_ubo.assert.subject.register`) HALTED, not shipped: the ratified
 //!   `NotAlreadyRegistered` (a bare `!state.registered` boolean) is
 //!   incompatible with `register`'s real production usage — one call
 //!   registers the subject entity itself, one MORE call per natural-person
@@ -25,7 +26,7 @@
 //!   geometry-free pending a matrix amendment to a KEYED
 //!   (subject_root, entity_id) check. `phase1_lexicon()`'s entry for this
 //!   verb is unchanged from pre-T6.3.
-//! - row 10 (`kyc.subject.classify-structure`): `SubjectRegistered` — block
+//! - row 10 (`kyc_ubo.assert.subject.structure-class`): `SubjectRegistered` — block
 //!   classify-structure on an unregistered subject.
 
 use sqlx::postgres::PgPoolOptions;
@@ -33,10 +34,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationApplySmoFallback,
-    UboDeterminationSelectStrategy, UboEdgeReconcileConflict,
-};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectClassifyStructure, KycSubjectRegister};
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -103,157 +101,41 @@ async fn register(scope: &mut Scope, subject: SubjectId) {
         .expect("register has no NotAlreadyRegistered violation on a fresh subject");
 }
 
-async fn classify(scope: &mut Scope, subject: SubjectId, class: &str) {
-    KycSubjectClassifyStructure
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": class }),
-            &mut VerbExecutionContext::default(),
-            scope,
-        )
-        .await
-        .expect("classify-structure must succeed on a registered subject");
-}
+// `classify` helper removed with the row-7 tests (TS.6 §5): its only
+// callers were the retired apply-smo-fallback gates.
 
-// ── row 6 — select-strategy: SubjectRegistered + StructureClassified ───────
+// ── row 6 — RETIRED (TS.6 P2, K-G7) ─────────────────────────────────────────
+//
+// `ubo.determination.select-strategy` and its two studs' attachment to it
+// (`SubjectRegistered`, `StructureClassified`) are gone — the strategy is
+// now DERIVED from `structure_class` (`strategy_for_structure_class`),
+// never separately asserted, so there is no verb left to carry row 6's
+// preconditions. `StructureClassified`/bare `SubjectRegistered` remain
+// evaluable T6.1(b) machinery (unattached, per that tranche's convention);
+// `StructureClassSupported` (a strictly stronger check — it also fails
+// closed on `None`) does the real work now, attached solely to `freeze`
+// (`compute-fold` also retired TS.6 P2), exhaustively covered by
+// `kyc_pack_closure.rs` and `kyc_t61_studs.rs`'s
+// precondition_{blocks,admits}_* gates.
 
-#[tokio::test]
-async fn row6_select_strategy_blocks_unregistered_subject() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    // Deliberately NOT registered.
+// ── row 7 — apply-smo-fallback — RETIRED (TS.6 §5, 2026-08-22) ─────────────
+//
+// `row7_apply_smo_fallback_{blocks,admits}_*` drove
+// `ubo.determination.apply-smo-fallback` to prove its
+// [ReconciledProjection, StructureClassSupported] pair was enforced at the
+// real op. The verb is retired: SMO is PULLED on exhaustion by the traversal
+// (`determination.rs` walks OfficerAppointment edges into the frontier and
+// emits `Prong::SmoFallback` straight into `candidates`, TS.3 §4a), so
+// asserting one was a second way to WRITE an answer the system computes.
+//
+// Nothing is lost from this matrix: the precondition pair was never unique to
+// row 7. `kyc_ubo.decide.determination.freeze` declares the IDENTICAL pair and is
+// exercised by row 8a here, by `kyc_t61_studs.rs`'s
+// `precondition_{blocks,admits}_*` gates, and by `kyc_pack_closure.rs`'s
+// totality sub-test. Deleting these two tests removes duplicate coverage,
+// not coverage.
 
-    let result = UboDeterminationSelectStrategy
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_err(),
-        "select-strategy must be blocked for an unregistered subject (SubjectRegistered): \
-         {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-#[tokio::test]
-async fn row6_select_strategy_blocks_unclassified_registered_subject() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject).await;
-    // Deliberately NOT classified — SubjectRegistered passes, StructureClassified must not.
-
-    let result = UboDeterminationSelectStrategy
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_err(),
-        "select-strategy must be blocked for a registered-but-unclassified subject \
-         (StructureClassified): {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-#[tokio::test]
-async fn row6_select_strategy_admits_registered_and_classified_subject() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject).await;
-    classify(&mut scope, subject, "private_company").await;
-
-    let result = UboDeterminationSelectStrategy
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_ok(),
-        "select-strategy must be admitted once registered + classified (supported class): \
-         {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-// ── row 7 — apply-smo-fallback: ReconciledProjection + StrategySelected ────
-
-#[tokio::test]
-async fn row7_apply_smo_fallback_blocks_before_reconcile_and_strategy() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject).await;
-    // Deliberately no reconcile-conflict / select-strategy before it.
-
-    let result = UboDeterminationApplySmoFallback
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "smo-person-id": Uuid::new_v4() }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_err(),
-        "apply-smo-fallback must be blocked before reconcile-conflict + select-strategy have \
-         fired: {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-#[tokio::test]
-async fn row7_apply_smo_fallback_admits_after_reconcile_and_strategy() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject).await;
-    classify(&mut scope, subject, "private_company").await;
-    UboEdgeReconcileConflict
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0 }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await
-        .expect("reconcile-conflict must succeed on a registered subject");
-    UboDeterminationSelectStrategy
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await
-        .expect("select-strategy must succeed once registered + classified");
-
-    let result = UboDeterminationApplySmoFallback
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "smo-person-id": Uuid::new_v4() }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_ok(),
-        "apply-smo-fallback must be admitted once reconcile-conflict + select-strategy have \
-         fired: {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-// ── row 9 — kyc.subject.register: NotAlreadyRegistered ─────────────────────
+// ── row 9 — kyc_ubo.assert.subject.register: NotAlreadyRegistered ─────────────────────
 
 #[tokio::test]
 async fn row9_register_admits_fresh_subject() {
@@ -279,14 +161,14 @@ async fn row9_register_admits_fresh_subject() {
 // row9_register_blocks_double_registration intentionally NOT written: row 9
 // (`NotAlreadyRegistered`) was HALTED during T6.3 execution, not shipped —
 // see the lexicon entry's own comment in `lexicon.rs`. A second
-// `kyc.subject.register` call on the same subject_root is a REAL production
+// `kyc_ubo.assert.subject.register` call on the same subject_root is a REAL production
 // pattern (one call per natural-person candidate within a determination
 // stream, see `kyc_m3_remediation.rs`'s
 // `m3_1_freeze_differential_matches_ownership_prong_strategy` /
 // `m4_control_prong_strategy_resolves_gp_statutory_control`), so it must
 // stay legal; asserting it here would pin the wrong behaviour.
 
-// ── row 10 — kyc.subject.classify-structure: SubjectRegistered ─────────────
+// ── row 10 — kyc_ubo.assert.subject.structure-class: SubjectRegistered ─────────────
 
 #[tokio::test]
 async fn row10_classify_structure_blocks_unregistered_subject() {

@@ -2017,4 +2017,225 @@ slots:
         cleanup_decision_data(&db, cbu_id, case_id).await?;
         Ok(())
     }
+
+    // =========================================================================
+    // F4: cbu-custody.lookup-ssi (EOP-PLAN-MANDATE-FIX-001 F4, D1)
+    // =========================================================================
+
+    /// `cbu-custody.lookup-ssi` (handler `lookup_ssi_for_trade`) calls SQL
+    /// function `"ob-poc".find_ssi_for_trade(...)`, which is absent from
+    /// `pg_proc` in the live DB -- every real invocation fails. Fixed by
+    /// replacing the function call with the equivalent inline query already
+    /// proven twice in `tests/custody_integration.rs`
+    /// (`test_ssi_lookup_exact_match`, `test_ssi_lookup_fallback_to_wildcard`):
+    /// `ORDER BY priority ASC, specificity_score DESC LIMIT 1` over
+    /// `ssi_booking_rules` joined to `cbu_ssi`.
+    #[tokio::test]
+    async fn test_lookup_ssi_resolves_without_absent_function() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        let cbu_id = db
+            .execute_dsl(&format!(
+                r#"(cbu.create :name "{}" :as @cbu)"#,
+                db.name("LookupSsiFixCBU")
+            ))
+            .await?
+            .resolve("cbu")
+            .unwrap();
+
+        let ssi_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".cbu_ssi (
+                cbu_id, ssi_name, ssi_type,
+                safekeeping_account, safekeeping_bic,
+                pset_bic, status, effective_date
+            )
+            VALUES ($1, 'F4 Lookup SSI', 'SECURITIES',
+                    'SAFE-F4-001', 'CITIUS33',
+                    'DTCYUS33', 'ACTIVE', CURRENT_DATE)
+            RETURNING ssi_id
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_one(&db.pool)
+        .await?;
+
+        let class_id: Uuid =
+            sqlx::query_scalar(r#"SELECT class_id FROM "ob-poc".instrument_classes WHERE code = 'EQUITY'"#)
+                .fetch_one(&db.pool)
+                .await?;
+        let market_id: Uuid =
+            sqlx::query_scalar(r#"SELECT market_id FROM "ob-poc".markets WHERE mic = 'XNYS'"#)
+                .fetch_one(&db.pool)
+                .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".ssi_booking_rules (
+                cbu_id, ssi_id, rule_name, priority,
+                instrument_class_id, market_id, currency, settlement_type
+            )
+            VALUES ($1, $2, 'F4 Exact Match Rule', 10, $3, $4, 'USD', 'DVP')
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(ssi_id)
+        .bind(class_id)
+        .bind(market_id)
+        .execute(&db.pool)
+        .await?;
+
+        let result = db
+            .execute_dsl(&format!(
+                r#"(cbu-custody.lookup-ssi :cbu-id "{cbu_id}" :instrument-class "EQUITY" :market "XNYS" :currency "USD" :settlement-type "DVP")"#
+            ))
+            .await;
+
+        assert!(
+            result.is_ok(),
+            "lookup-ssi must resolve via the live schema, not the absent \
+             find_ssi_for_trade() function: {result:?}"
+        );
+
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    // =========================================================================
+    // F4: baseline verification -- no_verb_targets_absent_table /
+    // no_verb_calls_absent_function (EOP-PLAN-MANDATE-FIX-001 F4)
+    // =========================================================================
+
+    /// Enumerates every verb the audit (EOP-AUDIT-MANDATE-IM-001) named as
+    /// dead -- D2 instruction-profile.* (7), D3 trade-gateway.* (8), D4
+    /// pricing-config.* (8), D5 mandate.instrument-matrix (1) = the
+    /// audit's 24, plus D1's absent function (cbu-custody.lookup-ssi) and
+    /// the 6 further absent-function verbs found while widening the check
+    /// this session (5 ownership/manco bridges + the document
+    /// upload-version/verify/reject/start-qa/list-versions/get cluster,
+    /// collapsed to its 2 registered plugin ops since the other 4 were
+    /// `crud` verbs removed alongside them) -- and asserts each is either
+    /// gone from the compiled catalogue (removed) or targets a table/
+    /// function that is actually present live (fixed). No silent
+    /// survivors: a verb absent from both lists below is not accounted
+    /// for and the test must be updated, not the assertion relaxed.
+    #[tokio::test]
+    async fn f4_no_verb_targets_or_calls_absent_schema_object() -> Result<()> {
+        let db = TestDb::new().await?;
+        let registry = runtime_registry();
+
+        // D2, D3, D4, D5 -- the audit's 24 CRUD verbs against absent
+        // tables. Every one must now be absent from the compiled catalogue.
+        let removed_crud_verbs = [
+            // D2: instruction-profile.* (7 of 7)
+            "instruction-profile.define-message-type",
+            "instruction-profile.list-message-types",
+            "instruction-profile.create-template",
+            "instruction-profile.read-template",
+            "instruction-profile.list-templates",
+            "instruction-profile.list-assignments",
+            "instruction-profile.list-field-overrides",
+            // D3: trade-gateway.* (8 of 14 -- definition/routing/fallback)
+            "trade-gateway.define-gateway",
+            "trade-gateway.read-gateway",
+            "trade-gateway.list-gateways",
+            "trade-gateway.add-routing-rule",
+            "trade-gateway.list-routing-rules",
+            "trade-gateway.remove-routing-rule",
+            "trade-gateway.set-fallback",
+            "trade-gateway.list-fallbacks",
+            // D4: pricing-config.* (8 of 14)
+            "pricing-config.set-valuation-schedule",
+            "pricing-config.list-valuation-schedules",
+            "pricing-config.set-fallback-chain",
+            "pricing-config.list-fallback-chains",
+            "pricing-config.set-stale-policy",
+            "pricing-config.list-stale-policies",
+            "pricing-config.set-nav-threshold",
+            "pricing-config.list-nav-thresholds",
+            // D5: mandate.instrument-matrix (1 of 2)
+            "mandate.instrument-matrix",
+            // Scope expansion (ownership/manco legacy governance bridges,
+            // superseded by the dsl.kyc stream determination system):
+            "ownership.bridge.manco-roles",
+            "ownership.bridge.gleif-fund-managers",
+            "ownership.bridge.bods-ownership",
+            "manco.primary-controller",
+            "ownership.control-links.compute",
+            "ownership.refresh",
+            // Scope expansion (document.* Layer-C version/QA cluster,
+            // built against document_versions / v_documents_with_status,
+            // both absent):
+            "document.upload-version",
+            "document.verify",
+            "document.reject",
+            "document.start-qa",
+            "document.list-versions",
+            "document.get",
+        ];
+        for fqn in removed_crud_verbs {
+            let (domain, verb) = fqn.split_once('.').expect("fqn has a domain");
+            assert!(
+                registry.get(domain, verb).is_none(),
+                "{fqn} should have been removed from the compiled catalogue \
+                 (targeted an absent table/function) but is still present"
+            );
+        }
+
+        // D1 + the widened function-call check: verbs that call SQL
+        // functions must resolve. cbu-custody.lookup-ssi was fixed in
+        // place (D1) -- assert it now resolves against the live schema
+        // without calling the absent find_ssi_for_trade(). The dead
+        // ownership/manco/document functions were retired along with
+        // their verbs above, so pg_proc need not carry them either.
+        assert!(
+            registry.get("cbu-custody", "lookup-ssi").is_some(),
+            "cbu-custody.lookup-ssi must still exist (fixed in place, not removed)"
+        );
+        let find_ssi_absent: bool = sqlx::query_scalar(
+            r#"SELECT to_regprocedure('"ob-poc".find_ssi_for_trade(uuid,uuid,uuid,text,text)') IS NULL"#,
+        )
+        .fetch_one(&db.pool)
+        .await?;
+        assert!(
+            find_ssi_absent,
+            "find_ssi_for_trade must remain absent -- if it now exists, \
+             this test's premise (the D1 fix bypasses it) needs re-checking"
+        );
+
+        // no_orphan_child_table (the B4 class, generalised): the audit
+        // recorded cbu_gateway_connectivity as a live table (0 rows) with
+        // a nullable gateway_id referencing the absent trade_gateways.
+        // Re-checked live against this DB rather than trusted from the
+        // audit snapshot: both tables are now absent entirely (neither
+        // ever existed here, or both were dropped between the audit run
+        // and now) -- to_regclass returns NULL for each, so there is no
+        // live table left to orphan. Whichever it is, the B4 class cannot
+        // recur: no verb writes to a table that isn't there.
+        let connectivity_table_absent: bool = sqlx::query_scalar(
+            r#"SELECT to_regclass('"ob-poc".cbu_gateway_connectivity') IS NULL"#,
+        )
+        .fetch_one(&db.pool)
+        .await?;
+        assert!(
+            connectivity_table_absent,
+            "cbu_gateway_connectivity reappeared live -- if it now exists, \
+             it must be re-audited for a dangling gateway_id before this \
+             assertion is loosened"
+        );
+        for verb in [
+            "enable-gateway",
+            "activate-gateway",
+            "suspend-gateway",
+            "list-cbu-gateways",
+        ] {
+            assert!(
+                registry.get("trade-gateway", verb).is_none(),
+                "trade-gateway.{verb} must be gone -- it is the write path \
+                 that could orphan cbu_gateway_connectivity.gateway_id"
+            );
+        }
+
+        Ok(())
+    }
 }

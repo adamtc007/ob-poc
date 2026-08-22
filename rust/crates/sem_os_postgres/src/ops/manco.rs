@@ -1,22 +1,26 @@
-//! ManCo / governance-controller verbs (9 plugin verbs spanning
+//! ManCo / governance-controller verbs (4 plugin verbs spanning
 //! `manco` + `ownership` domains) — SemOS-side YAML-first
 //! re-implementation of the plugin subset of
 //! `rust/config/verbs/manco.yaml` + `rust/config/verbs/ownership.yaml`.
 //!
-//! Three op shapes:
-//! - **Bridge ops** (ownership.bridge.*) — delegate to SQL
-//!   `fn_bridge_*` functions that translate data sources
-//!   (manco roles, GLEIF fund managers, BODS ownership) into
-//!   governance-controller signals.
-//! - **Group derivation** (manco.group.*, manco.primary-controller,
-//!   manco.control-chain, manco.book.summary) — SQL function
-//!   calls over the derived group state.
-//! - **Pipeline** (ownership.refresh) — runs all bridges +
-//!   control-links + group derivation in one atomic txn.
+//! **Group derivation** (manco.group.*, manco.control-chain,
+//! manco.book.summary) — SQL function calls over the derived group
+//! state.
 //!
-//! Ports the shared `ob_poc_types::manco_group::*` DTOs
-//! (BridgeRolesResult, DeriveGroupsResult, etc.) for
-//! consistent JSON shapes.
+//! Ports the shared `ob_poc_types::manco_group::*` DTOs for consistent
+//! JSON shapes.
+//!
+//! REMOVED 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F4,
+//! no_verb_calls_absent_function): the bridge ops (ownership.bridge.*),
+//! manco.primary-controller, ownership.control-links.compute, and the
+//! ownership.refresh pipeline. All called SQL functions that never
+//! existed under the live "ob-poc" schema -- migration
+//! 041_governance_bridges.sql created them under the pre-rename `kyc.`
+//! schema (targeting `kyc.special_rights`) and was never carried forward
+//! through the kyc->"ob-poc" rename. Every real invocation failed.
+//! Conceptually superseded by the dsl.kyc stream-backed UBO/control
+//! determination system -- same defect class as the 58 legacy
+//! determination verbs already deleted in the W4 rip.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -25,15 +29,12 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use dsl_runtime::TransactionScope;
-use dsl_runtime::{
-    json_extract_int_opt, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
-};
+use dsl_runtime::{json_extract_int_opt, json_extract_string_opt, json_extract_uuid};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 use ob_poc_types::manco_group::{
-    BridgeBodsResult, BridgeGleifResult, BridgeRolesResult, CbuMancoNotFound, CbuMancoResult,
-    ComputeControlLinksResult, ControlChainNode, ControlType, ControllerBasis, DeriveGroupsResult,
-    GovernanceRefreshResult, GroupCbuEntry, PrimaryGovernanceController,
+    CbuMancoNotFound, CbuMancoResult, ControlChainNode, ControlType, DeriveGroupsResult,
+    GroupCbuEntry,
 };
 
 use super::SemOsVerbOp;
@@ -41,95 +42,6 @@ use super::SemOsVerbOp;
 fn json_extract_date_opt(args: &Value, arg_name: &str) -> Option<chrono::NaiveDate> {
     json_extract_string_opt(args, arg_name)
         .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
-}
-
-// ── ownership.bridge.manco-roles ──────────────────────────────────────────────
-
-pub struct BridgeMancoRoles;
-
-#[async_trait]
-impl SemOsVerbOp for BridgeMancoRoles {
-    fn fqn(&self) -> &str {
-        "ownership.bridge.manco-roles"
-    }
-    async fn execute(
-        &self,
-        args: &Value,
-        _ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let as_of = json_extract_date_opt(args, "as-of");
-        let row: (i32, i32) =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_bridge_manco_role_to_board_rights($1)"#)
-                .bind(as_of)
-                .fetch_one(scope.executor())
-                .await?;
-        let result = BridgeRolesResult {
-            rights_created: row.0,
-            rights_updated: row.1,
-        };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-}
-
-// ── ownership.bridge.gleif-fund-managers ──────────────────────────────────────
-
-pub struct BridgeGleifFundManagers;
-
-#[async_trait]
-impl SemOsVerbOp for BridgeGleifFundManagers {
-    fn fqn(&self) -> &str {
-        "ownership.bridge.gleif-fund-managers"
-    }
-    async fn execute(
-        &self,
-        args: &Value,
-        _ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let as_of = json_extract_date_opt(args, "as-of");
-        let row: (i32, i32) = sqlx::query_as(
-            r#"SELECT * FROM "ob-poc".fn_bridge_gleif_fund_manager_to_board_rights($1)"#,
-        )
-        .bind(as_of)
-        .fetch_one(scope.executor())
-        .await?;
-        let result = BridgeGleifResult {
-            rights_created: row.0,
-            rights_updated: row.1,
-        };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-}
-
-// ── ownership.bridge.bods-ownership ───────────────────────────────────────────
-
-pub struct BridgeBodsOwnership;
-
-#[async_trait]
-impl SemOsVerbOp for BridgeBodsOwnership {
-    fn fqn(&self) -> &str {
-        "ownership.bridge.bods-ownership"
-    }
-    async fn execute(
-        &self,
-        args: &Value,
-        _ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let as_of = json_extract_date_opt(args, "as-of");
-        let row: (i32, i32, i32) =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_bridge_bods_to_holdings($1)"#)
-                .bind(as_of)
-                .fetch_one(scope.executor())
-                .await?;
-        let result = BridgeBodsResult {
-            holdings_created: row.0,
-            holdings_updated: row.1,
-            entities_linked: row.2,
-        };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
 }
 
 // ── manco.group.derive ────────────────────────────────────────────────────────
@@ -267,81 +179,6 @@ impl SemOsVerbOp for GroupForCbu {
             })?,
             None => serde_json::to_value(CbuMancoNotFound {
                 message: "No governance controller found for this CBU".to_string(),
-            })?,
-        };
-        Ok(VerbExecutionOutcome::Record(value))
-    }
-}
-
-// ── manco.primary-controller ──────────────────────────────────────────────────
-
-pub struct PrimaryController;
-
-#[async_trait]
-impl SemOsVerbOp for PrimaryController {
-    fn fqn(&self) -> &str {
-        "manco.primary-controller"
-    }
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = json_extract_date_opt(args, "as-of");
-
-        type Row = (
-            Uuid,
-            Option<Uuid>,
-            Option<Uuid>,
-            Option<String>,
-            Option<i32>,
-            Option<Decimal>,
-            Option<Decimal>,
-            Option<bool>,
-            Option<bool>,
-        );
-
-        let row: Option<Row> =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_primary_governance_controller($1, $2)"#)
-                .bind(issuer_entity_id)
-                .bind(as_of)
-                .fetch_optional(scope.executor())
-                .await?;
-
-        let value = match row {
-            Some((
-                _,
-                primary,
-                governance,
-                basis,
-                board_seats,
-                voting_pct,
-                economic_pct,
-                has_control,
-                has_sig,
-            )) => serde_json::to_value(PrimaryGovernanceController {
-                issuer_entity_id,
-                primary_controller_entity_id: primary.unwrap_or(Uuid::nil()),
-                governance_controller_entity_id: governance.unwrap_or(Uuid::nil()),
-                basis: basis
-                    .as_deref()
-                    .map(|s| match s {
-                        "BOARD_APPOINTMENT" => ControllerBasis::BoardAppointment,
-                        "VOTING_CONTROL" => ControllerBasis::VotingControl,
-                        "SIGNIFICANT_INFLUENCE" => ControllerBasis::SignificantInfluence,
-                        _ => ControllerBasis::None,
-                    })
-                    .unwrap_or(ControllerBasis::None),
-                board_seats: board_seats.unwrap_or(0),
-                voting_pct,
-                economic_pct,
-                has_control: has_control.unwrap_or(false),
-                has_significant_influence: has_sig.unwrap_or(false),
-            })?,
-            None => serde_json::to_value(CbuMancoNotFound {
-                message: "No governance controller found".to_string(),
             })?,
         };
         Ok(VerbExecutionOutcome::Record(value))
@@ -581,112 +418,3 @@ impl SemOsVerbOp for BookSummary {
     }
 }
 
-// ── ownership.control-links.compute ───────────────────────────────────────────
-
-pub struct ComputeControlLinks;
-
-#[async_trait]
-impl SemOsVerbOp for ComputeControlLinks {
-    fn fqn(&self) -> &str {
-        "ownership.control-links.compute"
-    }
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid_opt(args, ctx, "issuer-entity-id");
-        let as_of = json_extract_date_opt(args, "as-of");
-
-        let count: i32 = sqlx::query_scalar(r#"SELECT "ob-poc".fn_compute_control_links($1, $2)"#)
-            .bind(issuer_entity_id)
-            .bind(as_of)
-            .fetch_one(scope.executor())
-            .await?;
-
-        let result = ComputeControlLinksResult {
-            links_created: count,
-        };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-}
-
-// ── ownership.refresh ─────────────────────────────────────────────────────────
-
-pub struct Refresh;
-
-#[async_trait]
-impl SemOsVerbOp for Refresh {
-    fn fqn(&self) -> &str {
-        "ownership.refresh"
-    }
-    async fn execute(
-        &self,
-        args: &Value,
-        _ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let as_of = json_extract_date_opt(args, "as-of");
-
-        let manco_row: (i32, i32) =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_bridge_manco_role_to_board_rights($1)"#)
-                .bind(as_of)
-                .fetch_one(scope.executor())
-                .await?;
-        let manco_bridge = BridgeRolesResult {
-            rights_created: manco_row.0,
-            rights_updated: manco_row.1,
-        };
-
-        let gleif_row: (i32, i32) = sqlx::query_as(
-            r#"SELECT * FROM "ob-poc".fn_bridge_gleif_fund_manager_to_board_rights($1)"#,
-        )
-        .bind(as_of)
-        .fetch_one(scope.executor())
-        .await?;
-        let gleif_bridge = BridgeGleifResult {
-            rights_created: gleif_row.0,
-            rights_updated: gleif_row.1,
-        };
-
-        let bods_row: (i32, i32, i32) =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_bridge_bods_to_holdings($1)"#)
-                .bind(as_of)
-                .fetch_one(scope.executor())
-                .await?;
-        let bods_bridge = BridgeBodsResult {
-            holdings_created: bods_row.0,
-            holdings_updated: bods_row.1,
-            entities_linked: bods_row.2,
-        };
-
-        let links_count: i32 =
-            sqlx::query_scalar(r#"SELECT "ob-poc".fn_compute_control_links(NULL, $1)"#)
-                .bind(as_of)
-                .fetch_one(scope.executor())
-                .await?;
-        let control_links = ComputeControlLinksResult {
-            links_created: links_count,
-        };
-
-        let groups_row: (i32, i32) =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_derive_cbu_groups($1)"#)
-                .bind(as_of)
-                .fetch_one(scope.executor())
-                .await?;
-        let groups = DeriveGroupsResult {
-            groups_created: groups_row.0,
-            memberships_created: groups_row.1,
-        };
-
-        let result = GovernanceRefreshResult {
-            manco_bridge,
-            gleif_bridge,
-            bods_bridge,
-            control_links,
-            groups,
-        };
-        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
-    }
-}

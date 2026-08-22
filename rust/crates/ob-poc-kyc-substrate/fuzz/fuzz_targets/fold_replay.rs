@@ -1,7 +1,7 @@
 //! Flagship target (EOP-FUZZ-KYCUBO-001 F2, §4 P0): O1 (no-panic), O2 (fold
 //! determinism), O6 (cross-module smo_person_id/smo_event_id invariant).
 //!
-//! `ubo.determination.freeze` — the event a KYC case is approved against
+//! `kyc_ubo.decide.determination.freeze` — the event a KYC case is approved against
 //! (K-23) — folds over exactly `fold_control` + `fold_obligations`. If
 //! either panics, or produces different output on two calls over the
 //! identical event slice, that's a correctness-of-record defect, not a

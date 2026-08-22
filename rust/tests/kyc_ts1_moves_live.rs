@@ -1,7 +1,7 @@
 //! D1 Part A — RED-first live-DB gates for the four TS.1 §3 moves newly
 //! wired to the real dsl.kyc write path (EOP-DD-KYCUBO-TS.1):
-//! `kyc.subject.assert-type` (move 2), `kyc.subject.correct-type` (move 7),
-//! `kyc.subject.withdraw-member` (move 6), `kyc.subject.record-enquiry`
+//! `kyc_ubo.assert.subject.type` (move 2), `kyc_ubo.assert.subject.type-correction` (move 7),
+//! `kyc_ubo.assert.subject.member-withdrawal` (move 6), `kyc_ubo.assert.subject.enquiry`
 //! (move 8). Each move gets an admission pair (a legal position admits, an
 //! illegal position refuses) plus a persistence test proving a real append
 //! lands and re-folds correctly.

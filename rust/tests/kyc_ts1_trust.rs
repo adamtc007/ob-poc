@@ -27,11 +27,11 @@ use uuid::Uuid;
 use chrono::{TimeZone, Utc};
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze,
-    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeReconcileConflict,
+    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    UboEdgeReconcileConflict,
 };
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, AuthorityRef, EdgeKind, FoldRegistry, IntentEvent,
+    fold_control_versioned, assembly_lexicon, AuthorityRef, EdgeKind, FoldRegistry, IntentEvent,
     Principal, SubjectId, TargetBinding, TrustRoleKind, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -152,14 +152,14 @@ fn a_trust_wire_values_fold_to_distinct_sub_kinds_and_edge_ids() {
     let from = Uuid::new_v4();
     let to = Uuid::new_v4();
     let as_of = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-    let lexicon_hash = phase1_lexicon().hash;
+    let lexicon_hash = assembly_lexicon().hash;
     let mut reg = FoldRegistry::new();
     reg.register(lexicon_hash, std::sync::Arc::new(V1FoldImpl));
 
     let mk = |kind: &str| {
         IntentEvent::new(
             subject,
-            "ubo.edge.assert-control",
+            "kyc_ubo.assert.edge.control",
             Principal::test_analyst(),
             AuthorityRef("ts1-test".into()),
             TargetBinding::for_subject(subject),
@@ -336,7 +336,7 @@ async fn c_normalizer_rejects_unknown_and_absent_kind_listing_wire_values() {
 //
 // NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
 // (`render_value` now omits nulls at every depth), so these tests drive
-// `ubo.determination.freeze` LIVE and read the candidates + recorded
+// `kyc_ubo.decide.determination.freeze` LIVE and read the candidates + recorded
 // strategy off the freeze outcome.
 
 /// Drive the REAL freeze op, assert the recorded strategy name on the
@@ -428,14 +428,6 @@ async fn d_trust_role_strategy_resolves_trustee_protector_and_revocable_settlor(
         &pool,
     )
     .await;
-    // The gate widening proven at the REAL op: select-strategy on a
-    // Trust-classified subject is now ADMITTED (StructureClassSupported).
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "trust_role_strategy" }),
-        &pool,
-    )
-    .await;
 
     let candidates = freeze_candidates(&pool, subject, "trust_role_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
@@ -517,12 +509,6 @@ async fn e_settlor_excluded_when_trust_revocable_is_false() {
         &pool,
     )
     .await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "trust_role_strategy" }),
-        &pool,
-    )
-    .await;
 
     // Final leg drives the REAL freeze op (render nested-null defect fixed
     // 2026-08-14).
@@ -544,56 +530,17 @@ async fn e_settlor_excluded_when_trust_revocable_is_false() {
     cleanup(&pool, &[subject]).await;
 }
 
-// ── (f) unknown strategy still fails loudly post-widening ───────────────────
-
-#[tokio::test]
-async fn f_freeze_still_rejects_unknown_strategy_after_trust_widening() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let trustee = Uuid::new_v4();
-
-    setup_trust_subject(&pool, subject, &[trustee]).await;
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject.0, "from_entity_id": trustee, "to_entity_id": subject.0,
-            "kind": "trust_trustee",
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    // TS.4 fixture fix: nominee_pierce_strategy gained a real dispatch arm
-    // (NomineePierceStrategy), so the unknown-strategy exemplar is now a
-    // never-will-exist string.
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "no_such_strategy" }),
-        &pool,
-    )
-    .await;
-
-    let result = run_fallible(
-        &UboDeterminationFreeze,
-        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        result.is_err(),
-        "freeze must refuse an unimplemented strategy rather than silently \
-         substituting a registered one"
-    );
-    let msg = result.unwrap_err().to_string();
-    assert!(
-        msg.contains("no_such_strategy") && msg.contains("no DeterminationStrategy"),
-        "error should name the missing strategy; got: {msg}"
-    );
-
-    cleanup(&pool, &[subject]).await;
-}
+// ── (f) unknown strategy — RETIRED (TS.6 P2) ────────────────────────────────
+//
+// `f_freeze_still_rejects_unknown_strategy_after_trust_widening` exercised
+// `select-strategy` to inject an arbitrary `"no_such_strategy"` string, then
+// proved freeze refused it. That entry point is gone: the strategy is now
+// DERIVED from `structure_class` (`strategy_for_structure_class`), a TOTAL
+// function over all 11 `StructureClass` variants pinned by
+// `kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`
+// — there is no governed way left to hand freeze an arbitrary strategy
+// name. `UboDeterminationFreeze`'s `other => Err(...)` match arm is
+// unreachable through the real write path today; it remains as
+// defense-in-depth against a future non-total edit to
+// `strategy_for_structure_class`, not as live, verb-reachable capability —
+// same status as `IMPLEMENTED_STRATEGY_CLASSES` before TS.0-TS.4 closed it.

@@ -185,8 +185,61 @@ fn application_verb_catalogue_is_complete_and_well_formed() {
     // new verb (capital.close-holding, Phase 4 -- the missing exit move
     // for a zero-balance holding). Intentional sprawl reduction, not a
     // regression.
+    //
+    // Floor lowered again 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F1): -14
+    // from the 1248 baseline -- the entire trade-gateway.* domain removed
+    // (8 of 14 verbs targeted tables that never existed live --
+    // trade_gateways, cbu_gateway_routing, cbu_gateway_fallbacks -- and
+    // the remaining 6 targeted cbu_gateway_connectivity, whose only
+    // possible gateway_id value was an orphan reference since no row
+    // could ever exist in the absent parent table). Full concept removal,
+    // not a regression.
+    //
+    // Floor lowered again 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F3, B2):
+    // -1, 1234 -> 1233. trading-profile.materialize removed -- it parsed
+    // the document as TradingProfileDocument (flat), which requires
+    // `universe`; every real tree-shaped document lacks it, and
+    // trading_profile_materializations recorded 0 rows, ever. Full
+    // concept removal, not a regression.
+    //
+    // Floor lowered again 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F4, D2/D4/D5):
+    // -16, 1233 -> 1217. instruction-profile.* (7 of 7 verbs) removed --
+    // all 4 target tables (instruction_message_types, instruction_templates,
+    // cbu_instruction_assignments, cbu_instruction_field_overrides) absent
+    // from the live DB, only ever reachable via the unapplied
+    // 202501_instruction_gateway.sql migration. pricing-config.* lost 8 of
+    // 14 verbs (set/list-valuation-schedule, set/list-fallback-chain,
+    // set/list-stale-policy, set/list-nav-threshold) -- their 4 target
+    // tables (cbu_valuation_schedule, cbu_pricing_fallback_chains,
+    // cbu_stale_price_policies, cbu_nav_impact_thresholds) are all absent;
+    // the other 6 verbs against the real cbu_pricing_config table are
+    // untouched. mandate.instrument-matrix removed -- targeted the absent
+    // view v_permitted_instruments. All same defect class as F1's gateway
+    // kill: dead capability against tables that never existed live, not a
+    // regression.
+    //
+    // Floor lowered again 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F4,
+    // no_verb_calls_absent_function, expanded beyond the Instrument Matrix
+    // audit after live checks against pg_proc/information_schema found the
+    // same defect class in two more domains): -12, 1217 -> 1205. Five
+    // ownership/manco verbs (ownership.bridge.{manco-roles,
+    // gleif-fund-managers,bods-ownership}, manco.primary-controller,
+    // ownership.control-links.compute) plus the ownership.refresh pipeline
+    // (4 of its 5 steps were these same bridges) called SQL functions
+    // that never existed under the live "ob-poc" schema -- migration
+    // 041_governance_bridges.sql created them under the pre-rename `kyc.`
+    // schema and was never carried forward through the kyc->"ob-poc"
+    // rename; conceptually superseded by the dsl.kyc stream-backed
+    // UBO/control determination system, same defect class as the 58
+    // legacy determination verbs already deleted in the W4 rip. Six
+    // document.* verbs (upload-version, verify, reject, start-qa,
+    // list-versions, get) were a "Layer C" document-version-and-QA
+    // workflow built against "ob-poc".document_versions and
+    // "ob-poc".v_documents_with_status, neither of which exists, plus a
+    // call to the never-created "ob-poc".get_next_document_version().
+    // Full concept removal, not a regression.
     assert!(
-        total >= 1_248,
+        total >= 1_205,
         "verb count regressed below baseline: {total}"
     );
 
@@ -278,8 +331,15 @@ fn application_dag_predicates_and_green_when_coverage_are_qualified() {
     // independent of the +11 states the new share_register_dag.yaml slots
     // (share_class relocated, dilution_instrument + holding new) add on
     // the other side of the ledger.
+    //
+    // Floor lowered again 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F1): -2,
+    // 189 -> 187. Removing the trade_gateway slot (5 states, 2
+    // discretionary-flavoured transition verbs -- suspend-gateway,
+    // retire-gateway) drops both its own candidate states and the
+    // discretionary-verb-reachable states they contributed. Full concept
+    // removal, not a regression.
     assert!(
-        summary.candidate_states >= 189,
+        summary.candidate_states >= 187,
         "candidate count regressed: {summary:?}"
     );
     assert!(
@@ -607,10 +667,14 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
     // correct (kyc, investor/holding/manco/entity_proper_person) keys.
     // Universe rose 191 -> 217 (+26, exactly the newly-correctly-scoped
     // verbs); covered stayed 78 (none of the 26 declare requires_states).
+    //
+    // Floor lowered 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F1): 217 -> 215.
+    // The trade_gateway slot's removal drops its DAG-derivable verbs from
+    // the universe. Full concept removal, not a regression.
     let universe = derived.len();
     let covered = derived.keys().filter(|v| declared.contains_key(*v)).count();
     assert!(
-        universe >= 217,
+        universe >= 215,
         "DAG-derivable verb universe shrank unexpectedly: {universe}"
     );
     assert!(
@@ -623,7 +687,14 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
         // freely, so no requires_states restriction applies (see the R3
         // register doc and the verb's own YAML comment). Two fewer
         // "covered" verbs, both correct, not regressions.
-        covered >= 78,
+        //
+        // Floor lowered again 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F1):
+        // 78 -> 76. trade-gateway.activate-gateway and
+        // trade-gateway.suspend-gateway both declared requires_states
+        // (WS-2.D batch 1, 2026-08-06); both verbs are deleted along with
+        // the whole trade-gateway domain. Full concept removal, not a
+        // regression.
+        covered >= 76,
         "requires_states coverage regressed below the recorded floor \
          (batch 1 applied 2026-08-06): {covered} of {universe}"
     );
@@ -737,7 +808,7 @@ fn cross_slot_constraints_have_a_report_only_evaluator_not_yet_wired_to_dispatch
         "deal_ubo_assessment_blocked_halts_deal",
         "onboarding_request_requires_kyc_clearance",
         "rate_card_agreed_uniqueness",
-        // instrument_matrix_dag.yaml (10)
+        // instrument_matrix_dag.yaml (9)
         "archived_mandate_cascades_dependents",
         "cbu_archived_requires_mandate_archived",
         "cbu_suspended_implies_mandate_suspended",
@@ -747,7 +818,6 @@ fn cross_slot_constraints_have_a_report_only_evaluator_not_yet_wired_to_dispatch
         "isda_coverage_required_for_derivative_trading",
         "mandate_active_requires_live_settlement",
         "mandate_requires_validated_cbu",
-        "retired_gateway_prunes_routing_rules",
         // kyc_dag.yaml (4)
         "case_cannot_approve_with_unresolved_red_flags",
         "case_cannot_approve_with_unresolved_screening_hits",
@@ -982,8 +1052,6 @@ fn requires_states_domain_key_resolution_gap_is_exactly_known() {
         "service.propose-revision",
         "service.retire",
         "settlement-chain.deactivate-chain",
-        "trade-gateway.activate-gateway",
-        "trade-gateway.suspend-gateway",
         "trading-profile.approve",
         "trading-profile.archive",
         // trading-profile.create-draft REMOVED from this pin (2026-08-19,

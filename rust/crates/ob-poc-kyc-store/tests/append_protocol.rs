@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, AuthorityRef, FoldRegistry, Hash, IdemKey, IntentEvent,
+    fold_control_versioned, assembly_lexicon, AuthorityRef, FoldRegistry, Hash, IdemKey, IntentEvent,
     KycError, Principal, SubjectId, TargetBinding, V1FoldImpl, VerbFqn,
 };
 
@@ -40,7 +40,7 @@ async fn pool(max: u32) -> PgPool {
 }
 
 fn v1_hash() -> Hash {
-    phase1_lexicon().hash
+    assembly_lexicon().hash
 }
 
 fn v1_registry() -> FoldRegistry {
@@ -55,7 +55,7 @@ fn make_event(subject: SubjectId, idem: &str) -> IntentEvent {
     let entity = Uuid::new_v4();
     IntentEvent::new(
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         Principal::test_analyst(),
         AuthorityRef("analyst.register".into()),
         TargetBinding::for_subject(subject),
@@ -221,7 +221,7 @@ async fn precondition_rejection_under_lock_inserts_nothing() {
     let result = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_state, _obligation, _type_registry| {
         // The validator rejects — simulating a failed proof-ratchet precondition.
         Err(KycError::PreconditionFailed {
-            verb: VerbFqn("kyc.subject.register".into()),
+            verb: VerbFqn("kyc_ubo.assert.subject.register".into()),
             reason: "rejected by test validator".into(),
         })
     })

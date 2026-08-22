@@ -8,10 +8,10 @@
 //! (assert → attach-evidence → verify, etc.).
 //!
 //! Five verbs are already proven in dedicated test files:
-//!   ubo.edge.assert-control          → tests/kyc_stream_ops.rs
-//!   kyc.subject.register             → tests/kyc_stream_ops.rs + kyc_w3_w5_w6.rs
-//!   kyc.obligation.create            → tests/kyc_w3_w5_w6.rs
-//!   kyc.obligation.satisfy           → tests/kyc_w3_w5_w6.rs
+//!   kyc_ubo.assert.edge.control          → tests/kyc_stream_ops.rs
+//!   kyc_ubo.assert.subject.register             → tests/kyc_stream_ops.rs + kyc_w3_w5_w6.rs
+//!   kyc_ubo.assert.obligation.creation            → tests/kyc_w3_w5_w6.rs
+//!   kyc_ubo.assert.obligation.satisfaction           → tests/kyc_w3_w5_w6.rs
 //!   kyc.person.approve               → tests/kyc_w3_w5_w6.rs
 //!
 //! This file covers the remaining 15.
@@ -24,12 +24,12 @@ use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycObligationSatisfy, KycObligationUpdateIdentity, KycObligationUpdateRisk,
     KycObligationUpdateScreening, KycObligationWaive,
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationApplySmoFallback,
+    KycSubjectClassifyStructure, KycSubjectRegister,
     UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence, UboEdgeReconcileConflict,
     UboEdgeSupersede, UboEdgeVerify,
 };
-// kyc.person.approve/.reject renamed decide.approve/.reject TS.6 P2 — moved
+// kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject TS.6 P2 — moved
 // to ob-poc-kyc-decide.
 use ob_poc_kyc_decide::{DecideApprove, DecideReject};
 use ob_poc_kyc_substrate::SubjectId;
@@ -107,7 +107,7 @@ async fn assert_event(pool: &PgPool, subject: SubjectId, verb_fqn: &str) {
     );
 }
 
-/// decide.approve/decide.reject write to `kyc_decision_records`, not the
+/// kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject write to `kyc_decision_records`, not the
 /// fact stream (TS.6 P2) — this is `assert_event`'s counterpart for them.
 async fn assert_decision_record(pool: &PgPool, subject: SubjectId, verb_fqn: &str) {
     let count: i64 = sqlx::query_scalar(
@@ -134,7 +134,7 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
             "kyc_control_edge_projection",
             "kyc_obligation_projection",
             "kyc_subject_rollup_projection",
-            // decide.approve/decide.reject write here now, not the fact
+            // kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject write here now, not the fact
             // stream (TS.6 P2) — cleaned up alongside the other tables.
             "kyc_decision_records",
         ] {
@@ -180,7 +180,7 @@ async fn coverage_ubo_edge_assert_economic_interest() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "ubo.edge.assert-economic-interest").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.economic-interest").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -205,7 +205,7 @@ async fn coverage_ubo_edge_attach_evidence() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "ubo.edge.attach-evidence").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.evidence").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -239,7 +239,7 @@ async fn coverage_ubo_edge_verify() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "ubo.edge.verify").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.verification").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -264,10 +264,10 @@ async fn coverage_ubo_edge_supersede() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "ubo.edge.supersede").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.supersession").await;
     // K-13: edge still in stream, not deleted
     let edge_count: i64 = sqlx::query_scalar(
-        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'ubo.edge.assert-control'"#,
+        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.assert.edge.control'"#,
     ).bind(subject.0).fetch_one(&pool).await.unwrap();
     assert_eq!(
         edge_count, 1,
@@ -289,7 +289,7 @@ async fn coverage_ubo_edge_reconcile_conflict() {
     run(&UboEdgeReconcileConflict, serde_json::json!({
         "subject-id": subject.0, "resolution": "dominant edge selected based on date precedence",
     }), &pool).await;
-    assert_event(&pool, subject, "ubo.edge.reconcile-conflict").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.reconciliation").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -308,53 +308,17 @@ async fn coverage_ubo_edge_reconcile_conflict() {
 // `coverage_ubo_determination_freeze` below and `coverage_ubo_determination_
 // apply_smo_fallback`'s own precondition coverage for the surviving proof.
 
-#[tokio::test]
-async fn coverage_ubo_determination_apply_smo_fallback() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let smo_person = Uuid::new_v4();
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
-        &pool,
-    )
-    .await;
-    // T6.3 row 7 finding: apply-smo-fallback carries ReconciledProjection +
-    // StructureClassSupported (reused from compute-fold/freeze's own gates,
-    // TS.6 P2 retired the separate select-strategy step) — this fixture
-    // predates that stud and called apply-smo-fallback straight after
-    // register. Real predecessor moves added, same fix pattern as
-    // `coverage_ubo_determination_freeze` below already uses.
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({
-            "subject-id": subject.0, "structure-class": "private_company",
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboDeterminationApplySmoFallback,
-        serde_json::json!({
-            "subject-id": subject.0, "smo-person-id": smo_person,
-        }),
-        &pool,
-    )
-    .await;
-    assert_event(&pool, subject, "ubo.determination.apply-smo-fallback").await;
-    cleanup(&pool, &[subject]).await;
-}
+// `coverage_ubo_determination_apply_smo_fallback` RETIRED (TS.6 §5,
+// 2026-08-22), mirroring the select-strategy/compute-fold retirements: the
+// verb is gone, so there is no live op to cover. SMO now reaches a
+// determination only via the traversal's pull-on-exhaustion (TS.3 §4a),
+// which is covered by the determination tests, not by a verb-coverage row.
 
 #[tokio::test]
 async fn coverage_ubo_determination_freeze() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
+    let owner = Uuid::new_v4();
     run(
         &KycSubjectRegister,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
@@ -375,12 +339,24 @@ async fn coverage_ubo_determination_freeze() {
         &pool,
     )
     .await;
-    // No qualifying economic edges asserted — K-5 requires an SMO fallback so the
-    // determination is never silent.
+    // K-5: a determination must never be silent. This used to be satisfied by
+    // asserting an SMO (`ubo.determination.apply-smo-fallback`, retired
+    // TS.6 §5 — SMO is PULLED on exhaustion by the traversal, never written).
+    // With no manual override left, freeze needs a REAL candidate: a natural
+    // person holding ≥ the 25% default threshold directly in the subject.
     run(
-        &UboDeterminationApplySmoFallback,
+        &KycSubjectRegister,
         serde_json::json!({
-            "subject-id": subject.0, "smo_person_id": Uuid::new_v4(),
+            "subject-id": subject.0, "entity-id": owner, "is_natural_person": true,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeAssertEconomicInterest,
+        serde_json::json!({
+            "subject-id": subject.0, "from_entity_id": owner, "to_entity_id": subject.0,
+            "percentage": 60.0,
         }),
         &pool,
     )
@@ -393,7 +369,7 @@ async fn coverage_ubo_determination_freeze() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "ubo.determination.freeze").await;
+    assert_event(&pool, subject, "kyc_ubo.decide.determination.freeze").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -417,7 +393,7 @@ async fn coverage_kyc_subject_classify_structure() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc.subject.classify-structure").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.subject.structure-class").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -456,7 +432,7 @@ async fn coverage_kyc_obligation_update_identity() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "assert.identity").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.entity.identity").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -487,7 +463,7 @@ async fn coverage_kyc_obligation_update_screening() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "assert.screening").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.entity.screening").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -518,7 +494,7 @@ async fn coverage_kyc_obligation_update_risk() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "assert.risk").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.entity.risk").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -545,7 +521,7 @@ async fn coverage_kyc_obligation_waive() {
         "subject-id": subject.0, "obligation-id": obligation_id,
         "reason": "entity is regulated financial institution — simplified due diligence applies",
     }), &pool).await;
-    assert_event(&pool, subject, "kyc.obligation.waive").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.obligation.waiver").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -570,14 +546,14 @@ async fn coverage_kyc_person_reject() {
         &pool,
     )
     .await;
-    assert_decision_record(&pool, subject, "decide.reject").await;
+    assert_decision_record(&pool, subject, "kyc_ubo.decide.subject.reject").await;
     cleanup(&pool, &[subject]).await;
 }
 
 /// TS.6 §8 `decide_verbs_cite_their_basis`: every verdict records what it
 /// relied on — a non-empty obligation-fold snapshot, never a bare stamp.
-/// Exercises both landed verdicts: `decide.approve` (basis reflects an
-/// AllTerminal obligation) and `decide.reject` (basis reflects a subject
+/// Exercises both landed verdicts: `kyc_ubo.decide.subject.approve` (basis reflects an
+/// AllTerminal obligation) and `kyc_ubo.decide.subject.reject` (basis reflects a subject
 /// with no obligations yet — rejection is allowed at any stage, but the
 /// basis must still be recorded, not omitted because there was "nothing to
 /// cite").
@@ -585,7 +561,7 @@ async fn coverage_kyc_person_reject() {
 async fn decide_verbs_cite_their_basis() {
     let pool = pool().await;
 
-    // decide.approve — basis must reflect the AllTerminal obligation.
+    // kyc_ubo.decide.subject.approve — basis must reflect the AllTerminal obligation.
     let approve_subject = SubjectId(Uuid::new_v4());
     run(
         &KycSubjectRegister,
@@ -620,7 +596,7 @@ async fn decide_verbs_cite_their_basis() {
 
     let approve_basis: serde_json::Value = sqlx::query_scalar(
         r#"SELECT basis FROM "ob-poc".kyc_decision_records
-           WHERE subject_root = $1 AND verb_fqn = 'decide.approve'"#,
+           WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.decide.subject.approve'"#,
     )
     .bind(approve_subject.0)
     .fetch_one(&pool)
@@ -629,7 +605,7 @@ async fn decide_verbs_cite_their_basis() {
     assert_eq!(
         approve_basis.get("overall_state").and_then(|v| v.as_str()),
         Some("AllTerminal"),
-        "decide.approve's basis must cite the AllTerminal obligation state it relied on: {approve_basis:?}"
+        "kyc_ubo.decide.subject.approve's basis must cite the AllTerminal obligation state it relied on: {approve_basis:?}"
     );
     let approve_obligation_ids = approve_basis
         .get("obligation_ids")
@@ -638,10 +614,10 @@ async fn decide_verbs_cite_their_basis() {
     assert_eq!(
         approve_obligation_ids.len(),
         1,
-        "decide.approve's basis must name the obligation it relied on: {approve_basis:?}"
+        "kyc_ubo.decide.subject.approve's basis must name the obligation it relied on: {approve_basis:?}"
     );
 
-    // decide.reject — no obligations exist yet, but the basis must still be
+    // kyc_ubo.decide.subject.reject — no obligations exist yet, but the basis must still be
     // a real (non-empty) snapshot, not an omitted/null citation.
     let reject_subject = SubjectId(Uuid::new_v4());
     run(
@@ -662,7 +638,7 @@ async fn decide_verbs_cite_their_basis() {
 
     let reject_basis: serde_json::Value = sqlx::query_scalar(
         r#"SELECT basis FROM "ob-poc".kyc_decision_records
-           WHERE subject_root = $1 AND verb_fqn = 'decide.reject'"#,
+           WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.decide.subject.reject'"#,
     )
     .bind(reject_subject.0)
     .fetch_one(&pool)
@@ -671,11 +647,11 @@ async fn decide_verbs_cite_their_basis() {
     assert_eq!(
         reject_basis.get("overall_state").and_then(|v| v.as_str()),
         Some("InProgress"),
-        "decide.reject's basis must still cite the (empty) obligation state, not omit citation: {reject_basis:?}"
+        "kyc_ubo.decide.subject.reject's basis must still cite the (empty) obligation state, not omit citation: {reject_basis:?}"
     );
     assert!(
         reject_basis.get("obligation_ids").is_some(),
-        "decide.reject's basis must name the obligation_ids key even when empty: {reject_basis:?}"
+        "kyc_ubo.decide.subject.reject's basis must name the obligation_ids key even when empty: {reject_basis:?}"
     );
 
     cleanup(&pool, &[approve_subject, reject_subject]).await;

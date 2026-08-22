@@ -97,3 +97,91 @@ ubo.trace-chains:
   sets-state: []
 
   unlocks: []
+
+# ── dsl.kyc stream-governed macro (TS.6 P2, K-G7) ───────────────────────────
+#
+# Unlike ubo.discover/ubo.trace-chains above (the legacy percentage-based
+# ownership.* pipeline), this macro composes the append-only dsl.kyc
+# determination stream (ob-poc-kyc-substrate/ob-poc-kyc-seam). It replaces
+# the standalone `kyc_ubo.assert.edge.nominee-piercing` verb+op, retired TS.6 P2 per
+# EOP-DD-KYCUBO-TS.6 §5's ratified ruling: piercing records a real
+# handed-over fact (no traversal rule derives it), so it wasn't a
+# derivation-dressed-as-a-verb candidate for outright deletion — but two
+# effects in one bespoke op (supersede the nominee edge + assert the
+# nominator's real edge) had no governed multi-step composition mechanism
+# other than a single-purpose verb. `kyc_ubo.assert.edge.control` gained an
+# optional `pierced-from` arg (fold-side: stamps `EdgeState.pierced_from`;
+# op-side: fail-closed checks the referenced edge exists, is
+# `EdgeKind::Nominee`, and is active — K-8, the same check the retired
+# bespoke op made) so the two steps below are ordinary governed verb calls,
+# executed atomically under the Sequencer's one-scope-per-runbook model
+# (`execute_plan_atomic_in_scope`) exactly like any other multi-step macro.
+kyc_ubo.assert.edge.nominee-piercing:
+  kind: macro
+
+  ui:
+    label: "Pierce Nominee Arrangement"
+    description: "Supersede a nominee edge and assert the disclosed nominator's underlying control edge, in one governed step"
+    target-label: "Ownership"
+
+  routing:
+    mode-tags: [kyc]
+    operator-domain: ubo
+
+  target:
+    operates-on: structure-ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      subject-id:
+        type: str
+        ui-label: "Subject"
+        description: "Determination root (the subject stream)"
+      edge-id:
+        type: str
+        ui-label: "Nominee Edge"
+        description: "The target nominee edge to pierce (must exist, be active, and be of kind nominee — checked fail-closed on the assert-control step)"
+      nominator-id:
+        type: str
+        ui-label: "Disclosed Nominator"
+        description: "The entity that actually holds the underlying interest — the new control edge is asserted FROM this entity with pierced_from provenance"
+      to-entity-id:
+        type: str
+        ui-label: "Controlled Entity"
+        description: "The entity the nominee arrangement purports to control (the pierced edge's `to`) — supplied explicitly since macro expansion cannot read live fold state to derive it"
+      kind:
+        type: str
+        ui-label: "Underlying Kind"
+        description: "The UNDERLYING kind the nominator actually holds. Any canonical wire value EXCEPT nominee — a pierce cannot produce another nominee edge (fail-closed on the assert-control step)."
+    optional:
+      percentage:
+        type: str
+        ui-label: "Percentage"
+        description: "Percentage (for an underlying economic_interest kind)"
+      trust-revocable:
+        type: str
+        ui-label: "Trust Revocable"
+        description: "Whether the trust IS revocable — only meaningful when the underlying kind is trust_settlor"
+
+  prereqs: []
+
+  expands-to:
+    - verb: kyc_ubo.assert.edge.control
+      args:
+        subject-id: "${arg.subject-id}"
+        from_entity_id: "${arg.nominator-id}"
+        to_entity_id: "${arg.to-entity-id}"
+        kind: "${arg.kind}"
+        pierced-from: "${arg.edge-id}"
+        percentage: "${arg.percentage}"
+        trust-revocable: "${arg.trust-revocable}"
+    - verb: kyc_ubo.assert.edge.supersession
+      args:
+        subject-id: "${arg.subject-id}"
+        edge-id: "${arg.edge-id}"
+
+  sets-state: []
+
+  unlocks: []

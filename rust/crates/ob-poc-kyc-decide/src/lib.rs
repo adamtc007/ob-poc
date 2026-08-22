@@ -1,4 +1,4 @@
-//! KYC/UBO Evaluation-pack verdicts — `decide.approve`, `decide.reject`
+//! KYC/UBO Evaluation-pack verdicts — `kyc_ubo.decide.subject.approve`, `kyc_ubo.decide.subject.reject`
 //! (EOP-DD-KYCUBO-TS.6 §1/§4, landed TS.6 P1/P2).
 //!
 //! **This crate must never depend on `ob-poc-kyc-seam`**, directly or
@@ -24,7 +24,7 @@
 //! `"ob-poc".kyc_decision_records` directly for a prior terminal decision on
 //! the subject before writing a new one.
 //!
-//! `kyc.obligation.waive` stays a fact-stream verb (`ob-poc-kyc-substrate`'s
+//! `kyc_ubo.assert.obligation.waiver` stays a fact-stream verb (`ob-poc-kyc-substrate`'s
 //! `assembly_lexicon()`, unrenamed) for now — see that entry's own doc
 //! comment. It still mutates live obligation-track fold state
 //! (`TrackState::Waived`), so it cannot leave the fact stream until
@@ -124,7 +124,7 @@ fn basis_json(
 
 /// K-23 "decision is final" — query `kyc_decision_records` directly rather
 /// than the fact-stream fold (which can no longer see decisions at all,
-/// TS.6 P2). Refuses if a prior `decide.approve`/`decide.reject` exists for
+/// TS.6 P2). Refuses if a prior `kyc_ubo.decide.subject.approve`/`kyc_ubo.decide.subject.reject` exists for
 /// this subject.
 async fn refuse_if_already_decided(
     scope: &mut dyn TransactionScope,
@@ -132,7 +132,7 @@ async fn refuse_if_already_decided(
 ) -> Result<()> {
     let existing = sqlx::query(
         r#"SELECT verb_fqn FROM "ob-poc".kyc_decision_records
-           WHERE subject_root = $1 AND verb_fqn IN ('decide.approve', 'decide.reject')
+           WHERE subject_root = $1 AND verb_fqn IN ('kyc_ubo.decide.subject.approve', 'kyc_ubo.decide.subject.reject')
            LIMIT 1"#,
     )
     .bind(subject.0)
@@ -176,14 +176,14 @@ async fn insert_decision_record(
     Ok(row.get::<Uuid, _>("id"))
 }
 
-// ── decide.approve ──────────────────────────────────────────────────────────
+// ── kyc_ubo.decide.subject.approve ──────────────────────────────────────────────────────────
 
 pub struct DecideApprove;
 
 #[async_trait]
 impl SemOsVerbOp for DecideApprove {
     fn fqn(&self) -> &str {
-        "decide.approve"
+        "kyc_ubo.decide.subject.approve"
     }
 
     async fn execute(
@@ -198,7 +198,7 @@ impl SemOsVerbOp for DecideApprove {
         // K-23 gate: all required obligation tracks terminal.
         if obligations.derive_subject_state(subject) != SubjectOverallState::AllTerminal {
             return Err(anyhow!(
-                "decide.approve rejected: subject {} obligations are not all terminal — \
+                "kyc_ubo.decide.subject.approve rejected: subject {} obligations are not all terminal — \
                  K-23 gate (determination and approval are separate; approval requires \
                  every required obligation to reach a terminal state)",
                 subject.0,
@@ -212,7 +212,7 @@ impl SemOsVerbOp for DecideApprove {
         let decision_id = insert_decision_record(
             scope,
             subject,
-            "decide.approve",
+            "kyc_ubo.decide.subject.approve",
             &decided_by,
             basis,
             None,
@@ -226,14 +226,14 @@ impl SemOsVerbOp for DecideApprove {
     }
 }
 
-// ── decide.reject ───────────────────────────────────────────────────────────
+// ── kyc_ubo.decide.subject.reject ───────────────────────────────────────────────────────────
 
 pub struct DecideReject;
 
 #[async_trait]
 impl SemOsVerbOp for DecideReject {
     fn fqn(&self) -> &str {
-        "decide.reject"
+        "kyc_ubo.decide.subject.reject"
     }
 
     async fn execute(
@@ -256,7 +256,7 @@ impl SemOsVerbOp for DecideReject {
         let decision_id = insert_decision_record(
             scope,
             subject,
-            "decide.reject",
+            "kyc_ubo.decide.subject.reject",
             &decided_by,
             basis,
             reason.as_deref(),

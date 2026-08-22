@@ -14,7 +14,7 @@ use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycObligationSatisfy, KycSubjectRegister,
 };
-// kyc.person.approve renamed decide.approve TS.6 P2 — moved to ob-poc-kyc-decide.
+// kyc.person.approve renamed kyc_ubo.decide.subject.approve TS.6 P2 — moved to ob-poc-kyc-decide.
 use ob_poc_kyc_decide::DecideApprove;
 use ob_poc_kyc_store::{PgKycObligationProjector, PgKycProjector};
 use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
@@ -127,7 +127,7 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     )
     .await;
 
-    // W5: approve the subject (decide.approve, TS.6 P2 — writes to
+    // W5: approve the subject (kyc_ubo.decide.subject.approve, TS.6 P2 — writes to
     // kyc_decision_records, not the fact stream)
     dispatch(
         &DecideApprove,
@@ -171,7 +171,7 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     //
     // TS.6 §1/§5 (2026-08-22): this used to assert `overall_state ==
     // "Approved"`. It cannot any more, and that is the point of the two-pack
-    // split: `decide.approve` is an Evaluation-pack verb that writes ONLY
+    // split: `kyc_ubo.decide.subject.approve` is an Evaluation-pack verb that writes ONLY
     // `kyc_decision_records`, never the fact stream, so no fold over the
     // stream can ever observe a decision. `AllTerminal` is what Assembly can
     // truthfully say; the approval itself is asserted from Evaluation's own
@@ -200,7 +200,7 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(verb_fqn, "decide.approve", "decide.approve recorded (K-23)");
+    assert_eq!(verb_fqn, "kyc_ubo.decide.subject.approve", "kyc_ubo.decide.subject.approve recorded (K-23)");
     assert_eq!(
         basis.get("overall_state").and_then(|v| v.as_str()),
         Some("AllTerminal"),

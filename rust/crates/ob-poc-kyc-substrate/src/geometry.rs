@@ -47,7 +47,7 @@
 //!   characterises nominee as "a capacity held in a particular edge...
 //!   available during any strategy," not an ordinary typed linkage — its
 //!   traversal (pierce-and-substitute) is governed by the separate,
-//!   already-implemented `ubo.edge.pierce-nominee` mechanism, not by
+//!   already-implemented `kyc_ubo.assert.edge.nominee-piercing` mechanism, not by
 //!   ordinary type-geometry-gated `assert-linkage`. Its absence from the
 //!   grid is therefore read as consistent with the ratified design.
 
@@ -337,7 +337,7 @@ pub fn check_type_geometry(
 
 // ── Pipe derivation (TS.2 §3) ───────────────────────────────────────────────
 //
-// **Pulled forward from the D1-Part-B tranche.** `kyc.subject.correct-type`'s
+// **Pulled forward from the D1-Part-B tranche.** `kyc_ubo.assert.subject.type-correction`'s
 // §4 cascade (`fold::type_registry::edges_invalidated_by_correction`) needs a
 // `Pipe` classification for each edge touching the corrected entity — that is
 // exactly TS.2's `pipe_of(edge_kind, target_entity_type) -> Pipe` deliverable.

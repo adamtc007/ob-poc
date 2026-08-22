@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn slot_regex_matches_hyphenated_target_slots_only() {
         let re = slot_value_re();
-        let text = r#"(ubo.edge.assert-control :edge_id "@Foo" :entity-id "@Bar" :kind "voting_rights")"#;
+        let text = r#"(kyc_ubo.assert.edge.control :edge_id "@Foo" :entity-id "@Bar" :kind "voting_rights")"#;
         let matches: Vec<&str> = re.captures_iter(text).map(|c| c.get(0).unwrap().as_str()).collect();
         // `:edge_id` (underscore, payload arg) must NOT match; `:entity-id`
         // (hyphenated target-binding slot) must; `:kind` (payload) must not.

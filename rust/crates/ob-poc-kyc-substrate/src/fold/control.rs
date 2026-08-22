@@ -131,15 +131,15 @@ pub struct EdgeState {
     /// silently drop a controller.
     #[serde(default)]
     pub trust_revocable: Option<bool>,
-    /// The event that superseded this edge (set by `ubo.edge.supersede` —
+    /// The event that superseded this edge (set by `kyc_ubo.assert.edge.supersession` —
     /// K-35 traceability on the supersession; TS.4, EOP-DD-KYCUBO-KIT-TS0
     /// §2.6: for a pierced nominee edge this is the `supersede` half of the
     /// `pierce-nominee` macro composition, TS.6 P2).
     #[serde(default)]
     pub superseded_by: Option<EventId>,
     /// Provenance: the nominee edge this edge was pierced FROM (set only
-    /// when `ubo.edge.assert-control` is called with a `pierced-from` arg —
-    /// TS.4 §2.6, K-8; the standalone `ubo.edge.pierce-nominee` verb that
+    /// when `kyc_ubo.assert.edge.control` is called with a `pierced-from` arg —
+    /// TS.4 §2.6, K-8; the standalone `kyc_ubo.assert.edge.nominee-piercing` verb that
     /// originally set this field was retired TS.6 P2, folded into the
     /// `assert-control` + `supersede` macro composition, see
     /// `config/verb_schemas/macros/ubo.yaml`).
@@ -163,7 +163,7 @@ impl EdgeState {
 
 // ── Structure class ───────────────────────────────────────────────────────────
 
-/// The subject's structure class, set by `kyc.subject.classify-structure`.
+/// The subject's structure class, set by `kyc_ubo.assert.subject.structure-class`.
 /// Drives strategy selection (K-4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StructureClass {
@@ -189,11 +189,11 @@ pub enum StructureClass {
 pub struct ControlState {
     /// All edges, including Superseded ones (K-13: supersede-never-delete).
     pub edges: BTreeMap<EdgeId, EdgeState>,
-    /// Set if `kyc.subject.classify-structure` has fired.
+    /// Set if `kyc_ubo.assert.subject.structure-class` has fired.
     pub structure_class: Option<StructureClass>,
     /// Event that set the structure class (K-35 traceability).
     pub classify_event_id: Option<EventId>,
-    /// Event id of the most-recent `ubo.edge.reconcile-conflict`.
+    /// Event id of the most-recent `kyc_ubo.assert.edge.reconciliation`.
     /// Required before `freeze` (K-14; `compute-fold` retired TS.6 P2).
     pub reconciliation_event_id: Option<EventId>,
     // `smo_person_id` / `smo_event_id` removed TS.6 §5 (2026-08-22) with
@@ -203,7 +203,7 @@ pub struct ControlState {
     // as the retired verb itself. SMO now reaches a determination solely via
     // the traversal's pull-on-exhaustion, which populates `candidates`
     // (`Prong::SmoFallback`) — TS.3 §4a.
-    /// Subject registration (if `kyc.subject.register` has fired).
+    /// Subject registration (if `kyc_ubo.assert.subject.register` has fired).
     pub registered: bool,
     pub register_event_id: Option<EventId>,
     /// Entity ids registered so far under this subject_root (T6 row-9 fix,
@@ -289,7 +289,7 @@ fn opt_f64(v: &serde_json::Value, field: &str) -> Option<f64> {
     v.get(field)?.as_f64()
 }
 
-/// The canonical `kind` wire-string set for `ubo.edge.assert-control` —
+/// The canonical `kind` wire-string set for `kyc_ubo.assert.edge.control` —
 /// exactly the strings `edge_kind_from_payload` recognizes with a dedicated
 /// arm (TS.1, EOP-DD-KYCUBO-KIT-TS0 §1a/§1b). ONE source of truth: the
 /// op-normalizer (`kyc_stream_ops.rs`) rejects any `kind` outside this set
@@ -370,15 +370,15 @@ pub(crate) fn edge_kind_from_wire(wire: &str) -> EdgeKind {
 /// `placement.rs`'s R2 existence check — ONE extraction, not two.
 fn geometry_triple_for_event(event: &IntentEvent) -> Option<(EntityId, EntityId, EdgeKind)> {
     match event.verb_fqn.as_str() {
-        "ubo.edge.assert-economic-interest" => entity_id(&event.payload, "from_entity_id")
+        "kyc_ubo.assert.edge.economic-interest" => entity_id(&event.payload, "from_entity_id")
             .zip(entity_id(&event.payload, "to_entity_id"))
             .map(|(from, to)| (from, to, EdgeKind::EconomicInterest)),
-        // "ubo.edge.pierce-nominee" special case RETIRED (TS.6 P2, K-G7):
+        // "kyc_ubo.assert.edge.nominee-piercing" special case RETIRED (TS.6 P2, K-G7):
         // the old bespoke verb derived `to` from the pierced edge (needing
         // the folded `ControlState`, since its own payload never carried
         // `to_entity_id`). The macro composition that replaced it
         // (`config/verb_schemas/macros/ubo.yaml`) issues an ordinary
-        // `ubo.edge.assert-control` call with an explicit `to_entity_id` —
+        // `kyc_ubo.assert.edge.control` call with an explicit `to_entity_id` —
         // indistinguishable from any other assert-control call, so it falls
         // through to the generic arm below with no special-casing and no
         // `ControlState` lookup needed (the now-unused `control` parameter
@@ -433,7 +433,7 @@ pub(crate) fn evaluate_type_geometry(
 }
 
 /// The canonical `structure-class` wire-string set for
-/// `kyc.subject.classify-structure` — exactly the strings
+/// `kyc_ubo.assert.subject.structure-class` — exactly the strings
 /// `structure_class_from_payload` recognizes with a dedicated arm, mirroring
 /// `EDGE_KIND_WIRE_VALUES` (EOP-FUZZ-KYCUBO-001 §5 finding #2: this table
 /// didn't exist before, so `structure-class` had no op-side fail-closed gate
@@ -481,7 +481,7 @@ pub(crate) fn apply_one_control_event(
 ) -> ControlState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
-        "kyc.subject.register" => {
+        "kyc_ubo.assert.subject.register" => {
             state.registered = true;
             state.register_event_id = Some(event.id);
             if let Some(eid) = entity_id(p, "entity_id") {
@@ -489,12 +489,12 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "kyc.subject.classify-structure" => {
+        "kyc_ubo.assert.subject.structure-class" => {
             state.structure_class = structure_class_from_payload(p);
             state.classify_event_id = Some(event.id);
         }
 
-        "ubo.edge.assert-economic-interest" => {
+        "kyc_ubo.assert.edge.economic-interest" => {
             if let (Some(from), Some(to)) =
                 (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
             {
@@ -521,7 +521,7 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "ubo.edge.assert-control" => {
+        "kyc_ubo.assert.edge.control" => {
             if let (Some(from), Some(to)) =
                 (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
             {
@@ -554,7 +554,7 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "ubo.edge.attach-evidence" => {
+        "kyc_ubo.assert.edge.evidence" => {
             if let Some(eid) = edge_id_from_target(event) {
                 if let Some(edge) = state.edges.get_mut(&eid) {
                     if edge.status == EdgeStatus::Asserted {
@@ -565,7 +565,7 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "ubo.edge.verify" => {
+        "kyc_ubo.assert.edge.verification" => {
             if let Some(eid) = edge_id_from_target(event) {
                 if let Some(edge) = state.edges.get_mut(&eid) {
                     if edge.status == EdgeStatus::Evidenced {
@@ -575,7 +575,7 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "ubo.edge.supersede" => {
+        "kyc_ubo.assert.edge.supersession" => {
             // K-13: supersede-never-delete.
             if let Some(eid) = edge_id_from_target(event) {
                 if let Some(edge) = state.edges.get_mut(&eid) {
@@ -585,12 +585,12 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        // "ubo.edge.pierce-nominee" RETIRED (TS.6 P2, K-G7, 2026-08-22): the
+        // "kyc_ubo.assert.edge.nominee-piercing" RETIRED (TS.6 P2, K-G7, 2026-08-22): the
         // bespoke two-effect fold arm is gone — the same two effects (assert
         // the nominator's real edge with `pierced_from` provenance +
         // supersede the nominee edge) are now two ordinary fold arms above
-        // (`ubo.edge.assert-control`'s `pierced_from` read) and below
-        // (`ubo.edge.supersede`), composed by the `ubo.edge.pierce-nominee`
+        // (`kyc_ubo.assert.edge.control`'s `pierced_from` read) and below
+        // (`kyc_ubo.assert.edge.supersession`), composed by the `kyc_ubo.assert.edge.nominee-piercing`
         // MACRO (config/verb_schemas/macros/ubo.yaml), not a single event
         // under this verb_fqn. A historical event still bearing this
         // verb_fqn falls through to the catch-all `_ => {}` below, a
@@ -598,7 +598,7 @@ pub(crate) fn apply_one_control_event(
         // K-18/K-31), same discipline as select-strategy/compute-fold's
         // retirement.
 
-        "ubo.edge.reconcile-conflict" => {
+        "kyc_ubo.assert.edge.reconciliation" => {
             state.reconciliation_event_id = Some(event.id);
         }
 
@@ -657,7 +657,7 @@ use crate::lexicon::{LexiconEntry, Precondition};
 /// history: `Trust` joined at TS.1 (`TrustRoleStrategy`,
 /// EOP-DD-KYCUBO-KIT-TS0 §2.1); `InvestmentFund`/`Foundation` at TS.2
 /// (§2.2/§2.3); `StateOwned`/`Cooperative` at TS.3 (§2.4/§2.5); `Nominee`
-/// at TS.4 (§2.6 = K-8 — piercing via the `ubo.edge.pierce-nominee` macro
+/// at TS.4 (§2.6 = K-8 — piercing via the `kyc_ubo.assert.edge.nominee-piercing` macro
 /// (assert-control + supersede, TS.6 P2 — see `config/verb_schemas/macros/
 /// ubo.yaml`) + `NomineePierceStrategy`, whose unpierced-nominee guard
 /// fail-closes at the freeze dispatch site). The guard itself
@@ -753,7 +753,7 @@ pub fn check_preconditions(
                 if !control.registered {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),
-                        reason: "subject must be registered (kyc.subject.register) before this verb"
+                        reason: "subject must be registered (kyc_ubo.assert.subject.register) before this verb"
                             .into(),
                     });
                 }
@@ -785,7 +785,7 @@ pub fn check_preconditions(
                 if control.structure_class.is_none() {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),
-                        reason: "structure class must be set (kyc.subject.classify-structure) \
+                        reason: "structure class must be set (kyc_ubo.assert.subject.structure-class) \
                                  before this verb"
                             .into(),
                     });
@@ -844,7 +844,7 @@ pub fn check_preconditions(
                 let (Some(from), Some(to)) = (from, to) else {
                     continue;
                 };
-                let kind = if event.verb_fqn.as_str() == "ubo.edge.assert-economic-interest" {
+                let kind = if event.verb_fqn.as_str() == "kyc_ubo.assert.edge.economic-interest" {
                     EdgeKind::EconomicInterest
                 } else {
                     edge_kind_from_payload(&event.payload)
@@ -858,7 +858,7 @@ pub fn check_preconditions(
                         verb: lexicon_entry.fqn.clone(),
                         reason: format!(
                             "an active edge of kind {kind:?} already exists from {from:?} to \
-                             {to:?}; use ubo.edge.supersede, never a contradicting assert (K-13)"
+                             {to:?}; use kyc_ubo.assert.edge.supersession, never a contradicting assert (K-13)"
                         ),
                     });
                 }
@@ -908,7 +908,7 @@ pub fn check_preconditions(
                             verb: lexicon_entry.fqn.clone(),
                             reason: format!(
                                 "entity {eid:?} is not a registered group member \
-                                 (kyc.subject.register) — TS.1 §3 rows 2/6/7"
+                                 (kyc_ubo.assert.subject.register) — TS.1 §3 rows 2/6/7"
                             ),
                         });
                     }
@@ -952,7 +952,7 @@ pub fn check_preconditions(
                             verb: lexicon_entry.fqn.clone(),
                             reason: format!(
                                 "entity {eid:?} has no prior type assertion to correct — use \
-                                 kyc.subject.assert-type instead (TS.1 §3 row 7)"
+                                 kyc_ubo.assert.subject.type instead (TS.1 §3 row 7)"
                             ),
                         });
                     }
@@ -1096,7 +1096,7 @@ pub enum ControlAdmission {
     NotControl,
     /// Substitute the underlying holder and continue (K-8). Not filtered by
     /// `reconciled_control_edges` — pierce-and-substitute is handled by the
-    /// `ubo.edge.pierce-nominee` macro composition (TS.6 P2), before any
+    /// `kyc_ubo.assert.edge.nominee-piercing` macro composition (TS.6 P2), before any
     /// strategy ever runs.
     Pierce,
 }
@@ -1310,7 +1310,7 @@ pub fn reconciled_trust_edges(state: &ControlState) -> Vec<ReconciledTrustEdge> 
 pub fn natural_persons_from_events(events: &[&IntentEvent]) -> BTreeSet<PersonId> {
     let mut persons = BTreeSet::new();
     for event in events {
-        if event.verb_fqn.as_str() == "kyc.subject.register"
+        if event.verb_fqn.as_str() == "kyc_ubo.assert.subject.register"
             && event
                 .payload
                 .get("is_natural_person")

@@ -160,7 +160,7 @@ impl PgKycObligationProjector {
             // by the retired approve/reject fold arms, so after P2 it was
             // pinned at `InProgress` and this projection published
             // `all_terminal = false` for subjects whose obligations were all
-            // terminal — while `decide.approve`'s own K-23 gate, which calls
+            // terminal — while `kyc_ubo.decide.subject.approve`'s own K-23 gate, which calls
             // `derive_subject_state`, correctly saw `AllTerminal`. One value,
             // two authorities, disagreeing. The field is gone; this is the
             // single authority.

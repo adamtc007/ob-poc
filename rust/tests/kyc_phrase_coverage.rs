@@ -11,8 +11,8 @@
 //! decision records) are separate capabilities with separate manifests, and a
 //! phrase may legitimately name a verb in either. The tooth checks the UNION —
 //! it was written when only the Assembly pack existed, and read as "the kit"
-//! what was really "one of the two packs", which is why `decide.approve` /
-//! `decide.reject` tripped the foreign-verb arm the moment P2 relocated them.
+//! what was really "one of the two packs", which is why `kyc_ubo.decide.subject.approve` /
+//! `kyc_ubo.decide.subject.reject` tripped the foreign-verb arm the moment P2 relocated them.
 //! The `foreign` arm still has real teeth: a phrase naming a verb in NEITHER
 //! manifest is still a retired/foreign leak.
 //!

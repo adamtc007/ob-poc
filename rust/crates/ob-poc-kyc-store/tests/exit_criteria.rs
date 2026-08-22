@@ -40,7 +40,7 @@ fn v1_registry() -> FoldRegistry {
 fn register_event(subject: SubjectId, idem: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         Principal::test_analyst(),
         AuthorityRef("analyst".into()),
         TargetBinding::for_subject(subject),

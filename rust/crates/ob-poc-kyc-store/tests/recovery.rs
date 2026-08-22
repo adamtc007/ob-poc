@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use ob_poc_kyc_store::{load_source_text_history, PgKycEventStore};
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, render_intent_event_to_sexpr, AuthorityRef, FoldRegistry, IdemKey, IntentEvent,
+    assembly_lexicon, render_intent_event_to_sexpr, AuthorityRef, FoldRegistry, IdemKey, IntentEvent,
     Principal, SubjectId, TargetBinding, V1FoldImpl,
 };
 
@@ -34,7 +34,7 @@ async fn pool() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -50,14 +50,14 @@ fn event(subject: SubjectId, verb: &str, payload: serde_json::Value, idem: &str)
             .unwrap()
             .with_timezone(&Utc),
     )
-    .with_lexicon_hash(phase1_lexicon().hash)
+    .with_lexicon_hash(assembly_lexicon().hash)
     .with_idempotency_key(IdemKey::new(idem))
 }
 
 fn register(subject: SubjectId) -> IntentEvent {
     event(
         subject,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         serde_json::json!({ "is_natural_person": false }),
         "reg",
     )
@@ -66,7 +66,7 @@ fn register(subject: SubjectId) -> IntentEvent {
 fn assert_control(subject: SubjectId, to: Uuid, idem: &str) -> IntentEvent {
     event(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         serde_json::json!({
             "from_entity_id": Uuid::new_v4(),
             "to_entity_id": to,

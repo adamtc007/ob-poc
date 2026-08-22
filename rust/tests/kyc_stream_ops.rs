@@ -1,6 +1,6 @@
 //! R1 proof — the stream-backed verb pattern, end to end.
 //!
-//! Calls the `ubo.edge.assert-control` SemOsVerbOp through a real
+//! Calls the `kyc_ubo.assert.edge.control` SemOsVerbOp through a real
 //! `VerbExecutionContext` + `TransactionScope`, and proves: the verb appends an
 //! `IntentEvent` to the durable stream (committing/rolling back with the scope),
 //! `as_of` flows from the context onto the event, and the outbox drainer
@@ -156,13 +156,13 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     }
 
     let (verb, as_of): (String, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
-        r#"SELECT verb_fqn, as_of FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'ubo.edge.assert-control'"#,
+        r#"SELECT verb_fqn, as_of FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.assert.edge.control'"#,
     )
     .bind(subject.0)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(verb, "ubo.edge.assert-control");
+    assert_eq!(verb, "kyc_ubo.assert.edge.control");
     assert_eq!(
         as_of, fixed_as_of,
         "as_of flowed from the context, frozen at entry"

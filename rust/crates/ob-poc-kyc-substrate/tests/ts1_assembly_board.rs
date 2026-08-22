@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     check_type_geometry, edges_invalidated_by_correction, enumerate_placement_set,
-    fold_type_registry, phase1_lexicon, AuthorityRef, EdgeId, EntityId, EntityType,
+    fold_type_registry, assembly_lexicon, AuthorityRef, EdgeId, EntityId, EntityType,
     GeometryError, IntentEvent, LinkageSource, ObligationState, Pipe, Principal, SubjectId,
     TargetBinding, ALL_ENTITY_TYPES, ALL_PIPES,
 };
@@ -32,7 +32,7 @@ fn as_of() -> DateTime<Utc> {
 fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc.subject.assert-type",
+        "kyc_ubo.assert.subject.type",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -49,7 +49,7 @@ fn correct_type_event(
 ) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc.subject.correct-type",
+        "kyc_ubo.assert.subject.type-correction",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -65,7 +65,7 @@ fn correct_type_event(
 fn attach_evidence_for_entity(subject: SubjectId, entity: EntityId) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "ubo.edge.attach-evidence",
+        "kyc_ubo.assert.edge.evidence",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -495,14 +495,14 @@ fn construct_is_pure() {
 #[test]
 fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let person = EntityId(Uuid::new_v4());
     let company = EntityId(Uuid::new_v4());
 
     let register = |entity: EntityId| {
         IntentEvent::new(
             subj,
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             Principal::test_analyst(),
             AuthorityRef("test".into()),
             TargetBinding::for_subject(subj),
@@ -526,11 +526,11 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     let untyped_registry = ob_poc_kyc_substrate::TypeRegistryState::default();
     let set_before = enumerate_placement_set(subj, &control, &obligation, &untyped_registry, &lexicon);
     assert!(
-        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "ubo.edge.assert-control"),
+        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.control"),
         "assert-control must be refused before any group member has an asserted type"
     );
     assert!(
-        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "ubo.edge.assert-economic-interest"),
+        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.economic-interest"),
         "assert-economic-interest must be refused before any group member has an asserted type"
     );
     // But the new moves are already surfaced: assert-type for both members,
@@ -539,22 +539,22 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     assert!(set_before
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc.subject.assert-type"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type"
             && m.target.entity_id == Some(person)));
     assert!(set_before
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc.subject.assert-type"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type"
             && m.target.entity_id == Some(company)));
     assert!(set_before
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc.subject.record-enquiry"));
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.enquiry"));
     assert!(
         !set_before
             .moves
             .iter()
-            .any(|m| m.verb_fqn.as_str() == "kyc.subject.correct-type"),
+            .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type-correction"),
         "correct-type must not be offered before any type has been asserted"
     );
 
@@ -571,18 +571,18 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
 
     let set_after = enumerate_placement_set(subj, &control, &obligation, &typed_registry, &lexicon);
     assert!(
-        set_after.moves.iter().any(|m| m.verb_fqn.as_str() == "ubo.edge.assert-control"),
+        set_after.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.control"),
         "assert-control must be admitted once a geometrically-possible pair of typed members exists"
     );
     assert!(set_after
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc.subject.correct-type"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type-correction"
             && m.target.entity_id == Some(person)));
     assert!(set_after
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc.subject.correct-type"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type-correction"
             && m.target.entity_id == Some(company)));
 
     // Sanity: person is never a target anywhere in geometry — asserting

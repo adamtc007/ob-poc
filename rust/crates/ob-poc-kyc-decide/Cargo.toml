@@ -2,7 +2,7 @@
 name = "ob-poc-kyc-decide"
 version = "0.1.0"
 edition = "2021"
-description = "KYC/UBO Evaluation-pack verdicts (decide.approve, decide.reject). TS.6 §1/§4: writes only to kyc_decision_records, never the fact stream — structurally, by depending on ob-poc-kyc-read (which has no append) rather than on any crate that exposes one. Dep-gate: scripts/check_kyc_decide_deps.sh."
+description = "KYC/UBO Evaluation-pack verdicts (kyc_ubo.decide.subject.approve, kyc_ubo.decide.subject.reject). TS.6 §1/§4: writes only to kyc_decision_records, never the fact stream — structurally, by depending on ob-poc-kyc-read (which has no append) rather than on any crate that exposes one. Dep-gate: scripts/check_kyc_decide_deps.sh."
 
 # Evaluation pack: reads the Assembly-built fact stream (via ob-poc-kyc-read
 # + ob-poc-kyc-substrate's pure fold) but CANNOT write to it.

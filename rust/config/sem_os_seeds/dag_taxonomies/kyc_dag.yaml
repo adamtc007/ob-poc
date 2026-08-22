@@ -107,16 +107,16 @@ dsl_verb_reconciliation:
   kyc_surface:
     - kyc.case-status
     - kyc.list-missing-items
-    - kyc.obligation.create
-    - kyc.obligation.satisfy
-    - assert.identity
-    - assert.risk
-    - assert.screening
-    - kyc.obligation.waive
-    - decide.approve
-    - decide.reject
-    - kyc.subject.classify-structure
-    - kyc.subject.register
+    - kyc_ubo.assert.obligation.creation
+    - kyc_ubo.assert.obligation.satisfaction
+    - kyc_ubo.assert.entity.identity
+    - kyc_ubo.assert.entity.risk
+    - kyc_ubo.assert.entity.screening
+    - kyc_ubo.assert.obligation.waiver
+    - kyc_ubo.decide.subject.approve
+    - kyc_ubo.decide.subject.reject
+    - kyc_ubo.assert.subject.structure-class
+    - kyc_ubo.assert.subject.register
   observation_surface:
     - observation.get-current
     - observation.list-for-attribute
@@ -165,14 +165,13 @@ dsl_verb_reconciliation:
     - tollgate.evaluate
     - tollgate.override
   ubo_surface:
-    - ubo.determination.apply-smo-fallback
-    - ubo.determination.freeze
-    - ubo.edge.assert-control
-    - ubo.edge.assert-economic-interest
-    - ubo.edge.attach-evidence
-    - ubo.edge.reconcile-conflict
-    - ubo.edge.supersede
-    - ubo.edge.verify
+    - kyc_ubo.decide.determination.freeze
+    - kyc_ubo.assert.edge.control
+    - kyc_ubo.assert.edge.economic-interest
+    - kyc_ubo.assert.edge.evidence
+    - kyc_ubo.assert.edge.reconciliation
+    - kyc_ubo.assert.edge.supersession
+    - kyc_ubo.assert.edge.verification
   verify_surface:
     - verify.assert
     - verify.calculate-confidence
@@ -196,24 +195,26 @@ stream_governed:
     UBO/KYC determination verbs are governed by the stream lexicon and fold
     preconditions, not by DAG from-state/to-state slots. The DAG intentionally
     has no lifecycle slot for these stream-backed verb families.
-  # kyc.role.* and kyc.person.* are both vacuous (match zero live verbs) —
-  # kyc.role.assign/withdraw retired 2026-08-12 (K-G7), kyc.person.approve/
-  # .reject renamed decide.approve/.reject and moved to ob-poc-kyc-decide
-  # TS.6 P2 (no longer stream-governed at all — the whole point of the
-  # Evaluation-pack split). Both left here rather than deleted; see
-  # tests/kyc_pack_closure.rs for the full rationale. NOTE for future
+  # Four-segment rename, RATIFIED 2026-08-22: these globs follow
+  # `kyc_ubo.<capability>.<domain>.*`. The previously-listed vacuous families
+  # (`kyc.role.*`, `kyc.person.*`) are DELETED rather than renamed — a vacuous
+  # glob under an old naming scheme has nothing to carry forward:
+  # kyc.role.assign/withdraw were retired 2026-08-12 (K-G7), and
+  # kyc.person.approve/.reject became kyc_ubo.decide.subject.approve/.reject in
+  # the Evaluation pack, which is not stream-governed at all — that is the whole
+  # point of the split, so `kyc_ubo.decide.subject.*` is deliberately ABSENT
+  # from the list below while `kyc_ubo.decide.determination.*` (freeze, the one
+  # Assembly verdict) is present. NOTE for future
   # editors: this naive line-scanning parser (stream_governed_globs() in
   # kyc_pack_closure.rs) breaks the list early on any comment line placed
   # INSIDE the verb_families block below — keep per-item commentary here,
   # above the list, not interleaved with it.
   verb_families:
-    - ubo.edge.*
-    - ubo.determination.*
-    - kyc.subject.*
-    - kyc.role.*
-    - kyc.obligation.*
-    - kyc.person.*
-    - assert.*
+    - kyc_ubo.assert.edge.*
+    - kyc_ubo.assert.subject.*
+    - kyc_ubo.assert.obligation.*
+    - kyc_ubo.assert.entity.*
+    - kyc_ubo.decide.determination.*
   stream_tables:
     - kyc_intent_events
     - kyc_subject_streams
@@ -313,7 +314,7 @@ overall_lifecycle:
         - kyc-case.set-risk-rating
         # "ubo-registry.promote" was never a real verb — no ubo-registry
         # domain exists. UBO chain finalization here is
-        # ubo.determination.freeze's job (see EOP-DD-KYCUBO-003), not a
+        # kyc_ubo.decide.determination.freeze's job (see EOP-DD-KYCUBO-003), not a
         # separate promote step. Removed rather than left phantom
         # (2026-08-18 hygiene fix).
         - red-flag.close

@@ -296,7 +296,7 @@ notes = "Scenario analyse-ubo routes: full + ownership = ubo.list-ubos"
 
 [[test]]
 utterance = "add an ownership stake -- Vanguard holds 25% of this entity"
-expected_verb = "ubo.edge.assert-economic-interest"
+expected_verb = "kyc_ubo.assert.edge.economic-interest"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ubo"
@@ -316,7 +316,7 @@ notes = "Major collision point between ubo/ownership/control domains"
 
 [[test]]
 utterance = "add a control relationship -- board appointment"
-expected_verb = "ubo.edge.assert-control"
+expected_verb = "kyc_ubo.assert.edge.control"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ubo"
@@ -326,14 +326,14 @@ alt_verbs = []
 
 [[test]]
 utterance = "calculate the UBOs for this CBU"
-expected_verb = "ubo.determination.compute-fold"
-alt_verbs = ["ubo.list-ubos"]
+expected_verb = "kyc_ubo.decide.determination.freeze"
+alt_verbs = []
 expected_plane = "instance"
-expected_polarity = "read"
+expected_polarity = "write"
 expected_domain_concept = "ubo"
 category = "direct"
 difficulty = "easy"
-notes = "ubo.calculate merged into ubo.compute-chains; ubo.list-ubos is valid for 'calculate UBOs'"
+notes = "ubo.determination.compute-fold retired TS.6 P2 (K-G7) -- freeze is the sole surviving verb that runs the determination"
 
 [[test]]
 utterance = "trace the ownership chain from the top entity down"
@@ -1036,14 +1036,14 @@ notes = "TA = Transfer Agent -- a product/service"
 
 [[test]]
 utterance = "compute the 25% threshold test"
-expected_verb = "ubo.determination.compute-fold"
+expected_verb = "kyc_ubo.decide.determination.freeze"
 alt_verbs = ["control.identify-ubos"]
 expected_plane = "instance"
-expected_polarity = "read"
+expected_polarity = "write"
 expected_domain_concept = "ubo"
 category = "indirect"
 difficulty = "expert"
-notes = "25% threshold = UBO determination threshold under 4AMLD/5AMLD; ubo.calculate merged into compute-chains"
+notes = "25% threshold = UBO determination threshold under 4AMLD/5AMLD, applied by freeze's threshold-pct arg; ubo.determination.compute-fold retired TS.6 P2 (K-G7)"
 
 [[test]]
 utterance = "flag the circular ownership"
@@ -3560,7 +3560,7 @@ notes = "Contextual remaining work query"
 
 [[test]]
 utterance = "allege this person is a beneficial owner"
-expected_verb = "ubo.edge.assert-economic-interest"
+expected_verb = "kyc_ubo.assert.edge.economic-interest"
 alt_verbs = ["allegation.record"]
 category = "natural"
 difficulty = "medium"
@@ -3569,7 +3569,7 @@ notes = "UBO epistemic: undiscovered → alleged"
 
 [[test]]
 utterance = "record a beneficial ownership allegation for the director"
-expected_verb = "ubo.edge.assert-economic-interest"
+expected_verb = "kyc_ubo.assert.edge.economic-interest"
 alt_verbs = ["allegation.record"]
 category = "natural"
 difficulty = "hard"
@@ -3578,7 +3578,7 @@ notes = "UBO epistemic: allegation recording"
 
 [[test]]
 utterance = "verify the UBO evidence is sufficient"
-expected_verb = "ubo.edge.verify"
+expected_verb = "kyc_ubo.assert.edge.verification"
 alt_verbs = ["evidence.mark-verified"]
 category = "natural"
 difficulty = "medium"
@@ -3587,7 +3587,7 @@ notes = "UBO epistemic: alleged → provable"
 
 [[test]]
 utterance = "approve the beneficial ownership determination"
-expected_verb = "ubo.determination.freeze"
+expected_verb = "kyc_ubo.decide.determination.freeze"
 alt_verbs = []
 category = "natural"
 difficulty = "medium"
@@ -3596,7 +3596,7 @@ notes = "UBO epistemic: proved → approved"
 
 [[test]]
 utterance = "reject this UBO allegation as unsubstantiated"
-expected_verb = "ubo.edge.supersede"
+expected_verb = "kyc_ubo.assert.edge.supersession"
 alt_verbs = []
 category = "natural"
 difficulty = "medium"
@@ -3605,7 +3605,7 @@ notes = "UBO epistemic: rejection path"
 
 [[test]]
 utterance = "expire the UBO entry that has not been renewed"
-expected_verb = "ubo.edge.supersede"
+expected_verb = "kyc_ubo.assert.edge.supersession"
 alt_verbs = []
 category = "natural"
 difficulty = "hard"
@@ -3632,12 +3632,12 @@ notes = "Trust control vector analysis"
 
 [[test]]
 utterance = "capture a snapshot of the current UBO state"
-expected_verb = "ubo.determination.compute-fold"
+expected_verb = "kyc_ubo.decide.determination.freeze"
 alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
-notes = "UBO epistemic: snapshot for audit trail"
+notes = "UBO epistemic: snapshot for audit trail; ubo.determination.compute-fold retired TS.6 P2 (K-G7), freeze is the sole surviving verb that pins a determination"
 
 [[test]]
 utterance = "record a client allegation about who owns the shares"

@@ -768,12 +768,12 @@ mod enforced_verbs_tests {
 
     #[test]
     fn parse_mixed_untagged_and_tagged() {
-        let parsed = EnforcedVerbs::parse("cbu.confirm,kyc.person.approve:A").unwrap();
+        let parsed = EnforcedVerbs::parse("cbu.confirm,kyc_ubo.decide.subject.approve:A").unwrap();
         for path in ExecutionPath::ALL {
             assert!(parsed.is_enforced("cbu.confirm", path));
         }
-        assert!(parsed.is_enforced("kyc.person.approve", ExecutionPath::RunbookSequencer));
-        assert!(!parsed.is_enforced("kyc.person.approve", ExecutionPath::DslDirect));
+        assert!(parsed.is_enforced("kyc_ubo.decide.subject.approve", ExecutionPath::RunbookSequencer));
+        assert!(!parsed.is_enforced("kyc_ubo.decide.subject.approve", ExecutionPath::DslDirect));
     }
 
     /// §5 item 4: a malformed tag fails the WHOLE config, not just the
@@ -781,7 +781,7 @@ mod enforced_verbs_tests {
     /// silently applied.
     #[test]
     fn malformed_tag_fails_whole_config_not_just_the_entry() {
-        let result = EnforcedVerbs::parse("cbu.confirm:A,kyc.person.approve:Z");
+        let result = EnforcedVerbs::parse("cbu.confirm:A,kyc_ubo.decide.subject.approve:Z");
         assert!(result.is_err(), "unrecognised path letter must fail the whole parse");
     }
 

@@ -24,12 +24,12 @@
 //! "record deltas, don't silently absorb" discipline):
 //! - **No DB-backed kit loader.** The design's `load_current_lexicon_manifest`/
 //!   `load_current_lexicon_manifest_hash` presumed a DB round-trip. Traced
-//!   `ob-poc-kyc-store::manifest::publish_manifest`: it always publishes
-//!   *from* `phase1_lexicon()` (code → DB, one-way, audit/provenance only) and
+//!   `ob-poc-kyc-store::manifest::publish_assembly_manifest`: it always publishes
+//!   *from* `assembly_lexicon()` (code → DB, one-way, audit/provenance only) and
 //!   `PgKycEventStore::append` never reads `kyc_lexicon_manifest` back for
 //!   enforcement — so there is no scenario where the DB's manifest differs
-//!   from the running binary's `phase1_lexicon()`. The kit pin/drift check
-//!   (KIT-10) compares `phase1_lexicon().hash` in-process at open and at
+//!   from the running binary's `assembly_lexicon()`. The kit pin/drift check
+//!   (KIT-10) compares `assembly_lexicon().hash` in-process at open and at
 //!   commit; zero lines land in `ob-poc-kyc-store`/`ob-poc-kyc-seam` for this.
 //! - **`WorkbookError` is local, not `StoreError::KitDrift`.** Keeps the
 //!   kit-drift/recognition error surface entirely in this module rather than
@@ -53,7 +53,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, map_principal};
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_preconditions, enumerate_placement_set, phase1_lexicon, preview,
+    check_preconditions, enumerate_placement_set, assembly_lexicon, preview,
     render_intent_event_to_sexpr, AuthorityRef, ControlState, EdgeId, EntityId, FoldRegistry,
     IntentEvent, KycError, LexiconManifest, MoveId, ObligationId, ObligationState, PersonId,
     SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
@@ -188,7 +188,7 @@ fn raw_value_to_json(value: &RawValue) -> Result<serde_json::Value, RecognitionE
 /// (`subject-id`, `edge-id`, `entity-id`, `person-id`, `obligation-id` —
 /// `render.rs`'s slot list verbatim); every other slot is a payload entry,
 /// keyed exactly as typed (payload keys are snake_case verb args, e.g.
-/// `edge_id`/`from_entity_id` on `ubo.edge.assert-control` — a different
+/// `edge_id`/`from_entity_id` on `kyc_ubo.assert.edge.control` — a different
 /// name from the target's hyphenated `edge-id`, so the two never collide).
 /// `subject-id`, if typed, must match `workbook_subject`; if absent, the
 /// workbook's own subject fills it (the caller already knows which subject
@@ -272,7 +272,7 @@ pub async fn open_workbook(
     subject: SubjectId,
 ) -> Result<KycWorkbook, StoreError> {
     let committed = PgKycEventStore::load_events(conn, subject).await?;
-    let kit = phase1_lexicon();
+    let kit = assembly_lexicon();
     let kit_hash = kit.hash.to_hex();
     Ok(KycWorkbook {
         subject,
@@ -372,7 +372,7 @@ impl KycWorkbook {
         registry: &FoldRegistry,
     ) -> Result<Vec<AppendOutcome>, WorkbookError> {
         // KIT-10 kit-drift check, in-process (see module doc delta note).
-        let live_hash = phase1_lexicon().hash.to_hex();
+        let live_hash = assembly_lexicon().hash.to_hex();
         if live_hash != self.kit_hash {
             return Err(WorkbookError::KitDrift {
                 pinned: self.kit_hash.clone(),

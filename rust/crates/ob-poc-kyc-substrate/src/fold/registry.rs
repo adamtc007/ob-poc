@@ -43,7 +43,7 @@ pub trait FoldImpl: Send + Sync {
 
 // ── V1 implementation (the current lexicon) ───────────────────────────────────
 
-/// `FoldImpl` for the initial lexicon version (the `phase1_lexicon()` manifest).
+/// `FoldImpl` for the initial lexicon version (the `assembly_lexicon()` manifest).
 ///
 /// Wraps `apply_one_control_event` and `apply_one_obligation_event` — the
 /// authoritative v1 fold logic extracted from `fold/control.rs` and

@@ -72,6 +72,30 @@ pub async fn get_trading_matrix(
             };
             Ok(Json(response))
         }
+        Err(ast_db::AstDbError::Json(json_err)) => {
+            // The stored document does not parse as TradingMatrixDocument --
+            // a different document shape was written under ACTIVE status
+            // (B1, EOP-PLAN-MANDATE-FIX-001 F2). Both code paths that
+            // transition to ACTIVE (`ast_db::activate_profile` and
+            // `TradingProfileApprove`/`document_ops::approve_profile`)
+            // write the correct tree shape, so this is data-corruption/
+            // wrong-write, not a normal outcome -- log loudly so it's
+            // visible in telemetry, but degrade the same as "no document"
+            // rather than 500ing the whole endpoint on a single malformed
+            // row.
+            tracing::warn!(
+                %cbu_id,
+                error = %json_err,
+                "ACTIVE trading profile document does not match TradingMatrixDocument shape; returning empty tree"
+            );
+            let response = TradingMatrixResponse {
+                cbu_id: cbu_id.to_string(),
+                cbu_name: cbu.name,
+                children: Vec::new(),
+                total_leaf_count: 0,
+            };
+            Ok(Json(response))
+        }
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Failed to load trading matrix: {}", e),

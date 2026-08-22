@@ -47,14 +47,14 @@ pub enum FoldId {
 /// them (the fold just applies; the write path guards).
 ///
 /// Two verbs with non-trivial preconditions (§3):
-/// - `ubo.edge.verify`       → `EvidenceCited`
-/// - `ubo.determination.freeze` → `ReconciledProjection` + `StructureClassSupported`
+/// - `kyc_ubo.assert.edge.verification`       → `EvidenceCited`
+/// - `kyc_ubo.decide.determination.freeze` → `ReconciledProjection` + `StructureClassSupported`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Precondition {
-    /// A prior `ubo.edge.attach-evidence` event must exist in the stream for
+    /// A prior `kyc_ubo.assert.edge.evidence` event must exist in the stream for
     /// the same `target.edge_id` (K-11).  Enforces: evidence before verify.
     EvidenceCited,
-    /// A prior `ubo.edge.reconcile-conflict` event must exist in the stream
+    /// A prior `kyc_ubo.assert.edge.reconciliation` event must exist in the stream
     /// (K-14).  Enforces: reconcile before fold.
     ReconciledProjection,
     // `StrategySelected` RETIRED (TS.6 P2, K-G7) alongside
@@ -123,9 +123,9 @@ pub enum Precondition {
     // ── EOP-DD-KYCUBO-TS.5 R1 — geometry becomes a precondition ─────────────
     /// TS.1 §2/§2a's type→linkage matrix, checked against the event's
     /// endpoints and (classified) pipe (`crate::geometry::check_type_geometry`).
-    /// Attached to `ubo.edge.assert-control` and `ubo.edge.assert-economic-
+    /// Attached to `kyc_ubo.assert.edge.control` and `ubo.edge.assert-economic-
     /// interest` — the verbs that introduce or restate an edge's (from,
-    /// kind, to) triple (TS.5 §6 Q1/Q2). (`ubo.edge.pierce-nominee`'s own
+    /// kind, to) triple (TS.5 §6 Q1/Q2). (`kyc_ubo.assert.edge.nominee-piercing`'s own
     /// entry, which also carried this, was retired TS.6 P2 — piercing now
     /// reaches this precondition via its own `assert-control` step, same
     /// entry as any other assert-control call.)
@@ -290,12 +290,12 @@ impl LexiconManifest {
 /// `compute-fold`, and `pierce-nominee`'s own entries all retired TS.6 P2,
 /// K-G7 — piercing's precondition pair now reaches the stream via
 /// `assert-control`'s and `supersede`'s own entries, unchanged, composed by
-/// the `ubo.edge.pierce-nominee` macro; `kyc.person.approve`/`.reject`
+/// the `kyc_ubo.assert.edge.nominee-piercing` macro; `kyc.person.approve`/`.reject`
 /// retired from this manifest TS.6 P2 and moved to `evaluation_lexicon()` —
 /// see the note where they used to live, above): Phase-1/2 determination
 /// verbs, preconditions from birth per the K-G7 reintroduction discipline,
 /// plus 6 of the original 8 W5 obligation/person verbs (T6.0 closure,
-/// 2026-08-12 — `kyc.obligation.waive` stays here too, deferred per its own
+/// 2026-08-12 — `kyc_ubo.assert.obligation.waiver` stays here too, deferred per its own
 /// TS.6 note, pending obligation dissolution D2.0) plus 4 D1 type-registry
 /// moves (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8 — assert-type,
 /// withdraw-member, correct-type, record-enquiry). This is the normative
@@ -311,7 +311,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
     let entries = vec![
         // ── Phase 1 — substrate verbs ────────────────────────────────────────
         LexiconEntry::build(
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             "Bring a subject into KYC scope, recording the basis for obligation",
             Taxonomy::Subject,
             smallvec![FoldId::ObligationGraph],
@@ -319,7 +319,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // §5, see its §6 amendment): the ratified bare
             // `NotAlreadyRegistered` (`!state.registered`) would have
             // blocked every multi-person determination — `register`'s real
-            // production usage fires MULTIPLE `kyc.subject.register`
+            // production usage fires MULTIPLE `kyc_ubo.assert.subject.register`
             // events sharing one subject_root, differentiated by payload
             // `entity_id` (one call registers the subject entity itself,
             // one more per natural-person candidate — see
@@ -336,7 +336,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             "Set structure class, driving both determination strategy and obligation set",
             Taxonomy::Subject,
             smallvec![FoldId::ControlGraph, FoldId::ObligationGraph],
@@ -348,7 +348,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "ubo.edge.assert-control",
+            "kyc_ubo.assert.edge.control",
             "Claim a control edge (voting, board, GP statutory, etc.)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
@@ -366,7 +366,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             "Claim an economic-interest edge (shareholding percentage)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
@@ -382,7 +382,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "ubo.edge.attach-evidence",
+            "kyc_ubo.assert.edge.evidence",
             "Cite documentary proof for a control or economic edge",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
@@ -393,7 +393,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
         ),
         LexiconEntry::build(
             // The non-trivial one: requires EvidenceCited (K-11).
-            "ubo.edge.verify",
+            "kyc_ubo.assert.edge.verification",
             "Ratchet edge to Verified state; requires evidence previously attached",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
@@ -402,7 +402,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "ubo.edge.supersede",
+            "kyc_ubo.assert.edge.supersession",
             "Retire an edge and replace with a new one (supersede-never-delete, K-13)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
@@ -412,19 +412,19 @@ pub fn assembly_lexicon() -> LexiconManifest {
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
-        // "ubo.edge.pierce-nominee" LexiconEntry RETIRED (TS.6 P2, K-G7,
+        // "kyc_ubo.assert.edge.nominee-piercing" LexiconEntry RETIRED (TS.6 P2, K-G7,
         // 2026-08-22): the verb it covered no longer exists — piercing is
-        // now the `ubo.edge.pierce-nominee` MACRO (config/verb_schemas/
-        // macros/ubo.yaml) composing `ubo.edge.assert-control` (its own
+        // now the `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/
+        // macros/ubo.yaml) composing `kyc_ubo.assert.edge.control` (its own
         // entry above already carries the equivalent precondition set —
         // SubjectRegistered, NoDuplicateActiveEdge, TypeGeometryPermits —
         // plus a new op-layer-only "referenced edge is EdgeKind::Nominee
         // and active" check when its `pierced-from` arg is present, same
         // no-precondition-primitive discipline the retired verb used) +
-        // `ubo.edge.supersede` (its entry below: EdgeExists, EdgeActive).
+        // `kyc_ubo.assert.edge.supersession` (its entry below: EdgeExists, EdgeActive).
         // The decomposition is exact — no precondition was lost or gained.
         LexiconEntry::build(
-            "ubo.edge.reconcile-conflict",
+            "kyc_ubo.assert.edge.reconciliation",
             "Canonicalise conflicting source edges before determination (K-14)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
@@ -472,7 +472,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // Reintroduction path: a query/preview API, never a fact-stream verb.
         LexiconEntry::build(
             // The pivot verb: pins determination AND emits person obligations.
-            "ubo.determination.freeze",
+            "kyc_ubo.decide.determination.freeze",
             "Pin an immutable determination; emits PersonObligation for each resolved person",
             Taxonomy::Control,
             smallvec![FoldId::Determination, FoldId::ObligationGraph],
@@ -495,7 +495,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // (§7.3) this taxonomy names explicitly includes the decision step,
         // which is what `person.approve`/`person.reject` are.
         LexiconEntry::build(
-            "kyc.obligation.create",
+            "kyc_ubo.assert.obligation.creation",
             "Create an obligation for a subject under a stated role basis (K-21, K-35)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
@@ -506,7 +506,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "assert.identity",
+            "kyc_ubo.assert.entity.identity",
             "Advance the identity verification track of an obligation",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
@@ -519,7 +519,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "assert.screening",
+            "kyc_ubo.assert.entity.screening",
             "Advance the screening track of an obligation (K-26 — screening gates \
              approval, not determination)",
             Taxonomy::Obligation,
@@ -530,7 +530,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "assert.risk",
+            "kyc_ubo.assert.entity.risk",
             "Advance the risk-assessment track of an obligation",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
@@ -540,7 +540,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "kyc.obligation.satisfy",
+            "kyc_ubo.assert.obligation.satisfaction",
             "Mark all tracks on an obligation as satisfied (full KYC clearance)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
@@ -550,7 +550,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "kyc.obligation.waive",
+            "kyc_ubo.assert.obligation.waiver",
             "Waive an obligation (all tracks set to Waived with a recorded reason). \
              TS.6 §4 names this the future `decide.waive` — deferred: waive still \
              mutates live obligation-track fold state (`TrackState::Waived`, feeding \
@@ -568,7 +568,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         // `kyc.person.approve`/`kyc.person.reject` retired from this
-        // manifest TS.6 P2 (K-G7) — renamed `decide.approve`/`decide.reject`
+        // manifest TS.6 P2 (K-G7) — renamed `kyc_ubo.decide.subject.approve`/`kyc_ubo.decide.subject.reject`
         // and moved to `evaluation_lexicon()` (`ob-poc-kyc-decide`, no
         // dependency on `ob-poc-kyc-seam`). Their K-23 "decision is final"
         // finality check (`Precondition::SubjectNotDecided`, retired
@@ -577,7 +577,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // at all, by construction, which is the whole point of the split.
         // ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new moves ──────────────────
         LexiconEntry::build(
-            "kyc.subject.assert-type",
+            "kyc_ubo.assert.subject.type",
             "Assert this entity is of this type (TS.1 move 2) — always Alleged; \
              supersedes any prior type assertion (last-wins)",
             Taxonomy::Subject,
@@ -587,7 +587,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "kyc.subject.correct-type",
+            "kyc_ubo.assert.subject.type-correction",
             "Correct a wrongly-asserted type (TS.1 move 7) — triggers the §4 cascade: \
              affected linkages demote and flag for re-assertion, determination marked \
              stale; never silently deletes",
@@ -598,7 +598,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "kyc.subject.withdraw-member",
+            "kyc_ubo.assert.subject.member-withdrawal",
             "This entity is not, or is no longer, a group member (TS.1 move 6) — \
              flags membership, never deletes (TS.1 §2c basket-of-references)",
             Taxonomy::Subject,
@@ -608,7 +608,7 @@ pub fn assembly_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "kyc.subject.record-enquiry",
+            "kyc_ubo.assert.subject.enquiry",
             "Record sources consulted and searches run (TS.1 move 8) — completeness \
              is a diligence assertion, never a proof (TS.0 §6.3)",
             Taxonomy::Subject,
@@ -626,11 +626,11 @@ pub fn assembly_lexicon() -> LexiconManifest {
 
 /// Build the canonical Evaluation-pack `LexiconManifest` (TS.6 §1/§4).
 ///
-/// 2 verbs today: `decide.approve`, `decide.reject` (renamed from
+/// 2 verbs today: `kyc_ubo.decide.subject.approve`, `kyc_ubo.decide.subject.reject` (renamed from
 /// `kyc.person.approve`/`.reject`, TS.6 P2, landed with the structural
 /// crate split — `ob-poc-kyc-decide` has no dependency on
 /// `ob-poc-kyc-seam`, so this pack has no write path to the fact stream by
-/// construction). `decide.waive` (renamed from `kyc.obligation.waive`)
+/// construction). `decide.waive` (renamed from `kyc_ubo.assert.obligation.waiver`)
 /// stays in `assembly_lexicon()` for now — see that entry's own note; it is
 /// a live Assembly-fold mutation until obligation dissolution (D2.0)
 /// removes the obligation-track model, not yet a pure verdict.
@@ -648,7 +648,7 @@ pub fn evaluation_lexicon() -> LexiconManifest {
     use smallvec::smallvec;
     let entries = vec![
         LexiconEntry::build(
-            "decide.approve",
+            "kyc_ubo.decide.subject.approve",
             "Approve a subject once all obligations are terminal (K-23 gate). \
              Writes only to kyc_decision_records — never the fact stream \
              (TS.6 §1 structural split).",
@@ -659,7 +659,7 @@ pub fn evaluation_lexicon() -> LexiconManifest {
             vec![],
         ),
         LexiconEntry::build(
-            "decide.reject",
+            "kyc_ubo.decide.subject.reject",
             "Reject a subject (K-23 — decision recorded in kyc_decision_records, \
              never the fact stream, never erased). Rejection deliberately allowed \
              at ANY stage (early rejection is a real compliance outcome).",

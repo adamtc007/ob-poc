@@ -14,15 +14,15 @@
 //! zero risk to the 21-verb lexicon's existing behaviour.
 //!
 //! **`admit-member` (TS.1 move 1) has no fold arm here.** P1 recon found
-//! it already satisfied by the EXISTING `kyc.subject.register` event,
+//! it already satisfied by the EXISTING `kyc_ubo.assert.subject.register` event,
 //! which populates `ControlState.registered_entity_ids` — a group is
 //! already, informally, "the set of entities registered under one
 //! `subject_root`" (see that field's own doc comment). This axis therefore
 //! tracks withdrawal only, which has no existing home.
 //!
 //! **`assert-linkage`/`withdraw-linkage` (moves 3/5) have no fold arm
-//! here either** — deliberately. P1 recon found `ubo.edge.assert-control`/
-//! `assert-economic-interest`/`ubo.edge.supersede` are near-exact matches;
+//! here either** — deliberately. P1 recon found `kyc_ubo.assert.edge.control`/
+//! `assert-economic-interest`/`kyc_ubo.assert.edge.supersession` are near-exact matches;
 //! re-keying their EXISTING admission logic (in `placement`) to also check
 //! type geometry satisfies TS.1 §5 without minting duplicate verbs. See
 //! the tranche receipts for the one recorded gap this leaves (`supersede`
@@ -39,8 +39,8 @@ use crate::types::{EdgeId, EntityId, EventId};
 
 // ── Wire values (mirrors EDGE_KIND_WIRE_VALUES / STRUCTURE_CLASS_WIRE_VALUES) ─
 
-/// Canonical `entity-type` wire-string set for `kyc.subject.assert-type` /
-/// `kyc.subject.correct-type` — one arm per `EntityType` variant (TS.0 §4),
+/// Canonical `entity-type` wire-string set for `kyc_ubo.assert.subject.type` /
+/// `kyc_ubo.assert.subject.type-correction` — one arm per `EntityType` variant (TS.0 §4),
 /// fail-closed: any string outside this set is rejected, never guessed.
 pub const ENTITY_TYPE_WIRE_VALUES: &[&str] = &[
     "natural_person",
@@ -205,7 +205,7 @@ fn string_list_from_payload(v: &serde_json::Value, field: &str) -> Vec<String> {
 /// this_entity_is_source)` — reduced by the caller from `ControlState`
 /// (this module doesn't depend on `fold::control`, to avoid a fold-to-fold
 /// coupling; the caller, which already holds both folds at the write
-/// path, does the reduction — mirrors how `ubo.edge.pierce-nominee`'s
+/// path, does the reduction — mirrors how `kyc_ubo.assert.edge.nominee-piercing`'s
 /// op-layer, not the fold, resolves its own cross-references). Pure.
 pub fn edges_invalidated_by_correction(
     corrected_type: EntityType,
@@ -246,7 +246,7 @@ pub(crate) fn apply_one_type_registry_event(
 ) -> TypeRegistryState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
-        "kyc.subject.assert-type" => {
+        "kyc_ubo.assert.subject.type" => {
             // CTN-2f: status is computed, never asserted (`no_move_sets_status`,
             // TS.1 §6). Every `assert-type` starts `Alleged` — there is no
             // payload flag to skip that (contrast an earlier draft of this
@@ -274,14 +274,14 @@ pub(crate) fn apply_one_type_registry_event(
         // unchanged. This arm handles ONLY the type-scoped case: a target
         // naming `entity_id` with no `edge_id` evidences that entity's
         // current type assertion, deriving `Proved` — never set directly.
-        "ubo.edge.attach-evidence" if event.target.edge_id.is_none() => {
+        "kyc_ubo.assert.edge.evidence" if event.target.edge_id.is_none() => {
             if let Some(eid) = event.target.entity_id {
                 if let Some(record) = state.types.get_mut(&eid) {
                     record.proof = TypeProofStatus::Proved;
                 }
             }
         }
-        "kyc.subject.correct-type" => {
+        "kyc_ubo.assert.subject.type-correction" => {
             if let (Some(eid), Some(corrected_type)) =
                 (entity_id(p, "entity_id"), entity_type_from_payload(p))
             {
@@ -320,12 +320,12 @@ pub(crate) fn apply_one_type_registry_event(
                 });
             }
         }
-        "kyc.subject.withdraw-member" => {
+        "kyc_ubo.assert.subject.member-withdrawal" => {
             if let Some(eid) = entity_id(p, "entity_id") {
                 state.withdrawn_members.insert(eid);
             }
         }
-        "kyc.subject.record-enquiry" => {
+        "kyc_ubo.assert.subject.enquiry" => {
             state.enquiries.push(EnquiryRecord {
                 sources_consulted: string_list_from_payload(p, "sources_consulted"),
                 searches_run: string_list_from_payload(p, "searches_run"),

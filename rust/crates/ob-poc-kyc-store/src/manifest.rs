@@ -1,6 +1,14 @@
 //! W2 — lexicon manifest publishing (EOP-DD-KYCUBO-001 §8.1).
 //!
-//! Publishes the current `phase1_lexicon()` to:
+//! TS.6 P1: two packs, two manifests, two independent hashes (§1 "a pack is
+//! a capability"). Both publish through the same generic
+//! `publish_manifest_inner` into the same `kyc_lexicon_manifest` table — the
+//! table is content-addressed by `manifest_hash`, so an Assembly-pack row
+//! and an Evaluation-pack row never collide; each pack's hash moves only
+//! when that pack's own entries change (`packs_have_independent_hashes`,
+//! TS.6 §8).
+//!
+//! Publishes to:
 //!  1. `kyc_lexicon_manifest` — one row per whole-lexicon version (Q7, content-addressed).
 //!  2. `dsl_verbs.lexicon_hash` — the per-verb content-address for each dsl.kyc verb.
 //!
@@ -8,7 +16,7 @@
 
 use sqlx::PgConnection;
 
-use ob_poc_kyc_substrate::{phase1_lexicon, LexiconManifest};
+use ob_poc_kyc_substrate::{assembly_lexicon, evaluation_lexicon, LexiconManifest};
 
 use crate::error::StoreError;
 
@@ -23,16 +31,26 @@ pub struct ManifestPublishOutcome {
     pub verb_rows_updated: u64,
 }
 
-/// Publish the current `phase1_lexicon()` into the DB.
+/// Publish the current `assembly_lexicon()` into the DB.
 ///
 /// Runs in the caller's connection (not necessarily a transaction — the
 /// INSERT is idempotent and the UPDATE is convergent, so partial execution
 /// is safe to retry).
-pub async fn publish_manifest(
+pub async fn publish_assembly_manifest(
     conn: &mut PgConnection,
     published_by: Option<&str>,
 ) -> Result<ManifestPublishOutcome, StoreError> {
-    let manifest = phase1_lexicon();
+    let manifest = assembly_lexicon();
+    publish_manifest_inner(conn, &manifest, published_by).await
+}
+
+/// Publish the current `evaluation_lexicon()` into the DB — the Evaluation
+/// pack's own manifest, independently hashed from Assembly's (TS.6 §1).
+pub async fn publish_evaluation_manifest(
+    conn: &mut PgConnection,
+    published_by: Option<&str>,
+) -> Result<ManifestPublishOutcome, StoreError> {
+    let manifest = evaluation_lexicon();
     publish_manifest_inner(conn, &manifest, published_by).await
 }
 

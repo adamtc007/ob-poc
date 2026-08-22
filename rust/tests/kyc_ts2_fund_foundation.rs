@@ -28,7 +28,7 @@
 //!
 //! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
 //! (`render_value` omits nulls at every depth), so the final determination
-//! leg of (a)/(b) now drives `ubo.determination.freeze` LIVE and reads the
+//! leg of (a)/(b) now drives `kyc_ubo.decide.determination.freeze` LIVE and reads the
 //! candidates + recorded strategy off the freeze outcome. Test (c) still
 //! calls `ControlProngStrategy.resolve` directly on purpose — it pins
 //! strategy-level differential behavior, not the freeze path.
@@ -41,12 +41,12 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze,
-    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
+    KycSubjectClassifyStructure, KycSubjectRegister,
+    UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
     UboEdgeReconcileConflict,
 };
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, DeterminationStrategy, FoldRegistry, IntentEvent,
+    fold_control_versioned, assembly_lexicon, DeterminationStrategy, FoldRegistry, IntentEvent,
     SubjectId, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -197,8 +197,9 @@ async fn freeze_candidates(
     assert_eq!(
         outcome.get("strategy").and_then(|v| v.as_str()),
         Some(expected_strategy),
-        "select-strategy (real op) must have recorded {expected_strategy} — freeze \
-         dispatches to it and records it on the outcome; got {outcome:?}"
+        "structure_class must derive {expected_strategy} (TS.6 P2: strategy is derived, \
+         not separately asserted) — freeze dispatches to it and records it on the \
+         outcome; got {outcome:?}"
     );
     outcome
         .get("candidates")
@@ -258,21 +259,11 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
     )
     .await;
 
-    // The gate widening proven at the REAL op: select-strategy on an
-    // InvestmentFund-classified subject is now ADMITTED
-    // (StructureClassSupported) — pre-TS.2 this call fails-closed.
-    let select = run_fallible(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "fund_control_strategy" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        select.is_ok(),
-        "select-strategy on an InvestmentFund-classified subject must be admitted \
-         post-TS.2 (StructureClassSupported widened): {select:?}"
-    );
-
+    // The gate widening proven at the REAL op: freeze on an
+    // InvestmentFund-classified subject is now ADMITTED (StructureClassSupported)
+    // — pre-TS.2 this call fails-closed. `freeze_candidates` below succeeding
+    // IS the proof (a precondition failure surfaces as an error there); no
+    // separate probe verb exists since `compute-fold` retired (TS.6 P2).
     let candidates = freeze_candidates(&pool, subject, "fund_control_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
@@ -363,18 +354,6 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
         &pool,
     )
     .await;
-    let select = run_fallible(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "foundation_council_strategy" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        select.is_ok(),
-        "select-strategy on a Foundation-classified subject must be admitted \
-         post-TS.2 (StructureClassSupported widened): {select:?}"
-    );
-
     let candidates = freeze_candidates(&pool, subject, "foundation_council_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
@@ -439,7 +418,7 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
     let economic_only = Uuid::new_v4(); // economic axis → excluded
 
     let as_of = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-    let lexicon_hash = phase1_lexicon().hash;
+    let lexicon_hash = assembly_lexicon().hash;
     let mut reg = FoldRegistry::new();
     reg.register(lexicon_hash, std::sync::Arc::new(V1FoldImpl));
 
@@ -457,14 +436,14 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
     };
     let edge = |from: Uuid, to: Uuid, kind: &str| {
         mk(
-            "ubo.edge.assert-control",
+            "kyc_ubo.assert.edge.control",
             serde_json::json!({ "from_entity_id": from, "to_entity_id": to, "kind": kind }),
         )
     };
 
     let register = |entity: Uuid| {
         mk(
-            "kyc.subject.register",
+            "kyc_ubo.assert.subject.register",
             serde_json::json!({ "entity_id": entity, "is_natural_person": true }),
         )
     };
@@ -476,7 +455,7 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
         register(nominee),
         register(economic_only),
         mk(
-            "kyc.subject.classify-structure",
+            "kyc_ubo.assert.subject.structure-class",
             serde_json::json!({ "structure_class": "llp", "entity_id": subject_entity }),
         ),
         edge(direct_voter, subject_entity, "voting_rights"),
@@ -485,7 +464,7 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
         edge(gp_principal, intermediate, "dominant_influence"),
         edge(nominee, subject_entity, "nominee"),
         mk(
-            "ubo.edge.assert-economic-interest",
+            "kyc_ubo.assert.edge.economic-interest",
             serde_json::json!({
                 "from_entity_id": economic_only, "to_entity_id": subject_entity,
                 "percentage": 40.0,
@@ -544,92 +523,57 @@ async fn d_select_strategy_admits_nominee_after_ts4() {
 
     // TS.4 fixture flip (was `d_select_strategy_still_blocks_nominee_after_
     // widening`): Nominee joined the implemented set (NomineePierceStrategy),
-    // so select-strategy on a Nominee-classified subject is now ADMITTED —
-    // the old assertion inverted. The fail-closed floor for unknown/garbage
-    // class strings is pinned in kyc_t61_studs.rs and kyc_pack_closure.rs.
+    // so the `[ReconciledProjection, StructureClassSupported]` pair (formerly
+    // also carried by `compute-fold`, retired TS.6 P2) on a Nominee-classified
+    // subject is now ADMITTED — the old assertion inverted. Probed here via
+    // `apply-smo-fallback`, which declares the identical precondition pair and
+    // (unlike `freeze`) needs no candidate-producing edges to reach it — this
+    // fixture has none. The fail-closed floor for unknown/garbage class
+    // strings is pinned in kyc_t61_studs.rs and kyc_pack_closure.rs.
     setup_subject(&pool, subject, &[], "nominee").await;
-
-    let result = run_fallible(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "nominee_pierce_strategy" }),
-        &pool,
-    )
-    .await;
-    assert!(
-        result.is_ok(),
-        "select-strategy on a Nominee-classified subject must be ADMITTED \
-         post-TS.4 (StructureClassSupported widened to the total set): {result:?}"
-    );
-
-    cleanup(&pool, &[subject]).await;
-}
-
-// ── (e) freeze unknown-strategy arm errors, listing all implemented ─────────
-
-#[tokio::test]
-async fn e_freeze_rejects_unknown_strategy_listing_all_implemented() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let member = Uuid::new_v4();
-
-    setup_subject(&pool, subject, &[member], "foundation").await;
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject.0, "from_entity_id": member, "to_entity_id": subject.0,
-            "kind": "board_appointment",
-        }),
-        &pool,
-    )
-    .await;
     run(
         &UboEdgeReconcileConflict,
         serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;
-    // A strategy name with no arm behind it — TS.4 fixture fix:
-    // nominee_pierce_strategy gained a real dispatch arm, so the exemplar
-    // is now a never-will-exist string.
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "no_such_strategy" }),
-        &pool,
-    )
-    .await;
 
+    // StructureClassSupported must ADMIT a Nominee-classified subject
+    // (widened to the total 11-variant set at TS.4). Previously probed via
+    // `apply-smo-fallback`, which declared the identical precondition pair —
+    // retired TS.6 §5 (SMO is PULLED on exhaustion by the traversal, never
+    // asserted). `freeze` is now the only verb carrying that pair, so it is
+    // the probe: it will still error here (K-5 — no candidates and nothing
+    // for the SMO pull to find), but that is a DOWNSTREAM refusal reached
+    // only AFTER the preconditions admitted. The proof is the absence of the
+    // StructureClassSupported refusal text, not success.
     let result = run_fallible(
         &UboDeterminationFreeze,
         serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
         &pool,
     )
     .await;
+    let msg = match &result {
+        Ok(_) => String::new(),
+        Err(e) => e.to_string(),
+    };
     assert!(
-        result.is_err(),
-        "freeze must refuse an unimplemented strategy rather than silently \
-         substituting a registered one"
+        !msg.contains("has no implemented determination strategy yet"),
+        "StructureClassSupported must ADMIT a Nominee-classified subject \
+         post-TS.4 (widened to the total set); got: {msg}"
     );
-    let msg = result.unwrap_err().to_string();
-    assert!(
-        msg.contains("no_such_strategy") && msg.contains("no DeterminationStrategy"),
-        "error should name the missing strategy; got: {msg}"
-    );
-    for implemented in [
-        "ownership_prong_strategy",
-        "control_prong_strategy",
-        "trust_role_strategy",
-        "fund_control_strategy",
-        "foundation_council_strategy",
-        "state_owned_strategy",
-        "cooperative_member_strategy",
-        "nominee_pierce_strategy",
-    ] {
-        assert!(
-            msg.contains(implemented),
-            "the rejection must list all 8 implemented strategies (expected \
-             {implemented} in: {msg})"
-        );
-    }
 
     cleanup(&pool, &[subject]).await;
 }
+
+// ── (e) freeze unknown-strategy arm — RETIRED (TS.6 P2) ─────────────────────
+//
+// `e_freeze_rejects_unknown_strategy_listing_all_implemented` drove
+// `select-strategy` with a `"no_such_strategy"` string to prove freeze's
+// catch-all arm. That entry point is gone: the strategy is now DERIVED
+// from `structure_class`, a TOTAL function over all 11 `StructureClass`
+// variants (pinned by
+// `kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`),
+// so there is no governed way left to hand freeze an arbitrary strategy
+// name — see the identical note on `kyc_ts1_trust.rs`'s deleted
+// `f_freeze_still_rejects_unknown_strategy_after_trust_widening`.

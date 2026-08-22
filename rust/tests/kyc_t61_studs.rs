@@ -153,13 +153,13 @@ fn precondition_blocks_illegal_placement() {
         reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         ..Default::default()
     };
-    let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
+    let freeze_entry = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
     let freeze_result = check_preconditions(
         freeze_entry,
         &unclassified_ready,
         &empty_obligation,
         &TypeRegistryState::default(),
-        &probe(subject, "ubo.determination.freeze"),
+        &probe(subject, "kyc_ubo.decide.determination.freeze"),
     );
     assert!(
         freeze_result.is_err(),
@@ -176,14 +176,14 @@ fn precondition_admits_legal_placement() {
 
     // PrivateCompany is in the pinned implemented-strategy set.
     let pc_state = control_with_class_reconciled_and_strategized(StructureClass::PrivateCompany);
-    let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
+    let freeze_entry = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
     assert!(
         check_preconditions(
             freeze_entry,
             &pc_state,
             &empty_obligation,
             &TypeRegistryState::default(),
-            &probe(subject, "ubo.determination.freeze"),
+            &probe(subject, "kyc_ubo.decide.determination.freeze"),
         )
         .is_ok(),
         "freeze must be admitted for a PrivateCompany-classified subject with reconcile \
@@ -200,7 +200,7 @@ fn precondition_admits_legal_placement() {
 //
 // Originally exercised `SubjectNotDecided` (then UNATTACHED to any lexicon
 // entry in T6.1). `SubjectNotDecided` and `SubjectOverallState::Approved`/
-// `Rejected` were retired TS.6 P2 (K-G7): `decide.approve`/`decide.reject`
+// `Rejected` were retired TS.6 P2 (K-G7): `kyc_ubo.decide.subject.approve`/`kyc_ubo.decide.subject.reject`
 // moved off the fact stream entirely (structural Evaluation-pack split,
 // `ob-poc-kyc-decide`), so the substrate's pure fold can no longer see a
 // decision to be "not yet decided" about — the finality check moved with
@@ -214,7 +214,7 @@ fn checker_sees_both_folds() {
     let subject = SubjectId(Uuid::new_v4());
     let empty_control = ControlState::default();
 
-    let mut synthetic_entry = lexicon.get("kyc.obligation.create").unwrap().clone();
+    let mut synthetic_entry = lexicon.get("kyc_ubo.assert.obligation.creation").unwrap().clone();
     synthetic_entry.preconditions = vec![ob_poc_kyc_substrate::Precondition::SubjectAllTerminal];
 
     // InProgress (default/no rollup) — not all-terminal — must reject.
@@ -224,7 +224,7 @@ fn checker_sees_both_folds() {
         &empty_control,
         &not_terminal,
         &TypeRegistryState::default(),
-        &probe(subject, "kyc.obligation.create"),
+        &probe(subject, "kyc_ubo.assert.obligation.creation"),
     );
     assert!(
         result.is_err(),
@@ -273,7 +273,7 @@ fn checker_sees_both_folds() {
             &empty_control,
             &terminal,
             &TypeRegistryState::default(),
-            &probe(subject, "kyc.obligation.create"),
+            &probe(subject, "kyc_ubo.assert.obligation.creation"),
         )
         .is_ok(),
         "SubjectAllTerminal must admit once ObligationState shows the subject AllTerminal — \

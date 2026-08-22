@@ -125,7 +125,7 @@ fn sexpr_roundtrip_property_edge_assert_control() {
     let edge = EdgeId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         analyst(),
         authority(),
         TargetBinding::for_edge(subject, edge),
@@ -146,7 +146,7 @@ fn sexpr_roundtrip_property_subject_classify_structure() {
     let entity = EntityId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc.subject.classify-structure",
+        "kyc_ubo.assert.subject.structure-class",
         analyst(),
         authority(),
         TargetBinding {
@@ -166,7 +166,7 @@ fn sexpr_roundtrip_property_obligation_person_bound() {
     let obligation = ObligationId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc.obligation.satisfy",
+        "kyc_ubo.assert.obligation.satisfaction",
         analyst(),
         authority(),
         TargetBinding {
@@ -186,7 +186,7 @@ fn sexpr_roundtrip_property_string_escaping() {
     let subject = SubjectId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc.obligation.waive",
+        "kyc_ubo.assert.obligation.waiver",
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
@@ -201,7 +201,7 @@ fn sexpr_roundtrip_deterministic_same_event_same_text() {
     let subject = SubjectId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "ubo.edge.assert-economic-interest",
+        "kyc_ubo.assert.edge.economic-interest",
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
@@ -241,12 +241,12 @@ fn lexer_accepts_underscore_keywords() {
 use std::sync::Arc;
 
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, FoldRegistry, V1FoldImpl,
+    fold_control_versioned, assembly_lexicon, FoldRegistry, V1FoldImpl,
 };
 
 fn registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -303,7 +303,7 @@ fn history_replayable_as_dsl() {
 
     let e1 = IntentEvent::new(
         subject,
-        "kyc.subject.classify-structure",
+        "kyc_ubo.assert.subject.structure-class",
         analyst(),
         authority(),
         TargetBinding {
@@ -314,11 +314,11 @@ fn history_replayable_as_dsl() {
         ts(),
     )
     .with_seq(0)
-    .with_lexicon_hash(phase1_lexicon().hash);
+    .with_lexicon_hash(assembly_lexicon().hash);
 
     let e2 = IntentEvent::new(
         subject,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         analyst(),
         authority(),
         TargetBinding::for_edge(subject, edge1),
@@ -331,7 +331,7 @@ fn history_replayable_as_dsl() {
         ts(),
     )
     .with_seq(1)
-    .with_lexicon_hash(phase1_lexicon().hash);
+    .with_lexicon_hash(assembly_lexicon().hash);
 
     let original = [e1, e2];
     let original_refs: Vec<&IntentEvent> = original.iter().collect();
@@ -383,7 +383,7 @@ fn sexpr_render_omits_nested_nulls_at_every_depth() {
     let person = Uuid::new_v4().to_string();
     let event = IntentEvent::new(
         subject,
-        "ubo.determination.freeze",
+        "kyc_ubo.decide.determination.freeze",
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
@@ -403,7 +403,7 @@ fn sexpr_render_omits_nested_nulls_at_every_depth() {
     assert!(!rendered.contains("quantum"), "nested null entry must be omitted: {rendered}");
 
     let atom = parse_one_atom(&rendered);
-    assert_eq!(atom.kind, "ubo.determination.freeze");
+    assert_eq!(atom.kind, "kyc_ubo.decide.determination.freeze");
     let candidates = atom
         .slots
         .iter()

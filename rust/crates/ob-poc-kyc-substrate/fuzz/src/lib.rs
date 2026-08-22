@@ -30,27 +30,27 @@ use uuid::Uuid;
 /// more, so their strings would just be more `not.a.real.verb`-style
 /// fallthrough noise, indistinguishable from the two deliberate unknowns
 /// already below. `kyc.person.approve`/`.reject` also dropped (TS.6 P1/P2)
-/// — renamed `decide.approve`/`.reject` and moved to `ob-poc-kyc-decide`,
+/// — renamed `kyc_ubo.decide.subject.approve`/`.reject` and moved to `ob-poc-kyc-decide`,
 /// which never appends to the fact stream at all, so neither fold has ever
 /// had a dispatch arm for them (this fuzz target only exercises
 /// `apply_one_control_event`/`apply_one_obligation_event`, never
 /// `ob-poc-kyc-decide`'s DB-backed ops).
 const ALL_VERBS: &[&str] = &[
-    "kyc.subject.register",
-    "kyc.subject.classify-structure",
-    "ubo.edge.assert-economic-interest",
-    "ubo.edge.assert-control",
-    "ubo.edge.attach-evidence",
-    "ubo.edge.verify",
-    "ubo.edge.supersede",
-    "ubo.edge.reconcile-conflict",
-    "ubo.determination.freeze",
-    "kyc.obligation.create",
-    "assert.identity",
-    "assert.screening",
-    "assert.risk",
-    "kyc.obligation.satisfy",
-    "kyc.obligation.waive",
+    "kyc_ubo.assert.subject.register",
+    "kyc_ubo.assert.subject.structure-class",
+    "kyc_ubo.assert.edge.economic-interest",
+    "kyc_ubo.assert.edge.control",
+    "kyc_ubo.assert.edge.evidence",
+    "kyc_ubo.assert.edge.verification",
+    "kyc_ubo.assert.edge.supersession",
+    "kyc_ubo.assert.edge.reconciliation",
+    "kyc_ubo.decide.determination.freeze",
+    "kyc_ubo.assert.obligation.creation",
+    "kyc_ubo.assert.entity.identity",
+    "kyc_ubo.assert.entity.screening",
+    "kyc_ubo.assert.entity.risk",
+    "kyc_ubo.assert.obligation.satisfaction",
+    "kyc_ubo.assert.obligation.waiver",
     // Genuinely unknown FQNs — historical/garbage-event fallthrough (D2).
     "not.a.real.verb",
     "",
@@ -176,7 +176,7 @@ fn build_payload(
         "edge_id",
         pick_uuid_like(tape, edge_pool).map(serde_json::Value::from),
     );
-    // TS.6 P2: `ubo.edge.assert-control`'s new provenance field — the
+    // TS.6 P2: `kyc_ubo.assert.edge.control`'s new provenance field — the
     // `pierce-nominee` macro's `pierced-from` arg, normalized to this key.
     put(
         "pierced_from",

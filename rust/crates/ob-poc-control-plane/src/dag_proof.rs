@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn blocking_violation_fails_guard_regardless_of_lifecycle_mode() {
         let input = DagProofInput {
-            blocking_violations: vec!["cbu_operationally_active requires kyc.person.approve".to_string()],
+            blocking_violations: vec!["cbu_operationally_active requires kyc_ubo.decide.subject.approve".to_string()],
             ..base_input()
         };
         assert!(matches!(decide(&input), StateTransitionOutcome::GuardFailed { .. }));

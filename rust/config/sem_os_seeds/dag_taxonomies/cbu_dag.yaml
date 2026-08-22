@@ -268,16 +268,16 @@ dsl_verb_reconciliation:
   kyc_surface:
     - kyc.case-status
     - kyc.list-missing-items
-    - kyc.obligation.create
-    - kyc.obligation.satisfy
-    - assert.identity
-    - assert.risk
-    - assert.screening
-    - kyc.obligation.waive
-    - decide.approve
-    - decide.reject
-    - kyc.subject.classify-structure
-    - kyc.subject.register
+    - kyc_ubo.assert.obligation.creation
+    - kyc_ubo.assert.obligation.satisfaction
+    - kyc_ubo.assert.entity.identity
+    - kyc_ubo.assert.entity.risk
+    - kyc_ubo.assert.entity.screening
+    - kyc_ubo.assert.obligation.waiver
+    - kyc_ubo.decide.subject.approve
+    - kyc_ubo.decide.subject.reject
+    - kyc_ubo.assert.subject.structure-class
+    - kyc_ubo.assert.subject.register
   onboarding_surface:
     - onboarding.status
   red_flag_surface:
@@ -296,14 +296,13 @@ dsl_verb_reconciliation:
   trading_profile_surface:
     - trading-profile.read
   ubo_surface:
-    - ubo.determination.apply-smo-fallback
-    - ubo.determination.freeze
-    - ubo.edge.assert-control
-    - ubo.edge.assert-economic-interest
-    - ubo.edge.attach-evidence
-    - ubo.edge.reconcile-conflict
-    - ubo.edge.supersede
-    - ubo.edge.verify
+    - kyc_ubo.decide.determination.freeze
+    - kyc_ubo.assert.edge.control
+    - kyc_ubo.assert.edge.economic-interest
+    - kyc_ubo.assert.edge.evidence
+    - kyc_ubo.assert.edge.reconciliation
+    - kyc_ubo.assert.edge.supersession
+    - kyc_ubo.assert.edge.verification
   regulatory_registration_surface:
     - regulatory.registration.add
     - regulatory.registration.list

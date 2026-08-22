@@ -9,7 +9,7 @@
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, fold_control, phase1_lexicon, preview, ControlState, EdgeId,
+    check_control_preconditions, fold_control, assembly_lexicon, preview, ControlState, EdgeId,
     EntityId, IntentEvent, Principal, SubjectId, TargetBinding, TypeRegistryState,
 };
 
@@ -31,7 +31,7 @@ fn t() -> chrono::DateTime<chrono::Utc> {
 fn register_event(subj: SubjectId) -> IntentEvent {
     IntentEvent::new(
         subj,
-        "kyc.subject.register",
+        "kyc_ubo.assert.subject.register",
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
         TargetBinding::for_subject(subj),
@@ -43,7 +43,7 @@ fn register_event(subj: SubjectId) -> IntentEvent {
 fn assert_control_event(subj: SubjectId, edge: EdgeId, from: EntityId, to: EntityId) -> IntentEvent {
     IntentEvent::new(
         subj,
-        "ubo.edge.assert-control",
+        "kyc_ubo.assert.edge.control",
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
         TargetBinding::for_subject(subj),
@@ -58,7 +58,7 @@ fn assert_control_event(subj: SubjectId, edge: EdgeId, from: EntityId, to: Entit
 fn attach_evidence_event(subj: SubjectId, edge: EdgeId) -> IntentEvent {
     IntentEvent::new(
         subj,
-        "ubo.edge.attach-evidence",
+        "kyc_ubo.assert.edge.evidence",
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
         TargetBinding::for_edge(subj, edge),
@@ -70,7 +70,7 @@ fn attach_evidence_event(subj: SubjectId, edge: EdgeId) -> IntentEvent {
 fn verify_event(subj: SubjectId, edge: EdgeId) -> IntentEvent {
     IntentEvent::new(
         subj,
-        "ubo.edge.verify",
+        "kyc_ubo.assert.edge.verification",
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
         TargetBinding::for_edge(subj, edge),
@@ -91,7 +91,7 @@ fn verify_event(subj: SubjectId, edge: EdgeId) -> IntentEvent {
 #[test]
 fn preview_is_pure() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let edge = EdgeId(Uuid::new_v4());
     let (from, to) = (entity(), entity());
 
@@ -108,7 +108,7 @@ fn preview_is_pure() {
 #[test]
 fn per_step_matches_single_move() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let edge = EdgeId(Uuid::new_v4());
     let (from, to) = (entity(), entity());
 
@@ -146,7 +146,7 @@ fn per_step_matches_single_move() {
 #[test]
 fn committed_line_equals_preview() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let edge = EdgeId(Uuid::new_v4());
     let (from, to) = (entity(), entity());
 
@@ -175,7 +175,7 @@ fn committed_line_equals_preview() {
 #[test]
 fn illegal_mid_chain_rejected() {
     let subj = subject();
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let edge = EdgeId(Uuid::new_v4());
     let (from, to) = (entity(), entity());
 

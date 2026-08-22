@@ -253,7 +253,6 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             | "trading-profile.get-active"
             | "trading-profile.list-versions"
             | "trading-profile.activate"
-            | "trading-profile.materialize"
             | "trading-profile.add-component"
             | "trading-profile.remove-component"
             | "trading-profile.set-base-currency"
@@ -592,8 +591,6 @@ fn resolve_trading_profile_verb(step: &SemanticStep) -> Result<&'static str> {
         "update" => {
             if qualifier_mentions_any(step, &["activate", "go live", "live profile"]) {
                 Ok("trading-profile.activate")
-            } else if qualifier_mentions_any(step, &["materialize", "deploy", "sync profile"]) {
-                Ok("trading-profile.materialize")
             } else if has_parameter(step, "currency") {
                 Ok("trading-profile.set-base-currency")
             } else if has_parameter(step, "component-type")
@@ -604,7 +601,7 @@ fn resolve_trading_profile_verb(step: &SemanticStep) -> Result<&'static str> {
                 Ok("trading-profile.add-component")
             } else {
                 Err(anyhow!(
-                    "trading-profile compiler slice only supports update intents for activation, materialization, base currency, or component edits"
+                    "trading-profile compiler slice only supports update intents for activation, base currency, or component edits"
                 ))
             }
         }
@@ -759,7 +756,6 @@ fn ensure_primary_binding(
         }
         "trading-profile.read"
         | "trading-profile.activate"
-        | "trading-profile.materialize"
         | "trading-profile.add-component"
         | "trading-profile.remove-component"
         | "trading-profile.set-base-currency" => Some(("profile-id", "trading profile")),

@@ -49,7 +49,7 @@ pub struct IntentEvent {
     /// The determination root this stream belongs to (ordering domain, Q6).
     pub subject_root: SubjectId,
 
-    /// Verb FQN, e.g. `"ubo.edge.verify"`.
+    /// Verb FQN, e.g. `"kyc_ubo.assert.edge.verification"`.
     pub verb_fqn: VerbFqn,
     /// Content hash of the lexicon entry this event was written against (Q7).
     pub lexicon_hash: Hash,

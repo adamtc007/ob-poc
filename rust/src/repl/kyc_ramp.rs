@@ -179,13 +179,13 @@ mod tests {
         let subject = SubjectId(Uuid::new_v4());
         let moves = vec![
             LegalMove {
-                move_id: MoveId("kyc.subject.register::subject".to_string()),
-                verb_fqn: VerbFqn("kyc.subject.register".to_string()),
+                move_id: MoveId("kyc_ubo.assert.subject.register::subject".to_string()),
+                verb_fqn: VerbFqn("kyc_ubo.assert.subject.register".to_string()),
                 target: TargetBinding::for_subject(subject),
             },
             LegalMove {
-                move_id: MoveId("kyc.subject.classify-structure::subject".to_string()),
-                verb_fqn: VerbFqn("kyc.subject.classify-structure".to_string()),
+                move_id: MoveId("kyc_ubo.assert.subject.structure-class::subject".to_string()),
+                verb_fqn: VerbFqn("kyc_ubo.assert.subject.structure-class".to_string()),
                 target: TargetBinding::for_subject(subject),
             },
             LegalMove {
@@ -209,9 +209,9 @@ mod tests {
     fn ramp_only_proposes_board_moves() {
         let board = fixture_board();
         let mut scores = HashMap::new();
-        scores.insert("kyc.subject.register".to_string(), 0.9);
+        scores.insert("kyc_ubo.assert.subject.register".to_string(), 0.9);
         // A verb NOT on this board at all — must never leak into the output.
-        scores.insert("ubo.edge.assert-control".to_string(), 0.99);
+        scores.insert("kyc_ubo.assert.edge.control".to_string(), 0.99);
 
         let ranked = rank_board_with_scores(&board, &scores);
 
@@ -241,8 +241,8 @@ mod tests {
     fn multi_peak_clarifies_never_selects() {
         let board = fixture_board();
         let mut scores = HashMap::new();
-        scores.insert("kyc.subject.register".to_string(), 0.80);
-        scores.insert("kyc.subject.classify-structure".to_string(), 0.79);
+        scores.insert("kyc_ubo.assert.subject.register".to_string(), 0.80);
+        scores.insert("kyc_ubo.assert.subject.structure-class".to_string(), 0.79);
 
         let ranked = rank_board_with_scores(&board, &scores);
         let outcome = decide_disposition(&ranked, DEFAULT_SELECT_THRESHOLD, DEFAULT_CLARIFY_MARGIN);
@@ -259,15 +259,15 @@ mod tests {
     fn clear_winner_selects() {
         let board = fixture_board();
         let mut scores = HashMap::new();
-        scores.insert("kyc.subject.register".to_string(), 0.90);
-        scores.insert("kyc.subject.classify-structure".to_string(), 0.10);
+        scores.insert("kyc_ubo.assert.subject.register".to_string(), 0.90);
+        scores.insert("kyc_ubo.assert.subject.structure-class".to_string(), 0.10);
 
         let ranked = rank_board_with_scores(&board, &scores);
         let outcome = decide_disposition(&ranked, DEFAULT_SELECT_THRESHOLD, DEFAULT_CLARIFY_MARGIN);
 
         assert_eq!(
             outcome,
-            DispositionOutcome::Select(MoveId("kyc.subject.register::subject".to_string()))
+            DispositionOutcome::Select(MoveId("kyc_ubo.assert.subject.register::subject".to_string()))
         );
     }
 
@@ -275,7 +275,7 @@ mod tests {
     fn below_threshold_abstains() {
         let board = fixture_board();
         let mut scores = HashMap::new();
-        scores.insert("kyc.subject.register".to_string(), 0.20);
+        scores.insert("kyc_ubo.assert.subject.register".to_string(), 0.20);
 
         let ranked = rank_board_with_scores(&board, &scores);
         let outcome = decide_disposition(&ranked, DEFAULT_SELECT_THRESHOLD, DEFAULT_CLARIFY_MARGIN);

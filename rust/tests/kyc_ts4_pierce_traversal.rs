@@ -1,7 +1,7 @@
 //! TS.4 gate tests — EOP-DD-KYCUBO-TS.4 §3 Ruling B (piercing moves into
 //! the traversal itself, per TS.0 §5 / K-8). Live-DB harness, same pattern
 //! as `kyc_ts4_nominee.rs`/`kyc_ts4_fund_pivot_evidence.rs`: drives the REAL
-//! `ubo.determination.freeze` op end-to-end across three different
+//! `kyc_ubo.decide.determination.freeze` op end-to-end across three different
 //! top-level strategies.
 //!
 //! The mechanism itself: an already-pierced nominee's replacement edge is
@@ -22,9 +22,8 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze,
-    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAttachEvidence,
-    UboEdgePierceNominee, UboEdgeReconcileConflict,
+    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -143,6 +142,41 @@ async fn setup_subject(pool: &PgPool, subject: Uuid, natural_persons: &[Uuid], c
     .await;
 }
 
+/// `kyc_ubo.assert.edge.nominee-piercing` RETIRED (TS.6 P2, K-G7) — folded into a macro
+/// (`config/verb_schemas/macros/ubo.yaml`) composing `kyc_ubo.assert.edge.control`
+/// (with its `pierced-from` arg) + `kyc_ubo.assert.edge.supersession`. Drives the same two
+/// REAL ops the macro expands to, in the same order, mirroring the macro's
+/// static substitution exactly (no derivation trick available at macro
+/// expansion time, so `to_entity_id` is an explicit param here too — same as
+/// the macro's own required slot). Returns the `assert-control` outcome so
+/// callers can read the real (now randomly-generated, not the old bespoke
+/// op's deterministic `Uuid::new_v5`) replacement edge id off `edge_id`.
+async fn pierce_nominee(
+    pool: &PgPool,
+    subject: Uuid,
+    nominee_edge: Uuid,
+    nominator: Uuid,
+    to_entity: Uuid,
+    kind: &str,
+) -> serde_json::Value {
+    let outcome = run(
+        &UboEdgeAssertControl,
+        serde_json::json!({
+            "subject-id": subject, "from_entity_id": nominator, "to_entity_id": to_entity,
+            "kind": kind, "pierced-from": nominee_edge,
+        }),
+        pool,
+    )
+    .await;
+    run(
+        &UboEdgeSupersede,
+        serde_json::json!({ "subject-id": subject, "edge-id": nominee_edge }),
+        pool,
+    )
+    .await;
+    outcome
+}
+
 // ── Headline: mid_chain_nominee_is_pierced_in_every_strategy ───────────────
 
 #[tokio::test]
@@ -188,12 +222,6 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         )
         .await;
         run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-        run(
-            &UboDeterminationSelectStrategy,
-            serde_json::json!({ "subject-id": subject, "strategy": "fund_control_strategy" }),
-            &pool,
-        )
-        .await;
 
         let refused = run_fallible(
             &UboDeterminationFreeze,
@@ -204,15 +232,7 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         assert!(refused.is_err(), "fund: freeze must refuse while the mid-chain nominee is unpierced");
         assert!(refused.unwrap_err().to_string().contains(&nominee_edge.to_string()));
 
-        run(
-            &UboEdgePierceNominee,
-            serde_json::json!({
-                "subject-id": subject, "edge-id": nominee_edge,
-                "nominator-id": alice, "kind": "voting_rights",
-            }),
-            &pool,
-        )
-        .await;
+        pierce_nominee(&pool, subject, nominee_edge, alice, manco, "voting_rights").await;
         let outcome = run(
             &UboDeterminationFreeze,
             serde_json::json!({ "subject-id": subject, "policy-version": "v1.0" }),
@@ -232,6 +252,15 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
 
     // (b) CORPORATE — control_prong_strategy. Corp <-VotingRights- HoldCo
     // <-Nominee- NomineeCorp2 (unpierced); pierce reveals Carol.
+    // TS.6 P2 (K-G7): classified `llp`, not `private_company` — the
+    // strategy is now DERIVED from `structure_class`
+    // (`strategy_for_structure_class`), and `private_company` maps to
+    // `ownership_prong_strategy` (which reads economic edges, not the
+    // `voting_rights` control edge this leg asserts), not
+    // `control_prong_strategy`. Pre-TS.6 `select-strategy` let the test
+    // pick `control_prong_strategy` independently of the classified class;
+    // that decoupling is gone by design, so the fixture now classifies as
+    // the class that actually derives it.
     {
         let subject = Uuid::new_v4();
         let holdco = Uuid::new_v4();
@@ -239,7 +268,7 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         let carol = Uuid::new_v4();
         let nominee_edge = Uuid::new_v4();
 
-        setup_subject(&pool, subject, &[carol], "private_company").await;
+        setup_subject(&pool, subject, &[carol], "llp").await;
         run(
             &UboEdgeAssertControl,
             serde_json::json!({
@@ -259,12 +288,6 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         )
         .await;
         run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-        run(
-            &UboDeterminationSelectStrategy,
-            serde_json::json!({ "subject-id": subject, "strategy": "control_prong_strategy" }),
-            &pool,
-        )
-        .await;
 
         let refused = run_fallible(
             &UboDeterminationFreeze,
@@ -274,15 +297,7 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         .await;
         assert!(refused.is_err(), "corporate: freeze must refuse while the mid-chain nominee is unpierced");
 
-        run(
-            &UboEdgePierceNominee,
-            serde_json::json!({
-                "subject-id": subject, "edge-id": nominee_edge,
-                "nominator-id": carol, "kind": "voting_rights",
-            }),
-            &pool,
-        )
-        .await;
+        pierce_nominee(&pool, subject, nominee_edge, carol, holdco, "voting_rights").await;
         let outcome = run(
             &UboDeterminationFreeze,
             serde_json::json!({ "subject-id": subject, "policy-version": "v1.0" }),
@@ -323,12 +338,6 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         )
         .await;
         run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-        run(
-            &UboDeterminationSelectStrategy,
-            serde_json::json!({ "subject-id": subject, "strategy": "trust_role_strategy" }),
-            &pool,
-        )
-        .await;
 
         let refused = run_fallible(
             &UboDeterminationFreeze,
@@ -338,15 +347,7 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         .await;
         assert!(refused.is_err(), "trust: freeze must refuse while the trustee-slot nominee is unpierced");
 
-        run(
-            &UboEdgePierceNominee,
-            serde_json::json!({
-                "subject-id": subject, "edge-id": nominee_edge,
-                "nominator-id": dave, "kind": "trust_trustee",
-            }),
-            &pool,
-        )
-        .await;
+        pierce_nominee(&pool, subject, nominee_edge, dave, subject, "trust_trustee").await;
         let outcome = run(
             &UboDeterminationFreeze,
             serde_json::json!({ "subject-id": subject, "policy-version": "v1.0" }),
@@ -403,29 +404,19 @@ async fn pierce_is_recorded() {
     )
     .await;
     run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject, "strategy": "fund_control_strategy" }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgePierceNominee,
-        serde_json::json!({
-            "subject-id": subject, "edge-id": nominee_edge,
-            "nominator-id": alice, "kind": "voting_rights",
-        }),
-        &pool,
-    )
-    .await;
-    // The pierce op's outcome only exposes the SUPERSEDED (target) edge id;
-    // the replacement edge id is deterministically derived by the fold
-    // (`fold/control.rs`'s `"ubo.edge.pierce-nominee"` arm) as
-    // `Uuid::new_v5(NAMESPACE_OID, "control:{nominator}:{to}:{kind:?}")` —
-    // replicated here rather than re-deriving it from a second DB read.
-    let replacement_edge_id =
-        Uuid::new_v5(&Uuid::NAMESPACE_OID, format!("control:{alice}:{manco}:VotingRights").as_bytes())
-            .to_string();
+    // TS.6 P2 (K-G7): piercing is now the `assert-control` (pierced-from) +
+    // `supersede` macro composition, not a bespoke op with a deterministic
+    // `Uuid::new_v5` replacement-edge derivation — the real op assigns the
+    // new edge a fresh random id (the SAME convention as any other
+    // assert-control call), so the expected id is read off its outcome
+    // rather than re-derived by formula.
+    let pierce_outcome =
+        pierce_nominee(&pool, subject, nominee_edge, alice, manco, "voting_rights").await;
+    let replacement_edge_id = pierce_outcome
+        .get("edge_id")
+        .and_then(|v| v.as_str())
+        .expect("assert-control outcome must carry the new edge's id")
+        .to_string();
 
     let outcome = run(
         &UboDeterminationFreeze,
@@ -494,12 +485,6 @@ async fn determination_never_terminates_at_a_nominee() {
     )
     .await;
     run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject, "strategy": "control_prong_strategy" }),
-        &pool,
-    )
-    .await;
 
     let result = run_fallible(
         &UboDeterminationFreeze,

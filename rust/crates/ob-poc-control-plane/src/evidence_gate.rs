@@ -58,7 +58,7 @@ pub mod tests_support {
 /// mirrors the `Err` arm of `check_control_preconditions` (C-041) or the
 /// store-side re-check under stream lock (C-042), stringified at the call
 /// site. `satisfied_obligation_ids` lists obligations already resolved
-/// (`kyc.obligation.satisfy`/`waive`) that this evaluation may cite as
+/// (`kyc_ubo.assert.obligation.satisfaction`/`waive`) that this evaluation may cite as
 /// evidence.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EvidenceInput {

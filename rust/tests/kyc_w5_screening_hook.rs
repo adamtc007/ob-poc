@@ -1,6 +1,6 @@
 //! W5 screening hook proof (EOP-DD-KYCUBO-004 Part 1): a real `screening.complete`
 //! / `screening.review-hit` call now fans out to the dsl.kyc obligation stream —
-//! closing the gap where `assert.screening` existed and folded
+//! closing the gap where `kyc_ubo.assert.entity.screening` existed and folded
 //! correctly but nothing in the real screening lifecycle ever called it.
 
 use sqlx::postgres::PgPoolOptions;

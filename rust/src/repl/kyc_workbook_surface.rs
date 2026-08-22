@@ -40,7 +40,7 @@ use uuid::Uuid;
 use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_store::{PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_preconditions, enumerate_placement_set, phase1_lexicon, AuthorityRef, FoldRegistry,
+    check_preconditions, enumerate_placement_set, assembly_lexicon, AuthorityRef, FoldRegistry,
     KycError, MoveId, PlacementSet, SubjectId, V1FoldImpl,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
@@ -59,7 +59,7 @@ use super::kyc_entity_resolver::{resolve_handles, ResolverError};
 /// `tests/kyc_workbook.rs::v1_registry()` already uses.
 static SURFACE_REGISTRY: LazyLock<FoldRegistry> = LazyLock::new(|| {
     let mut registry = FoldRegistry::new();
-    registry.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    registry.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     registry
 });
 
@@ -401,7 +401,7 @@ pub(crate) async fn dispatch(
 /// loop of single-move commits, each of which must uphold the same
 /// never-silently-substitute guarantee `commit()` gives for the whole chain.
 fn subject_kit_hash_check(workbook: &KycWorkbook) -> Result<(), SurfaceError> {
-    let live_hash = phase1_lexicon().hash.to_hex();
+    let live_hash = assembly_lexicon().hash.to_hex();
     if live_hash != workbook.kit_hash {
         return Err(SurfaceError::Workbook(WorkbookError::KitDrift {
             pinned: workbook.kit_hash.clone(),
@@ -618,10 +618,10 @@ mod tests {
 
     #[test]
     fn parses_stage_with_dsl_text() {
-        let cmd = parse_kyc_workbook_command(r#"kyc-workbook.stage (kyc.subject.register)"#);
+        let cmd = parse_kyc_workbook_command(r#"kyc-workbook.stage (kyc_ubo.assert.subject.register)"#);
         assert_eq!(
             cmd,
-            Some(Ok(KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() }))
+            Some(Ok(KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() }))
         );
     }
 
@@ -743,7 +743,7 @@ mod tests {
     /// accepts by staging the proposed verb → ordinary `stage()` → the
     /// resulting preview matches real T4 semantics. The "utterance" here is
     /// simulated by feeding `Propose` a real stored embedding for
-    /// `kyc.subject.register` (fetched from the live
+    /// `kyc_ubo.assert.subject.register` (fetched from the live
     /// `verb_pattern_embeddings` table) rather than tokenizing English
     /// text — this module has no embedder of its own (I-5); production
     /// wiring (`sequencer.rs::handle_kyc_workbook_command`) is what turns
@@ -767,11 +767,11 @@ mod tests {
         // land on — stands in for "an utterance that clearly means this".
         let (embedding,): (pgvector::Vector,) = sqlx::query_as(
             r#"SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-               WHERE verb_name = 'kyc.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
+               WHERE verb_name = 'kyc_ubo.assert.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
         )
         .fetch_one(&pool)
         .await
-        .expect("kyc.subject.register must have at least one populated embedding");
+        .expect("kyc_ubo.assert.subject.register must have at least one populated embedding");
 
         // Guard against a stale row from a prior interrupted/failed run of
         // this test (this test's own capture-row assertion below does a
@@ -821,8 +821,8 @@ mod tests {
         .await
         .expect("propose");
         assert!(
-            proposal.starts_with("proposal for") && proposal.contains("kyc.subject.register"),
-            "proposal for a register-shaped utterance should SELECT kyc.subject.register \
+            proposal.starts_with("proposal for") && proposal.contains("kyc_ubo.assert.subject.register"),
+            "proposal for a register-shaped utterance should SELECT kyc_ubo.assert.subject.register \
              (not merely mention it in an abstain/clarify listing): {proposal:?}"
         );
         assert!(pending_proposals.contains_key(&session_id), "Propose(Select) must stash a pending proposal");
@@ -831,7 +831,7 @@ mod tests {
         // themselves (I-4: args are never synthesized by the ramp) —
         // ordinary `Stage`, wholly unmodified by T7.
         dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -861,7 +861,7 @@ mod tests {
         .expect("validate");
         assert!(
             preview.contains("registered=true"),
-            "T4 semantics: staging kyc.subject.register must flip registered=true in the preview: {preview:?}"
+            "T4 semantics: staging kyc_ubo.assert.subject.register must flip registered=true in the preview: {preview:?}"
         );
 
         // T7 capture-correlation slice 1: Stage after a matching Select
@@ -970,7 +970,7 @@ mod tests {
         );
 
         dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -1011,7 +1011,7 @@ mod tests {
             open_test_workbook().await;
         cleanup_capture_rows(&pool, "illegal-utterance").await;
 
-        // `kyc.subject.classify-structure` requires SubjectRegistered
+        // `kyc_ubo.assert.subject.structure-class` requires SubjectRegistered
         // (lexicon.rs) — on a freshly opened, never-registered subject it is
         // NOT in the frontier placement set.
         pending_proposals.insert(
@@ -1019,17 +1019,17 @@ mod tests {
             PendingProposal {
                 utterance_text: "illegal-utterance".to_string(),
                 placement_set_hash: "deadbeef".to_string(),
-                proposal: "proposal for \"illegal-utterance\": kyc.subject.classify-structure"
+                proposal: "proposal for \"illegal-utterance\": kyc_ubo.assert.subject.structure-class"
                     .to_string(),
                 disposition: Disposition::Select,
-                candidate_verb_fqns: vec!["kyc.subject.classify-structure".to_string()],
+                candidate_verb_fqns: vec!["kyc_ubo.assert.subject.structure-class".to_string()],
                 created_at: as_of,
             },
         );
 
         let response = dispatch(
             KycWorkbookCommand::Stage {
-                text: r#"(kyc.subject.classify-structure :structure-class "private_company")"#
+                text: r#"(kyc_ubo.assert.subject.structure-class :structure-class "private_company")"#
                     .to_string(),
             },
             &mut workbooks,
@@ -1075,9 +1075,9 @@ mod tests {
         let original = PendingProposal {
             utterance_text: "error-utterance".to_string(),
             placement_set_hash: "deadbeef".to_string(),
-            proposal: "proposal for \"error-utterance\": kyc.subject.register".to_string(),
+            proposal: "proposal for \"error-utterance\": kyc_ubo.assert.subject.register".to_string(),
             disposition: Disposition::Select,
-            candidate_verb_fqns: vec!["kyc.subject.register".to_string()],
+            candidate_verb_fqns: vec!["kyc_ubo.assert.subject.register".to_string()],
             created_at: as_of,
         };
         pending_proposals.insert(session_id, original.clone());
@@ -1111,7 +1111,7 @@ mod tests {
         // The earlier malformed attempt only deferred resolution — a
         // well-formed follow-up now resolves the SAME pending proposal.
         dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -1146,7 +1146,7 @@ mod tests {
         assert!(pending_proposals.is_empty());
 
         let response = dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -1185,11 +1185,11 @@ mod tests {
 
         let (embedding,): (pgvector::Vector,) = sqlx::query_as(
             r#"SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-               WHERE verb_name = 'kyc.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
+               WHERE verb_name = 'kyc_ubo.assert.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
         )
         .fetch_one(&pool)
         .await
-        .expect("kyc.subject.register must have at least one populated embedding");
+        .expect("kyc_ubo.assert.subject.register must have at least one populated embedding");
 
         dispatch(
             KycWorkbookCommand::Propose { utterance: "commit-guard-utterance".to_string() },

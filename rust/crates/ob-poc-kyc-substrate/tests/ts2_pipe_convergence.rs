@@ -152,7 +152,7 @@ fn economic_interest_unknown_target_is_provisional() {
     // absorbed: this crate has no "assurance" field (assurance is D2
     // territory per TS.1 §0, out of this tranche's SCOPE FENCE), and the
     // one real D1 consumer of `pipe_of` today —
-    // `kyc.subject.correct-type`'s §4 cascade
+    // `kyc_ubo.assert.subject.type-correction`'s §4 cascade
     // (`src/domain_ops/kyc_stream_ops.rs::KycSubjectCorrectType`) — turns
     // out to be SAFE regardless of this fix: `NonVotingShares` (the old
     // fabricated default) is geometrically permitted as a pipe-TARGET only
@@ -233,7 +233,7 @@ fn historical_edges_reclassify_without_mutation() {
 
     let assert_event = IntentEvent::new(
         subject,
-        "ubo.edge.assert-economic-interest",
+        "kyc_ubo.assert.edge.economic-interest",
         Principal::test_analyst(),
         AuthorityRef("historical".into()),
         TargetBinding::for_subject(subject),
@@ -244,7 +244,7 @@ fn historical_edges_reclassify_without_mutation() {
     );
     let type_event = IntentEvent::new(
         subject,
-        "kyc.subject.assert-type",
+        "kyc_ubo.assert.subject.type",
         Principal::test_analyst(),
         AuthorityRef("historical".into()),
         TargetBinding { entity_id: Some(fund), ..TargetBinding::for_subject(subject) },

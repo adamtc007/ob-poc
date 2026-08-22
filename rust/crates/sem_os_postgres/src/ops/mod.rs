@@ -451,19 +451,24 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(edge::Upsert));
 
     // Phase B slice #31: manco + ownership governance controller
-    // (9 plugin verbs — 3 bridges, 4 group queries, control-links
-    // compute, pipeline refresh).
-    registry.register(Arc::new(manco::BridgeMancoRoles));
-    registry.register(Arc::new(manco::BridgeGleifFundManagers));
-    registry.register(Arc::new(manco::BridgeBodsOwnership));
+    // (4 plugin verbs — 4 group queries).
+    //
+    // REMOVED 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F4,
+    // no_verb_calls_absent_function): BridgeMancoRoles, BridgeGleifFundManagers,
+    // BridgeBodsOwnership, PrimaryController, ComputeControlLinks, and the
+    // pipeline Refresh (4 of its 5 steps were these same bridges). All called
+    // SQL functions that never existed under the live "ob-poc" schema --
+    // migration 041_governance_bridges.sql created them under the pre-rename
+    // `kyc.` schema (targeting `kyc.special_rights`) and was never carried
+    // forward through the kyc->"ob-poc" rename. Every real invocation failed.
+    // Conceptually superseded by the dsl.kyc stream-backed UBO/control
+    // determination system -- same defect class as the 58 legacy
+    // determination verbs already deleted in the W4 rip.
     registry.register(Arc::new(manco::GroupDerive));
     registry.register(Arc::new(manco::GroupCbus));
     registry.register(Arc::new(manco::GroupForCbu));
-    registry.register(Arc::new(manco::PrimaryController));
     registry.register(Arc::new(manco::ControlChain));
     registry.register(Arc::new(manco::BookSummary));
-    registry.register(Arc::new(manco::ComputeControlLinks));
-    registry.register(Arc::new(manco::Refresh));
 
     // Phase B slice #32: temporal queries (8 plugin verbs — regulatory
     // lookback "what did X look like on date Y?").
@@ -810,20 +815,25 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // ENHANCED_DD when one is attached).
     registry.register(Arc::new(red_flag::Escalate));
 
-    // Phase B slice #61: document.* (9 plugin verbs — catalog/extract
-    // + solicit + solicit-batch + upload-version + verify + reject +
-    // missing-for-entity + compute-requirements; GovernedDocumentRequirementsService
+    // Phase B slice #61: document.* (5 plugin verbs — catalog/extract
+    // + missing-for-entity + compute-requirements; GovernedDocumentRequirementsService
     // still takes PgPool — transitional scope.pool().clone() on the
     // 3 governed ops).
     // `document.solicit` and `document.solicit-batch` are
     // `behavior: durable` in YAML (BPMN-Lite workflow) — they are
     // dispatched via the durable runtime, NOT through the
     // SemOsVerbOpRegistry. The Rust impls were dead-end registrations.
+    //
+    // REMOVED 2026-08-20 (EOP-PLAN-MANDATE-FIX-001 F4, no_orphan_child_table /
+    // no_verb_calls_absent_function): UploadVersion, Verify, Reject, plus
+    // the crud start-qa/list-versions/get (YAML only) -- the whole "Layer C"
+    // document-version-and-QA workflow was built against
+    // "ob-poc".document_versions and "ob-poc".v_documents_with_status,
+    // neither of which exists in the live schema, plus a call to the
+    // never-created "ob-poc".get_next_document_version(). Every real
+    // invocation of any of the 6 verbs failed.
     registry.register(Arc::new(document::Catalog));
     registry.register(Arc::new(document::Extract));
-    registry.register(Arc::new(document::UploadVersion));
-    registry.register(Arc::new(document::Verify));
-    registry.register(Arc::new(document::Reject));
     registry.register(Arc::new(document::MissingForEntity));
     registry.register(Arc::new(document::ListMissing));
     registry.register(Arc::new(document::ComputeRequirements));

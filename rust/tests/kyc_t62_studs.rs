@@ -20,7 +20,7 @@
 //! - row 5 (`reconcile-conflict`): `SubjectRegistered` alone — block targets
 //!   an unregistered subject; admit succeeds even with zero edges (the
 //!   ratified no-amendment reading).
-//! - row 9 (`kyc.subject.register`, T6.3 fix, 2026-08-17, corrects
+//! - row 9 (`kyc_ubo.assert.subject.register`, T6.3 fix, 2026-08-17, corrects
 //!   EOP-DD-KYCUBO-KIT-T6 §5 — see its §6 amendment): `NotAlreadyRegistered`,
 //!   now keyed off the event's `entity_id` (`ControlState.registered_entity_ids`)
 //!   rather than the bare per-subject `registered` bool — block targets a
@@ -430,7 +430,7 @@ async fn row5_reconcile_conflict_admits_registered_subject_with_zero_edges() {
     cleanup(&pool, subject).await;
 }
 
-// ── row 9 — kyc.subject.register (T6.3 fix, 2026-08-17) ────────────────────
+// ── row 9 — kyc_ubo.assert.subject.register (T6.3 fix, 2026-08-17) ────────────────────
 
 #[tokio::test]
 async fn row9_register_blocks_true_duplicate_entity_id() {

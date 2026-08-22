@@ -9,7 +9,7 @@
 //! `kyc_t62_studs.rs`/`kyc_t63_studs.rs`'s discipline.
 //!
 //! Row coverage:
-//! - row 11 (`kyc.obligation.create`): `SubjectRegistered` — block an
+//! - row 11 (`kyc_ubo.assert.obligation.creation`): `SubjectRegistered` — block an
 //!   unregistered subject (THE motivating cross-fold case for the T6.1
 //!   unified checker).
 //! - rows 12-14 (`update-identity`/`update-screening`/`update-risk`):
@@ -31,9 +31,12 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycObligationSatisfy, KycObligationUpdateIdentity,
-    KycObligationUpdateRisk, KycObligationUpdateScreening, KycObligationWaive, KycPersonApprove,
-    KycPersonReject, KycSubjectRegister,
+    KycObligationUpdateRisk, KycObligationUpdateScreening, KycObligationWaive,
+    KycSubjectRegister,
 };
+// kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject TS.6 P2 — moved
+// to ob-poc-kyc-decide.
+use ob_poc_kyc_decide::{DecideApprove, DecideReject};
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -113,7 +116,7 @@ async fn create_obligation(scope: &mut Scope, subject: SubjectId, obligation_id:
         .expect("obligation.create must succeed on a registered subject");
 }
 
-// ── row 11 — kyc.obligation.create: SubjectRegistered ───────────────────────
+// ── row 11 — kyc_ubo.assert.obligation.creation: SubjectRegistered ───────────────────────
 
 #[tokio::test]
 async fn row11_obligation_create_blocks_unregistered_subject() {
@@ -340,7 +343,7 @@ async fn row15_satisfy_blocks_once_subject_is_decided() {
         )
         .await
         .expect("satisfy on an existing, undecided obligation must succeed");
-    KycPersonApprove
+    DecideApprove
         .execute(
             &serde_json::json!({ "subject-id": subject.0 }),
             &mut VerbExecutionContext::default(),
@@ -459,7 +462,7 @@ async fn row17_approve_blocks_non_terminal_obligation() {
     create_obligation(&mut scope, subject, obligation_id, "director").await;
     // Deliberately leave identity/screening/risk tracks Pending.
 
-    let result = KycPersonApprove
+    let result = DecideApprove
         .execute(
             &serde_json::json!({ "subject-id": subject.0 }),
             &mut VerbExecutionContext::default(),
@@ -492,7 +495,7 @@ async fn row17_approve_admits_all_terminal_obligation() {
         .await
         .expect("satisfy must succeed on an existing, undecided obligation");
 
-    let result = KycPersonApprove
+    let result = DecideApprove
         .execute(
             &serde_json::json!({ "subject-id": subject.0 }),
             &mut VerbExecutionContext::default(),
@@ -526,7 +529,7 @@ async fn row18_reject_blocks_once_already_decided() {
         )
         .await
         .expect("satisfy must succeed on an existing, undecided obligation");
-    KycPersonApprove
+    DecideApprove
         .execute(
             &serde_json::json!({ "subject-id": subject.0 }),
             &mut VerbExecutionContext::default(),
@@ -535,7 +538,7 @@ async fn row18_reject_blocks_once_already_decided() {
         .await
         .expect("approve must succeed once the only obligation is all-terminal");
 
-    let result = KycPersonReject
+    let result = DecideReject
         .execute(
             &serde_json::json!({ "subject-id": subject.0 }),
             &mut VerbExecutionContext::default(),
@@ -563,7 +566,7 @@ async fn row18_reject_admits_first_decision_at_any_stage() {
     // ratified matrix is explicit reject carries no SubjectAllTerminal stud).
     create_obligation(&mut scope, subject, obligation_id, "director").await;
 
-    let result = KycPersonReject
+    let result = DecideReject
         .execute(
             &serde_json::json!({ "subject-id": subject.0 }),
             &mut VerbExecutionContext::default(),

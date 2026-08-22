@@ -1,7 +1,7 @@
 //! D1 Part B — the live-DB half of TS.2 §6's `unparseable_wire_value_is_not_
 //! dominant_influence` gate. The pure half (fold-level totality/mapping) is
 //! `crates/ob-poc-kyc-substrate/tests/ts2_pipe_convergence.rs`. This proves
-//! the actually-enforced boundary: the real `ubo.edge.assert-control` op
+//! the actually-enforced boundary: the real `kyc_ubo.assert.edge.control` op
 //! rejects a garbage or absent `kind` fail-closed, before append — a parse
 //! failure never becomes a persisted `DominantInfluence` edge.
 

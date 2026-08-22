@@ -171,12 +171,32 @@ impl SemOsVerbOp for LookupSsiForTrade {
             rule_id: Option<Uuid>,
             rule_name: Option<String>,
             rule_priority: Option<i32>,
-            specificity_score: Option<rust_decimal::Decimal>,
+            specificity_score: Option<i32>,
         }
 
+        // EOP-PLAN-MANDATE-FIX-001 F4, D1: `find_ssi_for_trade()` was never
+        // created in the live schema. Equivalent inline query, matching the
+        // resolution pattern already proven in
+        // tests/custody_integration.rs (test_ssi_lookup_exact_match,
+        // test_ssi_lookup_fallback_to_wildcard): highest priority first,
+        // ties broken by the generated specificity_score.
         let row: Option<SsiMatchRow> = sqlx::query_as(
-            r#"SELECT ssi_id, ssi_name, rule_id, rule_name, rule_priority, specificity_score
-               FROM "ob-poc".find_ssi_for_trade($1, $2, $3, $4, $5, $6, NULL)"#,
+            r#"
+            SELECT r.ssi_id, s.ssi_name, r.rule_id, r.rule_name, r.priority AS rule_priority,
+                   r.specificity_score
+            FROM "ob-poc".ssi_booking_rules r
+            JOIN "ob-poc".cbu_ssi s ON s.ssi_id = r.ssi_id
+            WHERE r.cbu_id = $1
+              AND r.is_active = true
+              AND s.status = 'ACTIVE'
+              AND (r.instrument_class_id IS NULL OR r.instrument_class_id = $2)
+              AND (r.security_type_id IS NULL OR r.security_type_id = $3)
+              AND (r.market_id IS NULL OR r.market_id = $4)
+              AND (r.currency IS NULL OR r.currency = $5)
+              AND (r.settlement_type IS NULL OR r.settlement_type = $6)
+            ORDER BY r.priority ASC, r.specificity_score DESC
+            LIMIT 1
+            "#,
         )
         .bind(cbu_id)
         .bind(class_id)
