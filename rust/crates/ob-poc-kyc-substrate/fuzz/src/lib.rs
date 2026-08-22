@@ -44,7 +44,6 @@ const ALL_VERBS: &[&str] = &[
     "ubo.edge.verify",
     "ubo.edge.supersede",
     "ubo.edge.reconcile-conflict",
-    "ubo.determination.apply-smo-fallback",
     "ubo.determination.freeze",
     "kyc.obligation.create",
     "assert.identity",

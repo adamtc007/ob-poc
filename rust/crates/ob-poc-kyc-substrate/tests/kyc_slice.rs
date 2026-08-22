@@ -20,11 +20,11 @@ use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     check_control_preconditions, fold_control, fold_control_versioned, fold_obligations,
-    fold_obligations_versioned, freeze_determination, phase1_lexicon, reconciled_economic_edges,
+    fold_obligations_versioned, freeze_determination, assembly_lexicon, reconciled_economic_edges,
     recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
     DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
     IntentEvent, ObligationId, ObligationState, OwnershipProngStrategy, PersonId, Principal, Prong,
-    RecoveryPin, SmoResult, SubjectId, TargetBinding, TypeRegistryState, V1FoldImpl,
+    RecoveryPin, SubjectId, TargetBinding, TypeRegistryState, V1FoldImpl,
 };
 use std::sync::Arc;
 
@@ -101,9 +101,11 @@ fn person_p2() -> PersonId {
 fn person_p3() -> PersonId {
     PersonId(Uuid::parse_str("20000000-0000-0000-0000-000000000003").unwrap())
 }
-fn person_smo() -> PersonId {
-    PersonId(Uuid::parse_str("20000000-0000-0000-0000-000000000099").unwrap())
-}
+// `person_smo()` retired with TS.6 §5: the only fixtures that named an SMO
+// person did so by asserting `ubo.determination.apply-smo-fallback`. SMO is
+// pulled on exhaustion from the officer population (TS.3 §4a), so a test
+// wanting one now records an `OfficerAppointment` edge instead of naming a
+// person out of band.
 
 /// Deterministic edge id from label.
 fn eid(label: &str) -> EdgeId {
@@ -380,7 +382,7 @@ fn ec1_ownership_prong_differential_equality() {
 
 #[test]
 fn ec2_conflicting_edges_fail_without_reconcile() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = fixture_subject_id();
     let h = dummy_hash();
     let a = entity_subject();
@@ -451,14 +453,16 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         "total claimed % should exceed 100: got {total}"
     );
 
-    // Check precondition for compute-fold: ReconciledProjection must fail.
-    let compute_entry = lexicon
-        .get("ubo.determination.compute-fold")
-        .expect("compute-fold in lexicon");
+    // Check precondition for freeze: ReconciledProjection must fail.
+    // (`ubo.determination.compute-fold` retired TS.6 P2 — freeze already
+    // independently declares the identical precondition pair.)
+    let freeze_entry = lexicon
+        .get("ubo.determination.freeze")
+        .expect("freeze in lexicon");
     let dummy_event = te(
         4,
         subject,
-        "ubo.determination.compute-fold",
+        "ubo.determination.freeze",
         h,
         analyst(),
         authority(),
@@ -468,8 +472,8 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         t,
     );
     let result =
-        check_control_preconditions(compute_entry, &control, &TypeRegistryState::default(), &dummy_event);
-    assert!(result.is_err(), "compute-fold without reconcile must fail");
+        check_control_preconditions(freeze_entry, &control, &TypeRegistryState::default(), &dummy_event);
+    assert!(result.is_err(), "freeze without reconcile must fail");
 }
 
 #[test]
@@ -495,7 +499,7 @@ fn ec2_reconciled_edges_do_not_exceed_100_percent() {
 
 #[test]
 fn ec3_verify_without_evidence_is_rejected() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = fixture_subject_id();
     let h = dummy_hash();
     let a = entity_subject();
@@ -558,7 +562,7 @@ fn ec3_verify_without_evidence_is_rejected() {
 
 #[test]
 fn ec3_verify_after_evidence_succeeds() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = fixture_subject_id();
     let h = dummy_hash();
     let a = entity_subject();
@@ -644,182 +648,18 @@ fn ec3_verify_after_evidence_succeeds() {
 // "An empty ownership+control result yields an SMO person or authorised waiver,
 // never silence" (K-5, gap-report Test 4).
 
-#[test]
-fn ec4_smo_fallback_when_no_ubos_found() {
-    let subject = fixture_subject_id();
-    let h = dummy_hash();
-    let a = entity_subject();
-    let t = ts(2026, 1, 1);
+// `ec4_smo_fallback_when_no_ubos_found` RETIRED (TS.6 §5, 2026-08-22).
+//
+// Its entire subject was the MANUAL SMO path: assert
+// `ubo.determination.apply-smo-fallback`, then check
+// `ControlState.smo_person_id` was set. That verb is retired — SMO is now
+// PULLED on exhaustion by the traversal (`determination.rs` walks
+// OfficerAppointment edges into the frontier and emits `Prong::SmoFallback`
+// straight into `candidates`, TS.3 §4a), so `smo_person_id` has no writer
+// and is permanently `None`. The scenario this test named ("no UBOs found →
+// SMO") still exists; it is now reached by the pull, exercised in the TS.3
+// state-owned/cooperative suite rather than by asserting a fact here.
 
-    // Company with no known owners → strategy finds nothing.
-    let events = [
-        te(
-            0,
-            subject,
-            "kyc.subject.register",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("reg"),
-            t,
-        ),
-        te(
-            1,
-            subject,
-            "kyc.subject.classify-structure",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("cls"),
-            t,
-        ),
-        // No economic edges → no candidates.
-        te(
-            2,
-            subject,
-            "ubo.edge.reconcile-conflict",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"note": "empty graph; no conflict"}),
-            idem("reconcile"),
-            t,
-        ),
-        te(
-            3,
-            subject,
-            "ubo.determination.select-strategy",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("strategy"),
-            t,
-        ),
-        // SMO fallback applied.
-        te(
-            4,
-            subject,
-            "ubo.determination.apply-smo-fallback",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"smo_person_id": person_smo().0}),
-            idem("smo"),
-            t,
-        ),
-        // Freeze.
-        te(
-            5,
-            subject,
-            "ubo.determination.freeze",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}),
-            idem("freeze"),
-            t,
-        ),
-    ];
-    let event_refs: Vec<&IntentEvent> = events.iter().collect();
-    let control = fold_control(&event_refs);
-
-    assert_eq!(
-        control.smo_person_id,
-        Some(person_smo()),
-        "SMO person must be set in control state"
-    );
-
-    // Build determination-in-progress.
-    let strategy = OwnershipProngStrategy;
-    let candidates = strategy.resolve(&control, entity_subject(), &BTreeSet::new(), 25.0);
-    assert!(
-        candidates.is_empty(),
-        "no candidates expected for empty graph"
-    );
-
-    // smo_event_id is always Some when smo_person_id is Some (fold invariant).
-    // Use expect() — a None here means the fold is broken, not that we should silently
-    // generate a random UUID (Q6, K-35 violation if we did).
-    let smo_orig_event_id = control
-        .smo_event_id
-        .expect("smo_event_id must be Some when smo_person_id is Some (fold invariant)");
-
-    let smo_result = control.smo_person_id.map(|pid| {
-        SmoResult::Person(ob_poc_kyc_substrate::ProngCandidate {
-            person_id: pid,
-            prong: Prong::SmoFallback,
-            effective_ownership_pct: None,
-            ownership_chain: vec![],
-            originating_event_id: smo_orig_event_id,
-            pivot: None,
-            pierces: Vec::new(),
-        })
-    });
-
-    let det = DeterminationInProgress {
-        strategy: control.selected_strategy.clone(),
-        candidates,
-        smo_result,
-        compute_event_id: control.strategy_event_id,
-        stops: vec![],
-        smo_pull: None,
-    };
-
-    let freeze_event = events.last().unwrap();
-    let result = freeze_determination(
-        &det,
-        &control,
-        &TypeRegistryState::default(),
-        freeze_event,
-        "v1.0",
-        dummy_hash(),
-        Uuid::new_v4(),
-        BTreeSet::new(),
-        None,
-    );
-    let frozen = result.expect("freeze with SMO must succeed");
-    assert!(
-        frozen.candidates.is_empty(),
-        "no ownership candidates expected"
-    );
-
-    // Phase 2 gate: assert SMO provenance, not just presence (K-5, K-35).
-    let smo = frozen
-        .smo_result
-        .as_ref()
-        .expect("SMO result must be present (K-5)");
-    match smo {
-        SmoResult::Person(c) => {
-            assert_eq!(
-                c.prong,
-                Prong::SmoFallback,
-                "SMO candidate must carry SmoFallback prong"
-            );
-            assert_ne!(
-                c.originating_event_id.0,
-                EventId::default().0,
-                "SMO originating_event_id must not be nil (K-35 traceability)",
-            );
-            assert_eq!(
-                c.person_id,
-                person_smo(),
-                "SMO person must be the declared SMO person, not a placeholder",
-            );
-        }
-        SmoResult::AuthorisedWaiver { .. } => {
-            panic!("expected a Person SMO, got AuthorisedWaiver");
-        }
-    }
-}
 
 #[test]
 fn ec4_freeze_without_candidates_or_smo_fails() {
@@ -882,7 +722,10 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
     let control = fold_control(&event_refs);
 
     let det = DeterminationInProgress {
-        strategy: control.selected_strategy.clone(),
+        strategy: control
+            .structure_class
+            .as_ref()
+            .map(|c| ob_poc_kyc_substrate::strategy_for_structure_class(c).to_string()),
         candidates: vec![], // EMPTY
         smo_result: None,   // NO SMO
         compute_event_id: None,
@@ -1083,22 +926,18 @@ fn ec5_replay_determinism_after_supersede() {
         idem("reconcile2"),
         t2,
     ));
-    // No ownership UBOs after restructuring → SMO fallback required (K-5).
+    // No ownership UBOs after restructuring, and no officer appointments for
+    // the TS.3 §4a pull to walk → nothing to conclude with.
+    //
+    // TS.6 §5 (2026-08-22): this fixture used to insert a manual
+    // `ubo.determination.apply-smo-fallback` here to give the second freeze a
+    // result. That verb is retired — SMO is PULLED on exhaustion by the
+    // traversal (TS.3 §4a), never asserted — so the second freeze is now
+    // attempted against an empty determination, which is exactly the case K-5
+    // exists to refuse. The refusal is asserted below.
+    // Attempt to freeze again at t2 — K-5 must refuse this.
     events.push(te(
         10,
-        subject,
-        "ubo.determination.apply-smo-fallback",
-        h,
-        analyst(),
-        authority(),
-        TargetBinding::for_subject(subject),
-        serde_json::json!({"smo_person_id": person_smo().0}),
-        idem("smo2"),
-        t2,
-    ));
-    // Freeze again at t2 (with SMO — satisfies K-5).
-    events.push(te(
-        11,
         subject,
         "ubo.determination.freeze",
         h,
@@ -1111,51 +950,30 @@ fn ec5_replay_determinism_after_supersede() {
     ));
 
     let all_refs: Vec<&IntentEvent> = events.iter().collect();
+
+    // Phase 2 gate (K-5, "a determination must never be silent"): the
+    // supersede broke the only ownership chain, and there are no officer
+    // appointments for the TS.3 §4a pull-on-exhaustion to walk. The freeze
+    // therefore has nothing to conclude and MUST be refused — `freeze_
+    // determination` returns `Err`, which `recover_determination_at` surfaces
+    // as `None`.
+    //
+    // Before TS.6 §5 this was masked: the fixture asserted a manual
+    // `apply-smo-fallback` to hand the freeze a result. With that verb retired
+    // there is no way to fabricate one, so the K-5 refusal is now visible on
+    // the replay path — a stronger assertion than the one it replaces.
     let latest_det = recover_determination_at(
         &all_refs,
         &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
-    )
-    .expect("should recover latest determination");
-
-    // After supersede: P1 chain is broken → no ownership UBOs.
-    // Latest determination should have no ownership candidates but an SMO.
-    assert!(
-        latest_det.candidates.is_empty(),
-        "post-supersede: no ownership candidates expected; got {:?}",
-        latest_det.candidates,
     );
-    // Phase 2 gate: verify SMO provenance (K-5, K-35), not just presence.
-    let latest_smo = latest_det
-        .smo_result
-        .as_ref()
-        .expect("post-supersede: SMO result must be present (K-5)");
-    match latest_smo {
-        SmoResult::Person(c) => {
-            assert_eq!(
-                c.prong,
-                Prong::SmoFallback,
-                "post-supersede SMO must carry SmoFallback prong"
-            );
-            assert_ne!(
-                c.originating_event_id.0,
-                EventId::default().0,
-                "post-supersede SMO originating_event_id must not be nil (K-35)",
-            );
-        }
-        SmoResult::AuthorisedWaiver { .. } => {
-            panic!("ec5: expected a Person SMO result, got AuthorisedWaiver");
-        }
-    }
-    // Prior determination had P1 as candidate; latest has none.
     assert!(
-        prior_det.candidates.len() > latest_det.candidates.len(),
-        "prior determination should have more candidates than post-supersede; \
-        prior={}, latest={}",
-        prior_det.candidates.len(),
-        latest_det.candidates.len(),
+        latest_det.is_none(),
+        "post-supersede: K-5 must refuse a determination with no candidates \
+         and no pulled SMO; got {:?}",
+        latest_det.map(|d| d.candidates),
     );
 
     // Replay prior at the prior graph-hash — must be bit-identical.
@@ -1419,7 +1237,7 @@ fn k13_superseded_edges_remain_in_fold() {
 
 #[test]
 fn k30_all_phase1_verbs_declare_governing_taxonomy() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     // If this list is empty, the lexicon builder is broken.
     assert!(!lexicon.entries.is_empty(), "lexicon must not be empty");
     for (fqn, entry) in &lexicon.entries {
@@ -1442,8 +1260,8 @@ fn k30_all_phase1_verbs_declare_governing_taxonomy() {
 
 #[test]
 fn q7_lexicon_manifest_hash_is_stable() {
-    let lex1 = phase1_lexicon();
-    let lex2 = phase1_lexicon();
+    let lex1 = assembly_lexicon();
+    let lex2 = assembly_lexicon();
     assert_eq!(
         lex1.hash, lex2.hash,
         "lexicon manifest hash must be stable across calls (Q7)",
@@ -1654,7 +1472,7 @@ fn d2_phase3a_two_versions_dispatch_to_different_impls() {
     let t = ts(2026, 1, 1);
 
     // v1 hash = real phase1 lexicon manifest hash.
-    let v1_hash = phase1_lexicon().hash;
+    let v1_hash = assembly_lexicon().hash;
     // v2 hash = a different content-addressed hash for a "second version".
     let v2_hash = Hash::of(b"v2-noop-lexicon-different-hash");
 
@@ -1730,7 +1548,7 @@ fn d2_phase3b_registry_replay_is_bit_identical() {
     let subject = fixture_subject_id();
     let events = build_fixture_events(subject); // build once, fold twice
 
-    let v1_hash = phase1_lexicon().hash;
+    let v1_hash = assembly_lexicon().hash;
     let mut registry = FoldRegistry::new();
     registry.register(v1_hash, Arc::new(V1FoldImpl));
 

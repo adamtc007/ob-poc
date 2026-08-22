@@ -460,21 +460,16 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // preview/projection capability is ever needed again, it should be
         // a query API, not a `dsl.kyc` fact-stream verb (this is exactly
         // the shape `enumerate_placement_set`/`preview` already serve).
-        LexiconEntry::build(
-            "ubo.determination.apply-smo-fallback",
-            "Record SMO where ownership+control resolution is empty (K-5, never silent)",
-            Taxonomy::Control,
-            smallvec![FoldId::Determination],
-            // T6.3 row 7: reuses the two EXISTING variants that gate
-            // freeze — zero new machinery. Prevents SMO fallback firing
-            // before the determination stage is set up.
-            vec![
-                Precondition::ReconciledProjection,
-                Precondition::StructureClassSupported,
-            ],
-            AuthoritySpec::senior_analyst(),
-            vec![],
-        ),
+        // TS.6 §5 (K-G7, RATIFIED): `ubo.determination.apply-smo-fallback`
+        // LexiconEntry RETIRED 2026-08-22. SMO is PULLED on exhaustion by
+        // the traversal (`determination.rs` walks OfficerAppointment edges
+        // into the frontier and emits `Prong::SmoFallback` straight into
+        // `candidates`, TS.3 §4a) — asserting it was a second way to WRITE
+        // an answer the system already computes, which could contradict the
+        // traversal. Its precondition pair (ReconciledProjection,
+        // StructureClassSupported) was never unique to it: `freeze` declares
+        // the identical pair independently, so nothing was lost.
+        // Reintroduction path: a query/preview API, never a fact-stream verb.
         LexiconEntry::build(
             // The pivot verb: pins determination AND emits person obligations.
             "ubo.determination.freeze",

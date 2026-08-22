@@ -233,16 +233,29 @@ impl PgKycObligationProjector {
 
         let mut subj_count = 0usize;
         for (sid, rollup) in &state.subjects {
-            let (overall, decision_event_id) = match &rollup.overall_state {
-                SubjectOverallState::Approved { by_event } => ("Approved", Some(by_event.0)),
-                SubjectOverallState::Rejected { by_event } => ("Rejected", Some(by_event.0)),
+            // `Approved`/`Rejected` retired from `SubjectOverallState` TS.6
+            // P2 (K-G7) — decisions live in `kyc_decision_records` now, not
+            // this fold, so `overall_state` can only ever be one of these
+            // two pre-decision values. `decision_event_id` is left
+            // permanently NULL rather than dropping the column (TS.6 P1
+            // ruling: non-destructive — a reader wanting the decision now
+            // joins `kyc_decision_records` instead).
+            //
+            // TS.6 §5 (2026-08-22): DERIVED, not read off a stored
+            // `rollup.overall_state` field. That field was only ever advanced
+            // by the retired approve/reject fold arms, so after P2 it was
+            // pinned at `InProgress` and this projection published
+            // `all_terminal = false` for subjects whose obligations were all
+            // terminal — while `decide.approve`'s own K-23 gate, which calls
+            // `derive_subject_state`, correctly saw `AllTerminal`. One value,
+            // two authorities, disagreeing. The field is gone; this is the
+            // single authority.
+            let derived = state.derive_subject_state(*sid);
+            let (overall, decision_event_id): (&str, Option<uuid::Uuid>) = match &derived {
                 SubjectOverallState::AllTerminal => ("AllTerminal", None),
                 SubjectOverallState::InProgress => ("InProgress", None),
             };
-            let all_terminal = matches!(
-                rollup.overall_state,
-                SubjectOverallState::AllTerminal | SubjectOverallState::Approved { .. }
-            );
+            let all_terminal = matches!(derived, SubjectOverallState::AllTerminal);
             sqlx::query(
                 r#"INSERT INTO "ob-poc".kyc_subject_rollup_projection
                    (subject_root, overall_state, obligation_count, all_terminal, decision_event_id)

@@ -26,7 +26,7 @@ use ob_poc_kyc_substrate::{
     fold_type_registry, natural_persons_from_events, assembly_lexicon, pipe_of,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
     CooperativeMemberStrategy, EdgeId, EdgeKind, EntityId, FoldRegistry, FoundationCouncilStrategy,
-    FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId, Prong,
+    FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId,
     ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, TargetBinding,
     TrustRoleStrategy, V1FoldImpl,
     EDGE_KIND_WIRE_VALUES, ENTITY_TYPE_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
@@ -437,41 +437,14 @@ impl SemOsVerbOp for UboEdgeReconcileConflict {
 // independently, so nothing needed building to "preserve the gate
 // elsewhere" — see the lexicon.rs comment at this verb's former entry.
 
-pub struct UboDeterminationApplySmoFallback;
-
-#[async_trait]
-impl SemOsVerbOp for UboDeterminationApplySmoFallback {
-    fn fqn(&self) -> &str {
-        "ubo.determination.apply-smo-fallback"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let payload = normalize_smo_fallback_payload(args);
-        // T6.3 row 7 finding: `validate_entry_fqn` was `None`, so the
-        // lexicon's declared ReconciledProjection/StrategySelected
-        // preconditions were dead at the real write path — same defect
-        // class as freeze's pre-DD-003 dead precondition.
-        let outcome = stream_append(
-            "ubo.determination.apply-smo-fallback",
-            subject,
-            TargetBinding::for_subject(subject),
-            payload,
-            "analyst.smo-fallback",
-            Some("ubo.determination.apply-smo-fallback"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
+// TS.6 §5 (K-G7, RATIFIED): `UboDeterminationApplySmoFallback` RETIRED
+// 2026-08-22 with its verb. SMO is PULLED on exhaustion by
+// `determination.rs` (OfficerAppointment edges -> Prong::SmoFallback,
+// straight into `candidates`, TS.3 §4a) — this op was a second, manual
+// way to write an answer the traversal already computes, and could
+// contradict it. The 54 historical events under this verb_fqn fall
+// through to the fold's catch-all `_ => {}` (replay-faithful; none of
+// those 54 subjects has a freeze, so no determination changes).
 
 /// Normalize the edge-identity payload key for `ubo.edge.assert-control` /
 /// `ubo.edge.assert-economic-interest` (T6.2, found while wiring the
@@ -564,24 +537,13 @@ fn normalize_assert_control_payload(
     }
     Ok(p)
 }
-
-/// Normalize `ubo.determination.apply-smo-fallback` payload: the YAML arg is
-/// kebab-case `smo-person-id`, but the fold reads snake_case `smo_person_id`
-/// (`fold::control::apply_one_control_event`, via `person_id(p, "smo_person_id")`)
-/// — without this the fold silently left `ControlState.smo_person_id` at
-/// `None`, meaning the entire SMO-fallback path (K-5's "never silent"
-/// escape hatch, consumed at `freeze` time) never actually populated
-/// anything even after a caller ran this verb. Same bug class as R3
-/// (structure_class) and the `edge.assert-control` kind/edge_kind mismatch.
-fn normalize_smo_fallback_payload(args: &serde_json::Value) -> serde_json::Value {
-    let mut p = args.clone();
-    if let Some(obj) = p.as_object_mut() {
-        if let Some(v) = obj.remove("smo-person-id") {
-            obj.insert("smo_person_id".to_string(), v);
-        }
-    }
-    p
-}
+// TS.6 §5: `normalize_smo_fallback_payload` deleted 2026-08-22 with
+// `ubo.determination.apply-smo-fallback`. It fixed a real kebab/snake
+// payload-key mismatch (`smo-person-id` vs `smo_person_id`) that had
+// left `ControlState.smo_person_id` silently `None` — the same defect
+// class as R3 (structure_class) and assert-control's kind/edge_kind.
+// With the verb retired there is no longer any writer for that field,
+// so the normalizer has nothing to normalize.
 
 pub struct UboDeterminationFreeze;
 
@@ -775,29 +737,33 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             ));
         }
 
-        let smo_result = match (control.smo_person_id, control.smo_event_id) {
-            (Some(pid), Some(orig)) => Some(SmoResult::Person(ProngCandidate {
-                person_id: pid,
-                prong: Prong::SmoFallback,
-                effective_ownership_pct: None,
-                ownership_chain: vec![],
-                originating_event_id: orig,
-                pivot: None,
-                pierces: Vec::new(),
-            })),
-            (None, _) => None,
-            (Some(_), None) => {
-                return Err(anyhow!(
-                    "freeze: fold invariant violated — smo_person_id set without smo_event_id"
-                ));
-            }
-        };
+        // SMO no longer arrives as a separate `smo_result`. `ControlState`'s
+        // `smo_person_id`/`smo_event_id` were removed in TS.6 §5 along with
+        // `ubo.determination.apply-smo-fallback`, their only writer. SMO now
+        // enters through the traversal's pull-on-exhaustion as
+        // `Prong::SmoFallback` candidates (TS.3 §4a), which the K-5 guard
+        // below counts like any other candidate.
+        let smo_result: Option<SmoResult> = None;
 
         // K-5: a determination must never be silent.
+        //
+        // TS.6 §5 (2026-08-22): this guard is now strictly STRONGER. It used
+        // to be satisfiable by asserting a manual SMO
+        // (`ubo.determination.apply-smo-fallback`, retired) — an operator
+        // could write an answer to clear the gate. With that verb gone, the
+        // only route to a non-empty result is the traversal itself, including
+        // TS.3 §4a's automatic pull-on-exhaustion (OfficerAppointment edges
+        // into the frontier → `Prong::SmoFallback`, folded into `candidates`).
+        // So reaching here means: ownership+control resolved nothing AND the
+        // SMO pull found no officer to pull. That is a real dead end, and
+        // refusing is correct — there is no longer a way to paper over it.
         if candidates.is_empty() && smo_result.is_none() {
             return Err(anyhow!(
-                "freeze: determination would be silent — no ownership/control candidates and \
-                 no SMO fallback applied (K-5); call ubo.determination.apply-smo-fallback first"
+                "freeze: determination would be silent — ownership/control traversal \
+                 produced no candidates and the SMO pull-on-exhaustion (TS.3 §4a) found \
+                 no officer to pull (K-5). Assert the missing control/ownership facts, or \
+                 record an officer appointment for the SMO pull to find; there is no \
+                 manual SMO override (ubo.determination.apply-smo-fallback retired TS.6 §5)"
             ));
         }
 

@@ -218,7 +218,7 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_22() {
+fn verb_universe_is_exactly_21() {
     // TS.6 P1/P2: kyc.person.approve/.reject renamed decide.approve/.reject
     // and moved to a new `decide:` domain block in the SAME YAML file
     // (dsl-kyc-obligation.yaml) — a rename+relocation, not a retirement, so
@@ -227,8 +227,8 @@ fn verb_universe_is_exactly_22() {
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        22,
-        "dsl.kyc verb count drifted from the post-TS.6-P2 22 (25 post-D1, \
+        21,
+        "dsl.kyc verb count drifted from the post-TS.6-§5 21 (25 post-D1, \
          minus the retired select-strategy, compute-fold, and pierce-nominee \
          verb declarations) — update the T0.3 audit and every other pinned \
          test in this file, not just this assertion: {fqns:#?}"
@@ -256,7 +256,6 @@ fn assembly_pack_is_exactly_known() {
         "ubo.edge.verify",
         "ubo.edge.supersede",
         "ubo.edge.reconcile-conflict",
-        "ubo.determination.apply-smo-fallback",
         "ubo.determination.freeze",
         "kyc.obligation.create",
         "assert.identity",
@@ -481,10 +480,10 @@ fn every_declared_verb_has_a_registered_op() {
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        24,
+        23,
         "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
          ops co-hosted in kyc_stream_ops.rs, and decide.approve/decide.reject \
-         in ob-poc-kyc-decide) drifted from 24: {registered:#?}"
+         in ob-poc-kyc-decide) drifted from 23: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -767,16 +766,10 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // arg.
 
     // T6.3 (2026-08-12, determination-family remainder — EOP-DD-KYCUBO-KIT-T6
-    // matrix rows 7, 9, 10; row 6 (`select-strategy`) RETIRED by TS.6 P2 —
-    // see the note above `freeze`; row 8 is the unchanged 8a freeze guard,
-    // asserted above).
-    expected.insert(
-        "ubo.determination.apply-smo-fallback".to_string(),
-        vec![
-            Precondition::ReconciledProjection,
-            Precondition::StructureClassSupported,
-        ],
-    );
+    // matrix rows 7, 9, 10; row 6 (`select-strategy`) RETIRED by TS.6 P2 and
+    // row 7 (`apply-smo-fallback`) by TS.6 §5 — see the note above `freeze`,
+    // which carries row 7's identical precondition pair; row 8 is the
+    // unchanged 8a freeze guard, asserted above).
     // row 9 (`kyc.subject.register`) CLOSED (2026-08-17, corrects
     // EOP-DD-KYCUBO-KIT-T6 §5 — see its §6 amendment and the lexicon
     // entry's own comment): `NotAlreadyRegistered` is now keyed off the
@@ -833,7 +826,7 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
 
     assert_eq!(
         actual.len(),
-        20,
+        19,
         "assembly_lexicon() entry count drifted from the post-TS.6-P1 20 \
          lexicon-covered verbs (25 post-D1, minus the retired select-strategy, \
          compute-fold, and pierce-nominee entries, minus decide.approve/decide.reject \
@@ -1266,16 +1259,13 @@ fn every_precondition_carrying_verb_is_reached_by_the_checker() {
     );
 
     // Sanity: the scanner itself must not be vacuously trivial — it must
-    // have found at least the 3 pre-T6.2 wired verbs (verify,
-    // apply-smo-fallback, freeze) as a floor, or a scanner bug (not a real
-    // gap) could be silently passing this test by finding nothing to check
-    // in the first place. (`select-strategy`/`compute-fold` retired TS.6
-    // P2 — dropped from this floor list.)
-    for known_wired in [
-        "ubo.edge.verify",
-        "ubo.determination.apply-smo-fallback",
-        "ubo.determination.freeze",
-    ] {
+    // have found at least the pre-T6.2 wired verbs as a floor, or a scanner
+    // bug (not a real gap) could be silently pass this test by finding
+    // nothing to check in the first place. (`select-strategy`/`compute-fold`
+    // retired TS.6 P2, `apply-smo-fallback` TS.6 §5 — all dropped from this
+    // floor list; `freeze` still carries the identical precondition pair the
+    // last two of those declared.)
+    for known_wired in ["ubo.edge.verify", "ubo.determination.freeze"] {
         assert!(
             precondition_carrying.contains(known_wired),
             "scanner sanity: {known_wired} must still carry a precondition in the pinned \

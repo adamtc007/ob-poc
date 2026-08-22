@@ -5,8 +5,10 @@
 # kyc_intent_events stream; current state is a fold/projection of that stream — never a
 # direct table write. Ops live in domain_ops::kyc_stream_ops.
 #
-# The domain split: ubo.edge.* (7 edge lifecycle, incl. pierce-nominee — TS.4 = K-8),
-# ubo.determination.* (4 fold/freeze), kyc.subject.* (2 subject registration). All are
+# The domain split: ubo.edge.* (6 edge lifecycle; pierce-nominee retired TS.6 P2 —
+# folded into a macro composing assert-control's pierced-from arg + supersede, K-8),
+# ubo.determination.* (1: freeze — select-strategy/compute-fold/apply-smo-fallback
+# both retired TS.6 P2), kyc.subject.* (6 subject/entity lifecycle). All are
 # covered by phase1_lexicon() in the ob-poc-kyc-substrate crate.
 
 domains:
@@ -73,6 +75,10 @@ domains:
             type: boolean
             required: false
             description: "Whether the trust IS revocable — only meaningful on trust_settlor edges (TS.1 §2.1). Polarity: false = PROVEN irrevocable, the only value that excludes the settlor from trust_role_strategy candidates; true or absent both treat the trust as revocable, so the settlor is INCLUDED (fail-closed toward inclusion: over-identify, never silently drop a controller)."
+          - name: pierced-from
+            type: uuid
+            required: false
+            description: "TS.6 P2 (K-G7): set ONLY by the `ubo.edge.pierce-nominee` macro (config/verb_schemas/macros/ubo.yaml), which composes this verb with edge.supersede to replace the retired standalone pierce-nominee verb. The referenced edge id — the nominee edge this assertion pierces. Op-layer fail-closed check (no precondition primitive expresses \"edge is of kind X\"): the referenced edge must exist, be EdgeKind::Nominee, and be active. `kind` above may not be `nominee` when this is set (a pierce cannot produce another nominee edge). Fold-side: stamps EdgeState.pierced_from (K-8 traceability)."
         returns:
           type: record
           fields:
@@ -285,68 +291,14 @@ domains:
           consequence:
             baseline: reviewable
 
-      edge.pierce-nominee:
-        flavour: attribute_mutating
-        description: Pierce a nominee arrangement — supersede the nominee edge and assert the disclosed nominator's underlying edge in one governed event (K-8, K-13)
-        effect_class: append_fact
-        invocation_phrases:
-          - "pierce nominee"
-          - "pierce the nominee edge"
-          - "pierce this nominee arrangement"
-          - "disclose the nominator"
-          - "look through the nominee"
-          - "pierce nominee shareholding"
-          - "replace nominee with true holder"
-          - "record the disclosed nominator"
-          - "pierce the nominee to the beneficial holder"
-          - "unwind the nominee arrangement"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: control_edge
-          tags: [ubo, nominee, pierce, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root (the subject stream)
-          - name: edge-id
-            type: uuid
-            required: true
-            description: The target nominee edge to pierce (must exist, be active, and be of kind nominee — the kind check is op-layer fail-closed; EdgeExists/EdgeActive are lexicon preconditions)
-          - name: nominator-id
-            type: uuid
-            required: true
-            description: The disclosed nominator — the entity that actually holds the underlying interest; the new control edge is asserted FROM this entity with pierced_from provenance (TS.4 §2.6)
-          - name: kind
-            type: string
-            required: true
-            description: "The UNDERLYING kind the nominator actually holds (what the pierced arrangement resolves to). Any canonical wire value EXCEPT nominee — a pierce cannot produce another nominee edge (fail-closed at the op-normalizer, TS.4 §2.6). The new edge's id derives from the assert-control scheme with this kind."
-            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, dominant_influence, economic_interest, officer_appointment, management_mandate, membership_rights, statutory_authority, employment, containment]
-          - name: percentage
-            type: decimal
-            required: false
-            description: Percentage (for an underlying economic_interest kind)
-          - name: trust-revocable
-            type: boolean
-            required: false
-            description: "Whether the trust IS revocable — only meaningful when the underlying kind is trust_settlor (same polarity as assert-control's trust-revocable, TS.1 §2.1)"
-        returns:
-          type: record
-          fields:
-            - name: pierced_edge_id
-              type: uuid
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
+      # edge.pierce-nominee RETIRED (TS.6 P2, K-G7, 2026-08-22): folded into
+      # the `ubo.edge.pierce-nominee` MACRO (config/verb_schemas/macros/
+      # ubo.yaml) composing `edge.assert-control` (with its new optional
+      # `pierced-from` arg, below) + `edge.supersede`. Piercing records a
+      # real handed-over fact, so it wasn't deleted outright (unlike
+      # select-strategy/compute-fold) — it was redesigned because the old
+      # shape was a bespoke single-purpose verb doing two governed effects
+      # in one hand-rolled fold arm, with no reusable composition mechanism.
 
       edge.reconcile-conflict:
         flavour: attribute_mutating
@@ -392,127 +344,18 @@ domains:
           consequence:
             baseline: reviewable
 
-      determination.select-strategy:
-        flavour: attribute_mutating
-        description: Select the determination strategy for a subject (e.g. OwnershipProng, SmoFallback)
-        effect_class: append_fact
-        invocation_phrases:
-          - "select determination strategy"
-          - "set determination strategy"
-          - "choose ubo strategy"
-          - "select ownership prong"
-          - "set UBO determination method"
-          - "configure determination strategy"
-          - "select the strategy for determination"
-          - "set determination approach"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: determination
-          tags: [ubo, strategy, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root
-          - name: strategy
-            type: string
-            required: true
-            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %), control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4), trust_role_strategy (trust-role control: trustee/protector always, settlor unless proven irrevocable, beneficiary never — TS.1), fund_control_strategy (corporate-form fund: control sits with the manager (ManCo/AIFM/GP-analog) asserted as dominant_influence/board_appointment, investors stay on the economic axis — TS.2), foundation_council_strategy (foundation: no owners by construction, control sits with the council — board_appointment + dominant_influence edges ONLY — TS.2), state_owned_strategy (state-owned: the controller is a state organ, so the terminal answer is usually SMO — the full control walk runs for the rare genuine natural-person controller, zero candidates legitimizes the existing apply-smo-fallback route — TS.3), and cooperative_member_strategy (cooperative: one-member-one-vote, membership per se never yields a UBO, control arises from office — voting_rights + board_appointment + dominant_influence edges ONLY — TS.3), and nominee_pierce_strategy (nominee: pierce first via ubo.edge.pierce-nominee, then the subject resolves by the UNDERLYING structure — a delegate to the control-prong walk; freeze hard-errors while any unpierced nominee edge remains active — TS.4 = K-8) are implemented. The strategy set is TOTAL: all 11 structure classes are served."
-            valid_values: [ownership_prong_strategy, control_prong_strategy, trust_role_strategy, fund_control_strategy, foundation_council_strategy, state_owned_strategy, cooperative_member_strategy, nominee_pierce_strategy]
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-
-      determination.compute-fold:
-        flavour: attribute_mutating
-        description: Trigger a fold computation — projects current state from the stream
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "compute fold"
-          - "run determination fold"
-          - "fold the stream"
-          - "compute current determination state"
-          - "run the fold"
-          - "project determination from stream"
-          - "recompute determination"
-          - "fold and project"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: determination
-          tags: [ubo, fold, computation, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root to fold
-        returns:
-          type: record
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: benign
-
-      determination.apply-smo-fallback:
-        flavour: attribute_mutating
-        description: Record an SMO fallback determination (senior managing official)
-        effect_class: append_fact
-        invocation_phrases:
-          - "apply SMO fallback"
-          - "record SMO determination"
-          - "use SMO fallback"
-          - "apply senior managing official rule"
-          - "fall back to SMO"
-          - "record senior managing official"
-          - "SMO fallback determination"
-          - "apply the SMO rule"
-          - "use the SMO route"
-          - "apply fallback determination"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: determination
-          tags: [ubo, smo, fallback, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root
-          - name: smo-person-id
-            type: uuid
-            required: true
-            description: The person designated as senior managing official
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
+      # TS.6 §5 (K-G7, RATIFIED) - `determination.apply-smo-fallback`
+      # RETIRED 2026-08-22. SMO is PULLED on exhaustion, never asserted -
+      # `determination.rs` walks OfficerAppointment edges into the
+      # frontier and emits Prong::SmoFallback candidates directly
+      # (TS.3 §4a). This verb was a second, manual way to WRITE an
+      # answer the traversal already computes, so it could contradict
+      # it. Reintroduction path - only as a query/preview API, never
+      # as a dsl.kyc fact-stream verb.
+      #
+      # NOTE for future editors: no comment line inside a `verbs:` block
+      # may END with a colon. `kyc_pack_closure.rs::extract_verb_fqns` is a
+      # naive 6-space-indent line scan and would read it as a verb key.
 
       determination.freeze:
         flavour: attribute_mutating

@@ -121,8 +121,15 @@ pub struct SubjectRollup {
     /// All obligations for this subject, keyed by ObligationId.
     /// Each has its own distinct basis (K-21).
     pub obligations: Vec<ObligationId>,
-    /// Folded overall state (Q4: fold over obligation tracks).
-    pub overall_state: SubjectOverallState,
+    // `overall_state` removed TS.6 §5 (2026-08-22). It was a STORED copy of
+    // what `derive_subject_state` computes, and the only two events that ever
+    // updated it were `kyc.person.approve`/`.reject` — both retired to the
+    // Evaluation pack in TS.6 P2. From that moment it was pinned at
+    // `InProgress` for every subject forever, while the real fold happily
+    // reached `AllTerminal`: a fold-blind stored field, the K-G7 defect class.
+    // `derive_subject_state` already ignored it; the projector did not, and so
+    // published a permanently-wrong `overall_state`/`all_terminal` pair.
+    // Derive it — there is one authority for this value, not two.
 }
 
 // ── Obligation state ──────────────────────────────────────────────────────────
@@ -231,7 +238,6 @@ pub(crate) fn apply_one_obligation_event(
                 state.subjects.entry(sid).or_insert_with(|| SubjectRollup {
                     subject_id: sid,
                     obligations: vec![],
-                    overall_state: SubjectOverallState::InProgress,
                 });
             }
         }
@@ -269,7 +275,6 @@ pub(crate) fn apply_one_obligation_event(
                 .or_insert_with(|| SubjectRollup {
                     subject_id: sid,
                     obligations: vec![],
-                    overall_state: SubjectOverallState::InProgress,
                 })
                 .obligations
                 .push(oid);

@@ -2,17 +2,17 @@
 //! EOP-DD-KYCUBO-KIT-T6 matrix rows 6a/8a) + the unified two-fold checker
 //! (T6.1(a)).
 //!
-//! Five gates:
+//! Four gates:
 //! - `precondition_blocks_illegal_placement` / `precondition_admits_legal_placement`
-//!   — the T6.1(c) exemplar (`StructureClassSupported`) on `select-strategy`
-//!   and `freeze`, at the checker level (pure, no DB — the same oracle the
-//!   write path and the placement generator both call).
+//!   — the T6.1(c) exemplar (`StructureClassSupported`), at the checker
+//!   level (pure, no DB — the same oracle the write path and the placement
+//!   generator both call). TS.6 P2 (K-G7) retired `select-strategy` AND
+//!   `compute-fold`, so both gates now drive `freeze` alone, the guard's
+//!   sole surviving home.
 //! - `checker_sees_both_folds` — a direct unit-level proof that
 //!   `check_preconditions` genuinely evaluates an `ObligationState`-reading
 //!   variant (`SubjectNotDecided`), with NO lexicon-entry attachment
 //!   (unattached machinery, as T6.1(b) ships it).
-//! - `select_strategy_blocked_end_to_end` — the exemplar proven through the
-//!   REAL governed append path (live DB), not just the pure checker.
 //! - `kit_drift_on_stud_batch` — an open workbook pinned to a pre-T6.1 kit
 //!   hash must KitDrift at commit against the live (post-T6.1) kit — the
 //!   batch-then-reopen discipline (EOP-PLAN v0.6 fact 3), demonstrated as
@@ -21,6 +21,14 @@
 //! `placement_iff_precondition_*` (the T2 property test) is unmodified and
 //! re-runs green in `ob-poc-kyc-substrate/tests/placement.rs` — not
 //! duplicated here.
+//!
+//! `select_strategy_blocked_end_to_end` RETIRED (TS.6 P2, K-G7): it proved
+//! the 6a exemplar through the real governed append path for
+//! `ubo.determination.select-strategy`, which no longer exists — the
+//! strategy is now derived from `structure_class`, never separately
+//! asserted. It was one of two known pre-existing carried reds through
+//! TS.5 (a stale structure-class fixture message); the retirement closes
+//! it rather than fixing the message, since there is no verb left to test.
 
 use std::sync::Arc;
 
@@ -28,17 +36,13 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationSelectStrategy,
-};
+use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_workbook::KycWorkbook;
 use ob_poc_kyc_substrate::{
-    check_preconditions, phase1_lexicon, ControlState, FoldRegistry, ObligationState,
+    check_preconditions, assembly_lexicon, ControlState, FoldRegistry, ObligationState,
     StructureClass, SubjectId, TypeRegistryState, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
-use sem_os_postgres::ops::SemOsVerbOp;
 
 fn database_url() -> String {
     std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string())
@@ -54,7 +58,7 @@ async fn pool() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -70,9 +74,6 @@ impl Scope {
             pool: p.clone(),
             id: TransactionScopeId::new(),
         }
-    }
-    async fn commit(self) {
-        self.tx.commit().await.unwrap();
     }
 }
 impl TransactionScope for Scope {
@@ -102,30 +103,19 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 
 // ── precondition_blocks_illegal_placement / _admits_legal_placement ────────
 //
-// Pure, no DB — direct proof against the governed lexicon entries
-// (`select-strategy`, `freeze`) that `StructureClassSupported` fail-closes on
-// an unimplemented class and admits an implemented one.
-
-// T6.3 row 6 (2026-08-12): select-strategy now ALSO carries SubjectRegistered
-// + StructureClassified (attached alongside 6a's StructureClassSupported) —
-// both helpers below must set `registered: true` too, or the fixtures below
-// would incorrectly block on the ordering studs instead of proving the 6a/8a
-// StructureClassSupported guard they target.
-fn control_with_class(class: StructureClass) -> ControlState {
-    ControlState {
-        registered: true,
-        structure_class: Some(class),
-        ..Default::default()
-    }
-}
-
+// Pure, no DB — direct proof against the governed lexicon entry (`freeze`)
+// that `StructureClassSupported` fail-closes on an unimplemented class and
+// admits an implemented one.
+//
+// TS.6 P2 (K-G7): `select-strategy` AND `compute-fold` retired —
+// `StructureClassSupported` now lives solely on `freeze`, which also
+// requires `ReconciledProjection`, so every fixture below needs
+// reconciliation set.
 fn control_with_class_reconciled_and_strategized(class: StructureClass) -> ControlState {
     ControlState {
         registered: true,
         structure_class: Some(class),
         reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
-        selected_strategy: Some("ownership_prong_strategy".to_string()),
-        strategy_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         ..Default::default()
     }
 }
@@ -144,7 +134,7 @@ fn probe(subject: SubjectId, verb_fqn: &str) -> ob_poc_kyc_substrate::IntentEven
 
 #[test]
 fn precondition_blocks_illegal_placement() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = SubjectId(Uuid::new_v4());
     let empty_obligation = ObligationState::default();
 
@@ -154,36 +144,13 @@ fn precondition_blocks_illegal_placement() {
     // remains — the guard set is TOTAL. The guard is retained, not retired:
     // the illegal placement it now fail-closes is the UNCLASSIFIED subject —
     // which is exactly what an unknown/garbage wire string folds to
-    // (`structure_class_from_payload` → None). Both 6a (select-strategy)
-    // and 8a (freeze) must still block that state.
-    let unclassified = ControlState {
-        registered: true,
-        structure_class: None,
-        ..Default::default()
-    };
-    let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
-    let result = check_preconditions(
-        select_entry,
-        &unclassified,
-        &empty_obligation,
-        &TypeRegistryState::default(),
-        &probe(subject, "ubo.determination.select-strategy"),
-    );
-    assert!(
-        result.is_err(),
-        "select-strategy must be blocked for an unclassified subject (6a — the \
-         post-TS.4 fail-closed floor)"
-    );
-
-    // 8a: freeze carries the guard as defense in depth, even with its other
-    // two preconditions (ReconciledProjection/StrategySelected) otherwise
-    // satisfied — the guard alone must still block a class-less subject.
+    // (`structure_class_from_payload` → None). TS.6 P2 retired both
+    // `select-strategy` and `compute-fold`; `freeze` alone must still block
+    // that state.
     let unclassified_ready = ControlState {
         registered: true,
         structure_class: None,
         reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
-        selected_strategy: Some("ownership_prong_strategy".to_string()),
-        strategy_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         ..Default::default()
     };
     let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
@@ -196,44 +163,30 @@ fn precondition_blocks_illegal_placement() {
     );
     assert!(
         freeze_result.is_err(),
-        "freeze must be blocked for an unclassified subject even with reconcile+strategy \
-         satisfied (8a defense in depth, post-TS.4 fail-closed floor)"
+        "freeze must be blocked for an unclassified subject even with reconcile satisfied \
+         (post-TS.4 fail-closed floor)"
     );
 }
 
 #[test]
 fn precondition_admits_legal_placement() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = SubjectId(Uuid::new_v4());
     let empty_obligation = ObligationState::default();
 
     // PrivateCompany is in the pinned implemented-strategy set.
-    let pc_state = control_with_class(StructureClass::PrivateCompany);
-    let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
-    assert!(
-        check_preconditions(
-            select_entry,
-            &pc_state,
-            &empty_obligation,
-            &TypeRegistryState::default(),
-            &probe(subject, "ubo.determination.select-strategy"),
-        )
-        .is_ok(),
-        "select-strategy must be admitted for a PrivateCompany-classified subject"
-    );
-
-    let pc_ready = control_with_class_reconciled_and_strategized(StructureClass::PrivateCompany);
+    let pc_state = control_with_class_reconciled_and_strategized(StructureClass::PrivateCompany);
     let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
     assert!(
         check_preconditions(
             freeze_entry,
-            &pc_ready,
+            &pc_state,
             &empty_obligation,
             &TypeRegistryState::default(),
             &probe(subject, "ubo.determination.freeze"),
         )
         .is_ok(),
-        "freeze must be admitted for a PrivateCompany-classified subject with reconcile+strategy \
+        "freeze must be admitted for a PrivateCompany-classified subject with reconcile \
          satisfied"
     );
 }
@@ -241,119 +194,91 @@ fn precondition_admits_legal_placement() {
 // ── checker_sees_both_folds ─────────────────────────────────────────────────
 //
 // Direct proof that `check_preconditions` genuinely evaluates an
-// ObligationState-reading variant. `SubjectNotDecided` is UNATTACHED to any
-// lexicon entry in T6.1 — this test builds a synthetic entry (clone a real
-// one, override `.preconditions`) rather than reaching for a wired-up verb,
-// exactly per the plan's own instruction for this gate.
+// ObligationState-reading variant — this test builds a synthetic entry
+// (clone a real one, override `.preconditions`) rather than reaching for a
+// wired-up verb, exactly per the plan's own instruction for this gate.
+//
+// Originally exercised `SubjectNotDecided` (then UNATTACHED to any lexicon
+// entry in T6.1). `SubjectNotDecided` and `SubjectOverallState::Approved`/
+// `Rejected` were retired TS.6 P2 (K-G7): `decide.approve`/`decide.reject`
+// moved off the fact stream entirely (structural Evaluation-pack split,
+// `ob-poc-kyc-decide`), so the substrate's pure fold can no longer see a
+// decision to be "not yet decided" about — the finality check moved with
+// them onto `kyc_decision_records`. Rewired onto `SubjectAllTerminal`
+// instead (wired, live, and still ObligationState-reading) — same proof,
+// a real precondition rather than a synthetic one.
 
 #[test]
 fn checker_sees_both_folds() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = SubjectId(Uuid::new_v4());
     let empty_control = ControlState::default();
 
     let mut synthetic_entry = lexicon.get("kyc.obligation.create").unwrap().clone();
-    synthetic_entry.preconditions = vec![ob_poc_kyc_substrate::Precondition::SubjectNotDecided];
+    synthetic_entry.preconditions = vec![ob_poc_kyc_substrate::Precondition::SubjectAllTerminal];
 
-    // InProgress (default/no rollup) — not decided — must admit.
-    let not_decided = ObligationState::default();
-    assert!(
-        check_preconditions(
-            &synthetic_entry,
-            &empty_control,
-            &not_decided,
-            &TypeRegistryState::default(),
-            &probe(subject, "kyc.obligation.create"),
-        )
-        .is_ok(),
-        "SubjectNotDecided must admit a subject with no decision on record"
-    );
-
-    // Approved — decided — must reject. Build a rollup by hand (obligation
-    // is otherwise unreachable from outside the crate without a real event
-    // stream; `ObligationState`'s fields are all `pub`).
-    let mut decided = ObligationState::default();
-    decided.subjects.insert(
-        subject,
-        ob_poc_kyc_substrate::SubjectRollup {
-            subject_id: subject,
-            obligations: vec![],
-            overall_state: ob_poc_kyc_substrate::SubjectOverallState::Approved {
-                by_event: ob_poc_kyc_substrate::EventId::new(),
-            },
-            decision_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
-        },
-    );
+    // InProgress (default/no rollup) — not all-terminal — must reject.
+    let not_terminal = ObligationState::default();
     let result = check_preconditions(
         &synthetic_entry,
         &empty_control,
-        &decided,
+        &not_terminal,
         &TypeRegistryState::default(),
         &probe(subject, "kyc.obligation.create"),
     );
     assert!(
         result.is_err(),
-        "SubjectNotDecided must reject once ObligationState shows the subject Approved — \
+        "SubjectAllTerminal must reject a subject with no rollup (defaults to InProgress)"
+    );
+
+    // AllTerminal — build a rollup AND a matching all-terminal obligation by
+    // hand (obligation is otherwise unreachable from outside the crate
+    // without a real event stream; `ObligationState`'s fields are all
+    // `pub`) — must admit. `derive_subject_state` derives fresh from
+    // `rollup.obligations`/`self.obligations` every call (it does not
+    // consult the stored `overall_state` field at all any more — that
+    // shortcut existed only for the now-retired Approved/Rejected
+    // variants), so a rollup with an empty `obligations` list is
+    // indistinguishable from InProgress regardless of what `overall_state`
+    // is set to; a real terminal obligation must be present.
+    let obligation_id = ob_poc_kyc_substrate::ObligationId(Uuid::new_v4());
+    let by_event = ob_poc_kyc_substrate::EventId::new();
+    let mut terminal = ObligationState::default();
+    terminal.obligations.insert(
+        obligation_id,
+        ob_poc_kyc_substrate::ObligationTracks {
+            obligation_id,
+            basis: ob_poc_kyc_substrate::ObligationBasis {
+                role: "director".into(),
+                jurisdiction: None,
+                cbu_role: None,
+                source_event_id: by_event,
+            },
+            identity: ob_poc_kyc_substrate::TrackState::Satisfied { by_event },
+            screening: ob_poc_kyc_substrate::TrackState::Satisfied { by_event },
+            risk: ob_poc_kyc_substrate::TrackState::Satisfied { by_event },
+            originating_event_id: by_event,
+        },
+    );
+    terminal.subjects.insert(
+        subject,
+        ob_poc_kyc_substrate::SubjectRollup {
+            subject_id: subject,
+            obligations: vec![obligation_id],
+        },
+    );
+    assert!(
+        check_preconditions(
+            &synthetic_entry,
+            &empty_control,
+            &terminal,
+            &TypeRegistryState::default(),
+            &probe(subject, "kyc.obligation.create"),
+        )
+        .is_ok(),
+        "SubjectAllTerminal must admit once ObligationState shows the subject AllTerminal — \
          proves the checker reads the obligation fold, not just control"
     );
-}
-
-// ── select_strategy_blocked_end_to_end ──────────────────────────────────────
-//
-// The 6a exemplar proven through the REAL governed append path (live DB),
-// not just the pure checker above.
-
-#[tokio::test]
-async fn select_strategy_blocked_end_to_end() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-
-    // NOTE: a fresh `VerbExecutionContext` per call — `execution_id` seeds the
-    // idempotency key (B3); reusing one `ctx` across calls would dedupe every
-    // call after the first against the register event, short-circuiting
-    // BEFORE fold+validate ever runs (the dedup check is step 2, ahead of
-    // step 3's precondition check, in `PgKycEventStore::append`).
-    let mut scope = Scope::begin(&pool).await;
-    KycSubjectRegister
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await
-        .expect("register has no preconditions");
-    KycSubjectClassifyStructure
-        .execute(
-            // TS.4 fixture rework: Nominee joined the implemented set
-            // (NomineePierceStrategy) — the last named fail-closed class is
-            // gone, so the end-to-end exemplar becomes an UNKNOWN wire
-            // string, which the fold maps to `structure_class: None`
-            // (classify itself succeeds; the fail-close fires downstream at
-            // select-strategy — proving garbage classes still cannot reach
-            // a determination through the real governed append path).
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": "not_a_real_class" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await
-        .expect("classify-structure records the event; an unknown class folds to None");
-
-    let result = UboDeterminationSelectStrategy
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_err(),
-        "select-strategy on an unknown-class subject must be rejected through the real \
-         governed append path (post-TS.4 fail-closed floor: garbage wire strings fold to \
-         None and never reach a strategy)"
-    );
-    scope.commit().await;
-
-    cleanup(&pool, subject).await;
 }
 
 // ── kit_drift_on_stud_batch ──────────────────────────────────────────────────
@@ -375,8 +300,8 @@ async fn kit_drift_on_stud_batch() {
         subject,
         committed: Vec::new(),
         staged: Vec::new(),
-        kit: phase1_lexicon(),
-        // A hash that is deliberately NOT today's live phase1_lexicon().hash —
+        kit: assembly_lexicon(),
+        // A hash that is deliberately NOT today's live assembly_lexicon().hash —
         // standing in for "this session was opened before the T6.1 stud batch
         // landed".
         kit_hash: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),

@@ -12,13 +12,15 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycObligationCreate, KycObligationSatisfy, KycPersonApprove, KycSubjectRegister,
+    KycObligationCreate, KycObligationSatisfy, KycSubjectRegister,
 };
+// kyc.person.approve renamed decide.approve TS.6 P2 — moved to ob-poc-kyc-decide.
+use ob_poc_kyc_decide::DecideApprove;
 use ob_poc_kyc_store::{
-    PgKycObligationDrainer, PgKycProjectionDrainer, CONTROL_EDGE_PROJECTION_EFFECT,
+    PgKycObligationProjector, PgKycProjector, CONTROL_EDGE_PROJECTION_EFFECT,
     OBLIGATION_PROJECTION_EFFECT,
 };
-use ob_poc_kyc_substrate::{phase1_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
+use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -36,7 +38,7 @@ async fn pool() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -71,6 +73,7 @@ impl TransactionScope for Scope {
 
 async fn cleanup(pool: &PgPool, subject: SubjectId) {
     for t in [
+        "kyc_decision_records",
         "kyc_intent_events",
         "kyc_subject_streams",
         "kyc_control_edge_projection",
@@ -136,21 +139,38 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     )
     .await;
 
-    // W5: approve the subject
+    // W5: approve the subject (decide.approve, TS.6 P2 — writes to
+    // kyc_decision_records, not the fact stream)
     dispatch(
-        &KycPersonApprove,
+        &DecideApprove,
         serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;
 
-    // W6: drain both projections
-    PgKycProjectionDrainer::drain_all(&pool, &registry, 100)
+    // W6: project THIS subject.
+    //
+    // Deliberately the per-subject projectors, not `drain_*::drain_all`.
+    // `drain_all` claims from the shared `public.outbox` queue globally
+    // (`ORDER BY created_at ... SKIP LOCKED LIMIT 1`), so it folds whatever
+    // other subjects happen to be pending — in a long-lived dev database that
+    // is a months-deep backlog spanning every historical lexicon version. The
+    // `FoldRegistry` here registers only the CURRENT `assembly_lexicon().hash`,
+    // so any claimed event from an older manifest hard-errors with
+    // `UnregisteredLexiconHash` (D2 total dispatch) and fails this test for
+    // reasons that have nothing to do with W3/W5/W6.
+    //
+    // This test's subject is the obligation lifecycle for the subject it just
+    // built, so it projects exactly that subject. The global drainers keep
+    // their own coverage in `crates/ob-poc-kyc-store/tests/drainer.rs`.
+    let mut conn = pool.acquire().await.unwrap();
+    PgKycProjector::rebuild_control_edges(&mut conn, &registry, subject)
         .await
         .unwrap();
-    PgKycObligationDrainer::drain_all(&pool, &registry, 100)
+    PgKycObligationProjector::rebuild_obligations(&mut conn, &registry, subject)
         .await
         .unwrap();
+    drop(conn);
 
     // Verify: obligation projection has the satisfied obligation
     let (o_state, o_role): (String, String) = sqlx::query_as(
@@ -165,7 +185,16 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     assert_eq!(o_state, "Satisfied", "obligation track satisfied");
     assert_eq!(o_role, "beneficial_owner", "basis role recorded (K-21)");
 
-    // Verify: subject rollup shows Approved (K-23 approval gate)
+    // Verify: the Assembly-side rollup shows the subject is eligible for the
+    // approval gate — all obligation tracks terminal.
+    //
+    // TS.6 §1/§5 (2026-08-22): this used to assert `overall_state ==
+    // "Approved"`. It cannot any more, and that is the point of the two-pack
+    // split: `decide.approve` is an Evaluation-pack verb that writes ONLY
+    // `kyc_decision_records`, never the fact stream, so no fold over the
+    // stream can ever observe a decision. `AllTerminal` is what Assembly can
+    // truthfully say; the approval itself is asserted from Evaluation's own
+    // record below.
     let (overall, all_term): (String, bool) = sqlx::query_as(
         r#"SELECT overall_state, all_terminal FROM "ob-poc".kyc_subject_rollup_projection
            WHERE subject_root = $1"#,
@@ -174,8 +203,28 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(overall, "Approved", "subject approved (K-23)");
+    assert_eq!(
+        overall, "AllTerminal",
+        "subject eligible for the K-23 approval gate"
+    );
     assert!(all_term, "all obligations terminal");
+
+    // Verify: the decision itself, in the Evaluation pack's own record.
+    // This is the half of K-23 the stream no longer carries — without it the
+    // test would no longer prove the approval happened at all.
+    let (verb_fqn, basis): (String, serde_json::Value) = sqlx::query_as(
+        r#"SELECT verb_fqn, basis FROM "ob-poc".kyc_decision_records WHERE subject_root = $1"#,
+    )
+    .bind(subject.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(verb_fqn, "decide.approve", "decide.approve recorded (K-23)");
+    assert_eq!(
+        basis.get("overall_state").and_then(|v| v.as_str()),
+        Some("AllTerminal"),
+        "the decision records the gate state it was taken on (K-23, K-35)",
+    );
 
     cleanup(&pool, subject).await;
 }

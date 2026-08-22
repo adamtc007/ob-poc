@@ -131,14 +131,18 @@ pub struct EdgeState {
     /// silently drop a controller.
     #[serde(default)]
     pub trust_revocable: Option<bool>,
-    /// The event that superseded this edge (set by `ubo.edge.supersede` and
-    /// `ubo.edge.pierce-nominee` — K-35 traceability on the supersession;
-    /// TS.4, EOP-DD-KYCUBO-KIT-TS0 §2.6: for a pierced nominee edge this
-    /// points at the pierce event).
+    /// The event that superseded this edge (set by `ubo.edge.supersede` —
+    /// K-35 traceability on the supersession; TS.4, EOP-DD-KYCUBO-KIT-TS0
+    /// §2.6: for a pierced nominee edge this is the `supersede` half of the
+    /// `pierce-nominee` macro composition, TS.6 P2).
     #[serde(default)]
     pub superseded_by: Option<EventId>,
-    /// Provenance: the nominee edge this edge was pierced FROM (set only on
-    /// edges created by `ubo.edge.pierce-nominee` — TS.4 §2.6, K-8).
+    /// Provenance: the nominee edge this edge was pierced FROM (set only
+    /// when `ubo.edge.assert-control` is called with a `pierced-from` arg —
+    /// TS.4 §2.6, K-8; the standalone `ubo.edge.pierce-nominee` verb that
+    /// originally set this field was retired TS.6 P2, folded into the
+    /// `assert-control` + `supersede` macro composition, see
+    /// `config/verb_schemas/macros/ubo.yaml`).
     #[serde(default)]
     pub pierced_from: Option<EdgeId>,
 }
@@ -190,14 +194,15 @@ pub struct ControlState {
     /// Event that set the structure class (K-35 traceability).
     pub classify_event_id: Option<EventId>,
     /// Event id of the most-recent `ubo.edge.reconcile-conflict`.
-    /// Required before `compute-fold` and `freeze` (K-14).
+    /// Required before `freeze` (K-14; `compute-fold` retired TS.6 P2).
     pub reconciliation_event_id: Option<EventId>,
-    /// Strategy selected by `ubo.determination.select-strategy`.
-    pub selected_strategy: Option<String>,
-    pub strategy_event_id: Option<EventId>,
-    /// SMO fallback person (if applied).
-    pub smo_person_id: Option<PersonId>,
-    pub smo_event_id: Option<EventId>,
+    // `smo_person_id` / `smo_event_id` removed TS.6 §5 (2026-08-22) with
+    // `ubo.determination.apply-smo-fallback`, their ONLY writer. Left in
+    // place they would have been permanently `None` while two `match` sites
+    // still branched on them — a fold-blind field pair, the same K-G7 class
+    // as the retired verb itself. SMO now reaches a determination solely via
+    // the traversal's pull-on-exhaustion, which populates `candidates`
+    // (`Prong::SmoFallback`) — TS.3 §4a.
     /// Subject registration (if `kyc.subject.register` has fired).
     pub registered: bool,
     pub register_event_id: Option<EventId>,
@@ -232,21 +237,34 @@ impl ControlState {
         self.reconciliation_event_id.is_some()
     }
 
-    /// True if a strategy has been selected (K-4 precondition for fold/freeze).
+    /// True if a supported strategy is derivable from the structure class
+    /// (K-4 precondition for fold/freeze). TS.6 P2: "strategy follows from
+    /// entity type" (TS.0 §1) — retired `ubo.determination.select-strategy`,
+    /// an explicit confirmation step that was redundant once
+    /// `classify-structure` alone determines the strategy unambiguously
+    /// (`strategy_for_structure_class`, the same 11-class/8-arm mapping
+    /// `implemented_class_split_matches_strategy_arms` already pins).
     pub fn has_strategy(&self) -> bool {
-        self.selected_strategy.is_some()
+        self.structure_class
+            .as_ref()
+            .is_some_and(|c| IMPLEMENTED_STRATEGY_CLASSES.contains(c))
     }
 }
 
 // ── Fold function ─────────────────────────────────────────────────────────────
 
-/// Parse an `EdgeId` from the event payload (field `"edge_id"`).
-fn edge_id_from_payload(payload: &serde_json::Value) -> Option<EdgeId> {
+/// Parse an `EdgeId` from a named field of the event payload.
+fn edge_id_field(payload: &serde_json::Value, field: &str) -> Option<EdgeId> {
     payload
-        .get("edge_id")?
+        .get(field)?
         .as_str()
         .and_then(|s| uuid::Uuid::parse_str(s).ok())
         .map(EdgeId)
+}
+
+/// Parse an `EdgeId` from the event payload (field `"edge_id"`).
+fn edge_id_from_payload(payload: &serde_json::Value) -> Option<EdgeId> {
+    edge_id_field(payload, "edge_id")
 }
 
 fn edge_id_from_target(event: &IntentEvent) -> Option<EdgeId> {
@@ -350,23 +368,23 @@ pub(crate) fn edge_kind_from_wire(wire: &str) -> EdgeKind {
 /// verb payload shape (TS.5 §6 Q1/Q2). Shared by `check_preconditions`'s
 /// `TypeGeometryPermits` arm (the append/preview chokepoint) and
 /// `placement.rs`'s R2 existence check — ONE extraction, not two.
-fn geometry_triple_for_event(
-    event: &IntentEvent,
-    control: &ControlState,
-) -> Option<(EntityId, EntityId, EdgeKind)> {
+fn geometry_triple_for_event(event: &IntentEvent) -> Option<(EntityId, EntityId, EdgeKind)> {
     match event.verb_fqn.as_str() {
         "ubo.edge.assert-economic-interest" => entity_id(&event.payload, "from_entity_id")
             .zip(entity_id(&event.payload, "to_entity_id"))
             .map(|(from, to)| (from, to, EdgeKind::EconomicInterest)),
-        "ubo.edge.pierce-nominee" => {
-            // Source is the disclosed nominator (payload); target is the
-            // PIERCED edge's own `to` (the new edge keeps the same target as
-            // the nominee arrangement it replaces — it is not in the payload
-            // at all).
-            let from = entity_id(&event.payload, "nominator_entity_id");
-            let to = edge_id_from_target(event).and_then(|eid| control.edges.get(&eid)).map(|e| e.to);
-            from.zip(to).map(|(from, to)| (from, to, edge_kind_from_payload(&event.payload)))
-        }
+        // "ubo.edge.pierce-nominee" special case RETIRED (TS.6 P2, K-G7):
+        // the old bespoke verb derived `to` from the pierced edge (needing
+        // the folded `ControlState`, since its own payload never carried
+        // `to_entity_id`). The macro composition that replaced it
+        // (`config/verb_schemas/macros/ubo.yaml`) issues an ordinary
+        // `ubo.edge.assert-control` call with an explicit `to_entity_id` —
+        // indistinguishable from any other assert-control call, so it falls
+        // through to the generic arm below with no special-casing and no
+        // `ControlState` lookup needed (the now-unused `control` parameter
+        // was removed with this arm). A historical event still bearing the
+        // retired verb_fqn falls through too and evaluates as `None` —
+        // `Unevaluable`, which admits — not a crash.
         _ => entity_id(&event.payload, "from_entity_id")
             .zip(entity_id(&event.payload, "to_entity_id"))
             .map(|(from, to)| (from, to, edge_kind_from_payload(&event.payload))),
@@ -526,7 +544,11 @@ pub(crate) fn apply_one_control_event(
                         // (see the field's polarity doc on `EdgeState`).
                         trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
                         superseded_by: None,
-                        pierced_from: None,
+                        // TS.6 P2 (K-G7): set only when this assert-control
+                        // call is the first half of the `pierce-nominee`
+                        // macro composition (op-layer stamps `pierced_from`
+                        // from the caller's `pierced-from` arg).
+                        pierced_from: edge_id_field(p, "pierced_from"),
                     },
                 );
             }
@@ -563,70 +585,39 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "ubo.edge.pierce-nominee" => {
-            // TS.4 (K-8, EOP-DD-KYCUBO-KIT-TS0 §2.6): TWO effects in ONE
-            // governed event. (a) the target nominee edge is SUPERSEDED
-            // (the existing supersession lifecycle — K-13
-            // supersede-never-contradict; `superseded_by` points at this
-            // pierce event); (b) a NEW control edge from the disclosed
-            // nominator is asserted with the UNDERLYING kind (payload
-            // `kind` — what the nominator actually holds; the op-normalizer
-            // rejects `nominee` fail-closed before append) and
-            // `pierced_from` provenance. Total-dispatch discipline: if the
-            // target edge or nominator is unresolvable (historical/garbage
-            // event), the arm applies nothing — the fold stays infallible;
-            // the live append path can't reach that state (EdgeExists/
-            // EdgeActive preconditions + the op-layer nominee-kind check).
-            if let (Some(eid), Some(nominator)) = (
-                edge_id_from_target(event),
-                entity_id(p, "nominator_entity_id"),
-            ) {
-                if let Some(to) = state.edges.get(&eid).map(|e| e.to) {
-                    if let Some(edge) = state.edges.get_mut(&eid) {
-                        edge.status = EdgeStatus::Superseded;
-                        edge.superseded_by = Some(event.id);
-                    }
-                    let kind = edge_kind_from_payload(p);
-                    // Edge-id derivation follows the assert-control scheme
-                    // with the UNDERLYING kind (deterministic, never random).
-                    let key = format!("control:{}:{}:{:?}", nominator.0, to.0, kind);
-                    let new_id = EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes()));
-                    state.edges.insert(
-                        new_id,
-                        EdgeState {
-                            id: new_id,
-                            kind,
-                            from: nominator,
-                            to,
-                            percentage: opt_f64(p, "percentage"),
-                            status: EdgeStatus::Asserted,
-                            evidence_event_id: None,
-                            originating_event_id: event.id,
-                            trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
-                            superseded_by: None,
-                            pierced_from: Some(eid),
-                        },
-                    );
-                }
-            }
-        }
+        // "ubo.edge.pierce-nominee" RETIRED (TS.6 P2, K-G7, 2026-08-22): the
+        // bespoke two-effect fold arm is gone — the same two effects (assert
+        // the nominator's real edge with `pierced_from` provenance +
+        // supersede the nominee edge) are now two ordinary fold arms above
+        // (`ubo.edge.assert-control`'s `pierced_from` read) and below
+        // (`ubo.edge.supersede`), composed by the `ubo.edge.pierce-nominee`
+        // MACRO (config/verb_schemas/macros/ubo.yaml), not a single event
+        // under this verb_fqn. A historical event still bearing this
+        // verb_fqn falls through to the catch-all `_ => {}` below, a
+        // no-op — replay-faithful for events already in the stream (Q7/
+        // K-18/K-31), same discipline as select-strategy/compute-fold's
+        // retirement.
 
         "ubo.edge.reconcile-conflict" => {
             state.reconciliation_event_id = Some(event.id);
         }
 
-        "ubo.determination.select-strategy" => {
-            state.selected_strategy = p
-                .get("strategy")
-                .and_then(|v| v.as_str())
-                .map(str::to_owned);
-            state.strategy_event_id = Some(event.id);
-        }
-
-        "ubo.determination.apply-smo-fallback" => {
-            state.smo_person_id = person_id(p, "smo_person_id");
-            state.smo_event_id = Some(event.id);
-        }
+        // TS.6 P2 (K-G7): "ubo.determination.select-strategy" retired —
+        // strategy is now derived from `structure_class`
+        // (`strategy_for_structure_class`), never asserted. A historical
+        // event under this verb_fqn falls through to the catch-all `_ =>
+        // {}` below, a no-op — replay-faithful for events already in the
+        // stream, no special handling needed (Q7/K-18/K-31).
+        // TS.6 §5 (K-G7, RATIFIED): "ubo.determination.apply-smo-fallback"
+        // fold arm RETIRED 2026-08-22 with the verb. `smo_person_id` /
+        // `smo_event_id` therefore stay `None` for good: the ONLY writer is
+        // gone, and SMO now reaches a determination solely via the
+        // traversal's pull-on-exhaustion, which populates `candidates`
+        // (Prong::SmoFallback) rather than these fields (TS.3 §4a). The 54
+        // historical events under this verb_fqn fall through to the
+        // catch-all `_ => {}` below — replay-faithful, and provably
+        // determination-neutral: none of those 54 subjects carries a freeze,
+        // so no determination was ever computed from a manual SMO.
 
         _ => {}
     }
@@ -666,9 +657,11 @@ use crate::lexicon::{LexiconEntry, Precondition};
 /// history: `Trust` joined at TS.1 (`TrustRoleStrategy`,
 /// EOP-DD-KYCUBO-KIT-TS0 §2.1); `InvestmentFund`/`Foundation` at TS.2
 /// (§2.2/§2.3); `StateOwned`/`Cooperative` at TS.3 (§2.4/§2.5); `Nominee`
-/// at TS.4 (§2.6 = K-8 — `ubo.edge.pierce-nominee` +
-/// `NomineePierceStrategy`, whose unpierced-nominee guard fail-closes at
-/// the freeze dispatch site). The guard itself (`StructureClassSupported`)
+/// at TS.4 (§2.6 = K-8 — piercing via the `ubo.edge.pierce-nominee` macro
+/// (assert-control + supersede, TS.6 P2 — see `config/verb_schemas/macros/
+/// ubo.yaml`) + `NomineePierceStrategy`, whose unpierced-nominee guard
+/// fail-closes at the freeze dispatch site). The guard itself
+/// (`StructureClassSupported`)
 /// is retained: it now fail-closes the UNKNOWN-class case (a garbage wire
 /// string folds to `None`) and any future `StructureClass` widening that
 /// lands without a strategy. Widen this set ONLY when a new
@@ -691,6 +684,34 @@ pub const IMPLEMENTED_STRATEGY_CLASSES: &[StructureClass] = &[
     StructureClass::Cooperative,
     StructureClass::Nominee,
 ];
+
+/// TS.6 P2 — "strategy follows from entity type" (TS.0 §1), realised: the
+/// SAME class→strategy mapping already ratified and pinned by
+/// `tests/kyc_pack_closure.rs::implemented_class_split_matches_strategy_arms`
+/// (11 classes, 8 arms, TOTAL — every class implemented has exactly one
+/// strategy), now promoted from test-only pinned data into the actual
+/// freeze-dispatch source. Retires `ubo.determination.select-strategy`
+/// (TS.6 §5, K-G7): an explicit human "confirm the strategy" step is
+/// redundant once `classify-structure` alone determines it unambiguously —
+/// there was never a second legitimate strategy for any of the 11 classes
+/// to choose between. `IMPLEMENTED_STRATEGY_CLASSES` still gates the
+/// fail-closed guard for any class with no arm; this function is total only
+/// over that guarded set, by construction (an unimplemented class never
+/// reaches here — `StructureClassSupported` refuses first).
+pub fn strategy_for_structure_class(class: &StructureClass) -> &'static str {
+    match class {
+        StructureClass::PrivateCompany
+        | StructureClass::MultiTierHoldingGroup
+        | StructureClass::ListedEntity => "ownership_prong_strategy",
+        StructureClass::LimitedPartnershipFund | StructureClass::Llp => "control_prong_strategy",
+        StructureClass::Trust => "trust_role_strategy",
+        StructureClass::InvestmentFund => "fund_control_strategy",
+        StructureClass::Foundation => "foundation_council_strategy",
+        StructureClass::StateOwned => "state_owned_strategy",
+        StructureClass::Cooperative => "cooperative_member_strategy",
+        StructureClass::Nominee => "nominee_pierce_strategy",
+    }
+}
 
 /// Check all preconditions for a verb against the current control state,
 /// obligation state, and target binding **before** appending the event
@@ -724,15 +745,7 @@ pub fn check_preconditions(
                 if !control.is_reconciled() {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),
-                        reason: "reconcile-conflict must fire before compute-fold / freeze".into(),
-                    });
-                }
-            }
-            Precondition::StrategySelected => {
-                if !control.has_strategy() {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "select-strategy must fire before compute-fold / freeze".into(),
+                        reason: "reconcile-conflict must fire before freeze".into(),
                     });
                 }
             }
@@ -881,19 +894,6 @@ pub fn check_preconditions(
                     return Err(KycError::ObligationNotFound(oid));
                 }
             }
-            Precondition::SubjectNotDecided => {
-                if let crate::fold::obligation::SubjectOverallState::Approved { .. }
-                | crate::fold::obligation::SubjectOverallState::Rejected { .. } =
-                    obligation.derive_subject_state(event.subject_root)
-                {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "subject has already been decided (approved/rejected); the \
-                                 decision is final (K-23)"
-                            .into(),
-                    });
-                }
-            }
             Precondition::EntityRegistered => {
                 // TS.1 §3 rows 2/6/7 ("entity exists"). Vacuous when the
                 // probe carries no `entity_id` — same convention as
@@ -965,7 +965,7 @@ pub fn check_preconditions(
                 // (below) so `placement.rs`'s R2 preview check can call the
                 // IDENTICAL logic instead of a hand-rolled duplicate — one
                 // chokepoint, reused, not two implementations to keep in sync.
-                let Some((from, to, kind)) = geometry_triple_for_event(event, control) else {
+                let Some((from, to, kind)) = geometry_triple_for_event(event) else {
                     // Vacuous when the probe carries no resolvable endpoints
                     // — same convention as `NoDuplicateActiveEdge`/
                     // `EntityRegistered` above.
@@ -1095,8 +1095,9 @@ pub enum ControlAdmission {
     /// never by admission.
     NotControl,
     /// Substitute the underlying holder and continue (K-8). Not filtered by
-    /// `reconciled_control_edges` — pierce-and-substitute is handled at the
-    /// `ubo.edge.pierce-nominee` op layer, before any strategy ever runs.
+    /// `reconciled_control_edges` — pierce-and-substitute is handled by the
+    /// `ubo.edge.pierce-nominee` macro composition (TS.6 P2), before any
+    /// strategy ever runs.
     Pierce,
 }
 

@@ -149,10 +149,11 @@ pub struct PierceRecord {
 
 // ── Strategy interface (K-4) ─────────────────────────────────────────────────
 
-/// The determination strategy selected by `ubo.determination.select-strategy`
-/// based on the subject's structure class (K-4).
+/// The determination strategy derived from the subject's structure class via
+/// `strategy_for_structure_class` (K-4; `select-strategy`/`compute-fold`
+/// retired TS.6 P2 — neither a separate assertion nor a separate verb).
 ///
-/// One strategy per structure class; composable: `compute-fold` calls
+/// One strategy per structure class; composable: `freeze` calls
 /// ownership prong + control prong + SMO-fallback in sequence and merges.
 pub trait DeterminationStrategy: Send + Sync {
     fn name(&self) -> &'static str;
@@ -776,11 +777,14 @@ impl DeterminationStrategy for FoundationCouncilStrategy {
 /// admission as `ControlProngStrategy` — voting rights, board appointment,
 /// GP statutory, LLP designated member, trust roles, dominant influence)
 /// for the RARE genuine natural-person controller. When no candidate
-/// crosses, the result is an empty Vec and the EXISTING
-/// `apply-smo-fallback` path (already stage-gated by `ReconciledProjection`
-/// + `StrategySelected`, matrix row 7) supplies the determination — that
-/// is, `state_owned_strategy` legitimizes the SMO route for this class
-/// rather than inventing a new resolution model; NO new SMO machinery.
+/// crosses, the result is an empty Vec and the SMO route supplies the
+/// determination — that is, `state_owned_strategy` legitimizes the SMO
+/// route for this class rather than inventing a new resolution model; NO
+/// new SMO machinery. (TS.6 §5, 2026-08-22: that route is now the
+/// AUTOMATIC pull-on-exhaustion, `pull_smo_on_exhaustion` — the manual
+/// `ubo.determination.apply-smo-fallback` verb this comment named is
+/// retired. The behaviour for this class is unchanged; the SMO population
+/// is pulled from `OfficerAppointment` edges rather than asserted.)
 /// Candidates it does emit are `Prong::ControlByOtherMeans`;
 /// `effective_ownership_pct` is always `None`; `threshold_pct` is accepted
 /// for signature parity but unused. BODS `UboType::StateOwned`
@@ -1067,9 +1071,11 @@ pub struct SmoPullRecord {
 /// walk actually exhausted at, not the subject blindly. Returns `None` if
 /// `prior_candidates` is non-empty (§4a: pull fires ONLY on exhaustion,
 /// never pushed — `officers_contribute_only_on_exhaustion`) or if no
-/// `OfficerAppointment` edge exists at the exhaustion frontier (the
-/// existing manual `apply-smo-fallback` / authorised-waiver route remains
-/// the K-5 escape hatch in that case).
+/// `OfficerAppointment` edge exists at the exhaustion frontier — in which
+/// case there is no escape hatch and K-5 refuses the freeze outright
+/// (TS.6 §5, 2026-08-22: the manual `ubo.determination.apply-smo-fallback`
+/// route this comment named as the fallback is retired; a determination
+/// with no candidates and no pull is silent, and K-5 forbids silence).
 ///
 /// **Frontier, independently derived:** re-walks `reconciled_control_edges`
 /// from `subject_entity_id` (the SAME admitted-edge set every control-axis
@@ -1438,7 +1444,7 @@ impl FrozenDetermination {
 
 // ── Intermediate determination (pre-freeze) ───────────────────────────────────
 
-/// Built by `compute-fold`; finalised by `freeze`.
+/// Built and finalised by `freeze` (`compute-fold` retired TS.6 P2).
 #[derive(Debug, Default, Clone)]
 pub struct DeterminationInProgress {
     pub strategy: Option<String>,
@@ -1578,26 +1584,13 @@ pub fn recover_determination_at(
         c.pierces = detect_pierces_in_chain(&control, &c.ownership_chain);
     }
 
-    // Find SMO from control state.
-    // smo_event_id is ALWAYS Some when smo_person_id is Some (set together in fold_control).
-    // Using expect() rather than a fallback here: a None would mean the fold is
-    // inconsistent, which must surface as a panic, not a silent random UUID (Q6, K-35).
-    let smo_result = match (control.smo_person_id, control.smo_event_id) {
-        (Some(pid), Some(orig_event_id)) => Some(SmoResult::Person(ProngCandidate {
-            person_id: pid,
-            prong: Prong::SmoFallback,
-            effective_ownership_pct: None,
-            ownership_chain: vec![],
-            originating_event_id: orig_event_id,
-            pivot: None,
-            pierces: Vec::new(),
-        })),
-        (None, _) => None,
-        (Some(_), None) => {
-            // Fold invariant violated: smo_person_id set without smo_event_id.
-            panic!("fold invariant violated: smo_person_id is Some but smo_event_id is None");
-        }
-    };
+    // SMO no longer arrives as a separate `smo_result`. `ControlState`'s
+    // `smo_person_id`/`smo_event_id` were removed in TS.6 §5 along with
+    // `ubo.determination.apply-smo-fallback`, their only writer; the two
+    // `match` arms that read them (and the `panic!` guarding their
+    // consistency) went with them. SMO now enters through
+    // `pull_smo_on_exhaustion` above, as `Prong::SmoFallback` candidates.
+    let smo_result: Option<SmoResult> = None;
 
     // Find the freeze event.
     let freeze_event = events
@@ -1605,11 +1598,19 @@ pub fn recover_determination_at(
         .rev()
         .find(|e| e.verb_fqn.as_str() == "ubo.determination.freeze")?;
 
+    // TS.6 P2: strategy is derived from `structure_class`, never asserted
+    // (`select-strategy` retired). `classify_event_id` — the event that
+    // determines the strategy now that no separate confirmation step exists
+    // — replaces the removed `strategy_event_id` as this preview's
+    // provenance pointer.
     let det = DeterminationInProgress {
-        strategy: control.selected_strategy.clone(),
+        strategy: control
+            .structure_class
+            .as_ref()
+            .map(|c| crate::fold::control::strategy_for_structure_class(c).to_string()),
         candidates,
         smo_result,
-        compute_event_id: control.strategy_event_id,
+        compute_event_id: control.classify_event_id,
         stops,
         smo_pull,
     };

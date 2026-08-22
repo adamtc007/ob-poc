@@ -7,15 +7,16 @@
 //! identical event slice, that's a correctness-of-record defect, not a
 //! cosmetic bug.
 //!
-//! O6 note: `determination.rs:798-801`'s `panic!("fold invariant violated:
-//! smo_person_id is Some but smo_event_id is None")` is reached through
-//! `recover_determination_at`, which this target calls on every generated
-//! sequence. `apply_one_control_event`'s `apply-smo-fallback` arm always
-//! sets both fields from the *same* event
-//! (`fold/control.rs:489-492`), so this panic should be structurally
-//! unreachable via any sequence `gen_events` can produce — that
-//! unreachability is exactly what O6 claims, and what this target spends
-//! its cycles trying to falsify rather than asserting by inspection alone.
+//! O6 note: the `panic!("fold invariant violated: smo_person_id is Some but
+//! smo_event_id is None")` this target used to hunt is GONE — TS.6 §5
+//! (2026-08-22) removed `ControlState::smo_person_id`/`smo_event_id` along
+//! with `ubo.determination.apply-smo-fallback`, their only writer, so the
+//! inconsistent state the panic guarded is now unrepresentable rather than
+//! merely unreachable. O6's claim is discharged structurally; this target
+//! keeps its remaining value as a determinism/no-panic sweep over
+//! `recover_determination_at`, which it still calls on every generated
+//! sequence.
+
 #![no_main]
 
 use std::collections::BTreeSet;
@@ -24,7 +25,7 @@ use std::sync::OnceLock;
 use libfuzzer_sys::fuzz_target;
 use ob_poc_kyc_substrate::{
     check_preconditions, fold_control, fold_obligations, fold_type_registry,
-    natural_persons_from_events, phase1_lexicon, recover_determination_at, Hash, LexiconManifest,
+    natural_persons_from_events, assembly_lexicon, recover_determination_at, Hash, LexiconManifest,
     OwnershipProngStrategy, RecoveryPin,
 };
 use ob_poc_kyc_substrate_fuzz::{gen_events, Tape};
@@ -32,7 +33,7 @@ use uuid::Uuid;
 
 fn lexicon() -> &'static LexiconManifest {
     static MANIFEST: OnceLock<LexiconManifest> = OnceLock::new();
-    MANIFEST.get_or_init(phase1_lexicon)
+    MANIFEST.get_or_init(assembly_lexicon)
 }
 
 fuzz_target!(|data: &[u8]| {
