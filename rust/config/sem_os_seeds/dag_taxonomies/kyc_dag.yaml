@@ -107,12 +107,10 @@ dsl_verb_reconciliation:
   kyc_surface:
     - kyc.case-status
     - kyc.list-missing-items
-    - kyc_ubo.assert.obligation.creation
-    - kyc_ubo.assert.obligation.satisfaction
     - kyc_ubo.assert.entity.identity
     - kyc_ubo.assert.entity.risk
     - kyc_ubo.assert.entity.screening
-    - kyc_ubo.assert.obligation.waiver
+    - kyc_ubo.decide.obligation.waiver
     - kyc_ubo.decide.subject.approve
     - kyc_ubo.decide.subject.reject
     - kyc_ubo.assert.subject.structure-class
@@ -212,7 +210,6 @@ stream_governed:
   verb_families:
     - kyc_ubo.assert.edge.*
     - kyc_ubo.assert.subject.*
-    - kyc_ubo.assert.obligation.*
     - kyc_ubo.assert.entity.*
     - kyc_ubo.decide.determination.*
   stream_tables:
