@@ -1249,53 +1249,11 @@ fn normalize_obligation_payload(args: &serde_json::Value) -> serde_json::Value {
 
 // ── W5: Obligation lifecycle ──────────────────────────────────────────────────
 
-pub struct KycObligationCreate;
-
-#[async_trait]
-impl SemOsVerbOp for KycObligationCreate {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.obligation.creation"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let obligation_id =
-            json_extract_uuid_opt(args, ctx, "obligation-id").unwrap_or_else(Uuid::new_v4);
-        let _role = json_extract_string(args, "role")?;
-        let mut payload = args.clone();
-        payload["obligation_id"] = serde_json::Value::String(obligation_id.to_string());
-        // The YAML arg is kebab-case `cbu-role`, but the fold reads snake_case
-        // `cbu_role` (fold::obligation::str_field(p, "cbu_role"), K-24 exposure
-        // linkage) — without this the fold silently left ObligationBasis.cbu_role
-        // at None. Same bug class as R3 / the smo-person-id fix above.
-        if let Some(obj) = payload.as_object_mut() {
-            if let Some(v) = obj.remove("cbu-role") {
-                obj.insert("cbu_role".to_string(), v);
-            }
-        }
-        // T6.4 row 11 finding: `validate_entry_fqn` was `None` — the
-        // SubjectRegistered precondition (the motivating cross-fold case
-        // for the T6.1 unified checker) was dead at the real write path.
-        let outcome = stream_append(
-            "kyc_ubo.assert.obligation.creation",
-            subject,
-            TargetBinding::for_subject(subject),
-            payload,
-            "analyst.obligation-create",
-            Some("kyc_ubo.assert.obligation.creation"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "obligation_id": obligation_id, "seq": outcome.seq }),
-        ))
-    }
-}
+// `KycObligationCreate`/`kyc_ubo.assert.obligation.creation` DISSOLVED
+// (EOP-DD-KYCUBO-D2.0 §5, K-G7, 2026-08-22): "nobody hands over an
+// obligation; you run the checks and they fail. The finding is the
+// record." See `ob-poc-kyc-substrate/src/fold/obligation.rs`'s retirement
+// comment for the full rationale and reintroduction path.
 
 pub struct KycObligationUpdateIdentity;
 
@@ -1408,80 +1366,14 @@ impl SemOsVerbOp for KycObligationUpdateRisk {
     }
 }
 
-pub struct KycObligationSatisfy;
-
-#[async_trait]
-impl SemOsVerbOp for KycObligationSatisfy {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.obligation.satisfaction"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        // T6.4 row 15 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists was dead at the real write path.
-        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
-        // (retired from the substrate — kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject no
-        // longer append to the fact stream, so the fold can't see it).
-        refuse_if_subject_already_decided(scope, subject, "kyc_ubo.assert.obligation.satisfaction").await?;
-        let outcome = stream_append(
-            "kyc_ubo.assert.obligation.satisfaction",
-            subject,
-            TargetBinding::for_subject(subject),
-            normalize_obligation_payload(args),
-            "analyst.obligation-satisfy",
-            Some("kyc_ubo.assert.obligation.satisfaction"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
-
-pub struct KycObligationWaive;
-
-#[async_trait]
-impl SemOsVerbOp for KycObligationWaive {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.obligation.waiver"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let _reason = json_extract_string(args, "reason")?;
-        // T6.4 row 16 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists was dead at the real write path.
-        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
-        // (retired from the substrate — kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject no
-        // longer append to the fact stream, so the fold can't see it).
-        refuse_if_subject_already_decided(scope, subject, "kyc_ubo.assert.obligation.waiver").await?;
-        let outcome = stream_append(
-            "kyc_ubo.assert.obligation.waiver",
-            subject,
-            TargetBinding::for_subject(subject),
-            normalize_obligation_payload(args),
-            "analyst.obligation-waive",
-            Some("kyc_ubo.assert.obligation.waiver"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
+// `KycObligationSatisfy`/`kyc_ubo.assert.obligation.satisfaction` DISSOLVED
+// (EOP-DD-KYCUBO-D2.0 §5, K-G7, 2026-08-22): "nothing is satisfied; you
+// assert the missing fact and re-run. The new run supersedes the old."
+//
+// `KycObligationWaive`/`kyc_ubo.assert.obligation.waiver` MOVED (D2.0 §5) to
+// `ob-poc-kyc-decide::DecideObligationWaive` as `kyc_ubo.decide.obligation.waiver`
+// — a human ruling that a failing check does not apply, citing the run, is
+// an Evaluation decision, never a fact-stream append.
 
 // `KycPersonApprove`/`KycPersonReject` retired from this file TS.6 P2
 // (K-G7) — renamed `kyc_ubo.decide.subject.approve`/`kyc_ubo.decide.subject.reject` and moved to

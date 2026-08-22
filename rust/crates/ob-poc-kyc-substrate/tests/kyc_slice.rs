@@ -19,11 +19,11 @@ use chrono::{TimeZone, Utc};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, fold_control, fold_control_versioned, fold_obligations,
+    check_control_preconditions, fold_control, fold_control_versioned,
     fold_obligations_versioned, freeze_determination, assembly_lexicon, reconciled_economic_edges,
     recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
     DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
-    IntentEvent, ObligationId, ObligationState, OwnershipProngStrategy, PersonId, Principal, Prong,
+    IntentEvent, ObligationState, OwnershipProngStrategy, PersonId, Principal, Prong,
     RecoveryPin, SubjectId, TargetBinding, TypeRegistryState, V1FoldImpl,
 };
 use std::sync::Arc;
@@ -1030,149 +1030,19 @@ fn ec6_every_candidate_has_originating_event_id() {
     }
 }
 
-// ── Exit criterion 7: Multi-role fold (K-21/22) ───────────────────────────────
+// ── Exit criterion 7: RETIRED (EOP-DD-KYCUBO-D2.0 §5, K-G7, 2026-08-22) ────
 //
-// "The same person as shareholder + director folds into one subject with
-// distinct basis-obligations" (K-21, K-22, gap-report Test 8).
-
-#[test]
-fn ec7_multi_role_person_one_subject_two_obligations() {
-    let subject = fixture_subject_id();
-    let h = dummy_hash();
-    let person = person_p1();
-    let person_subject = SubjectId(person.0); // person is its own KYC subject
-    let t = ts(2026, 1, 1);
-
-    let obl_shareholder =
-        ObligationId(Uuid::parse_str("50000000-0000-0000-0000-000000000001").unwrap());
-    let obl_director =
-        ObligationId(Uuid::parse_str("50000000-0000-0000-0000-000000000002").unwrap());
-
-    // P1 appears as shareholder (obligation 1) and director (obligation 2).
-    // Both obligations point to the SAME SubjectId (K-22: one identity record).
-    let events = [
-        // Register P1 as a subject.
-        te(
-            0,
-            subject,
-            "kyc_ubo.assert.subject.register",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding {
-                subject_root: Some(person_subject),
-                ..Default::default()
-            },
-            serde_json::json!({"entity_id": person.0, "is_natural_person": true, "role": "shareholder"}),
-            idem("reg-p1"),
-            t,
-        ),
-        // Obligation 1: shareholder basis.
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.obligation.creation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding {
-                subject_root: Some(person_subject),
-                ..Default::default()
-            },
-            serde_json::json!({
-                "subject_id": person_subject.0,
-                "obligation_id": obl_shareholder.0,
-                "role": "shareholder",
-                "basis": "30pct_economic_ownership",
-                "jurisdiction": "LU",
-            }),
-            idem("obl-shareholder"),
-            t,
-        ),
-        // Obligation 2: director basis.
-        te(
-            2,
-            subject,
-            "kyc_ubo.assert.obligation.creation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding {
-                subject_root: Some(person_subject),
-                ..Default::default()
-            },
-            serde_json::json!({
-                "subject_id": person_subject.0,
-                "obligation_id": obl_director.0,
-                "role": "director",
-                "basis": "board_role",
-                "jurisdiction": "LU",
-            }),
-            idem("obl-director"),
-            t,
-        ),
-    ];
-
-    let event_refs: Vec<&IntentEvent> = events.iter().collect();
-    let obl_state = fold_obligations(&event_refs);
-
-    // ONE subject for P1 (K-22: identity distinct from obligations).
-    assert_eq!(
-        obl_state.subjects.len(),
-        1,
-        "one subject entry expected; got {}",
-        obl_state.subjects.len(),
-    );
-    let rollup = obl_state
-        .subjects
-        .get(&person_subject)
-        .expect("person_subject must have a rollup");
-
-    // TWO distinct obligations on that subject (K-21: each has its own basis).
-    assert_eq!(
-        rollup.obligations.len(),
-        2,
-        "two obligations expected; got {}",
-        rollup.obligations.len(),
-    );
-
-    let obl1 = obl_state
-        .obligations
-        .get(&obl_shareholder)
-        .expect("shareholder obligation must exist");
-    let obl2 = obl_state
-        .obligations
-        .get(&obl_director)
-        .expect("director obligation must exist");
-
-    // Distinct bases (K-21).
-    assert_ne!(
-        obl1.basis.role, obl2.basis.role,
-        "obligations must have distinct bases"
-    );
-    assert_eq!(obl1.basis.role, "shareholder");
-    assert_eq!(obl2.basis.role, "director");
-
-    // Both obligations must have originating_event_id (K-35).
-    assert_ne!(
-        obl1.originating_event_id.0,
-        EventId::default().0,
-        "shareholder obligation missing originating_event_id",
-    );
-    assert_ne!(
-        obl2.originating_event_id.0,
-        EventId::default().0,
-        "director obligation missing originating_event_id",
-    );
-
-    // Fold: neither obligation is terminal → overall state is InProgress (Q4).
-    let overall = obl_state.derive_subject_state(person_subject);
-    assert_eq!(
-        overall,
-        ob_poc_kyc_substrate::SubjectOverallState::InProgress,
-        "both obligations pending → overall must be InProgress (Q4)",
-    );
-}
+// `ec7_multi_role_person_one_subject_two_obligations` proved "the same
+// person as shareholder + director folds into one subject with distinct
+// basis-obligations" (K-21, K-22, gap-report Test 8) by appending two
+// `kyc_ubo.assert.obligation.creation` events. `creation` — the only writer
+// of a new `ObligationTracks` entry — is dissolved: the events now fall to
+// the fold's catch-all, `obl_state.subjects` stays empty, and every
+// assertion in this test would fail against the current (correct) fold.
+// K-21/K-22 are not retired as principles — a run's findings will need the
+// same "one identity, many distinct bases" shape once the check catalogue
+// (D2.0 §7 Q2, out of scope here) exists — but there is no obligation-fold
+// mechanism left to prove them against today.
 
 // ── K-13: Supersede-never-delete ─────────────────────────────────────────────
 

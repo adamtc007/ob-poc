@@ -446,13 +446,12 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::KycSubjectRecordEnquiry));
     // W3: role-basis recording — KycRoleAssign/KycRoleWithdraw retired
     // 2026-08-12 (T0.3 K-G7 fold-blind write; see kyc_stream_ops.rs).
-    // W5: obligation lifecycle
-    registry.register(Arc::new(kyc_stream_ops::KycObligationCreate));
+    // W5: obligation lifecycle. KycObligationCreate/Satisfy DISSOLVED,
+    // KycObligationWaive MOVED to ob-poc-kyc-decide (D2.0 §5, K-G7,
+    // 2026-08-22) — see kyc_stream_ops.rs's retirement comment.
     registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateIdentity));
     registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateScreening));
     registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateRisk));
-    registry.register(Arc::new(kyc_stream_ops::KycObligationSatisfy));
-    registry.register(Arc::new(kyc_stream_ops::KycObligationWaive));
     // KycPersonApprove/KycPersonReject retired from this file TS.6 P2 (K-G7)
     // — renamed kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject and moved to ob-poc-kyc-decide
     // (structural Evaluation-pack split: that crate has no dependency on

@@ -164,8 +164,9 @@ impl PgKycEventStore {
         // stranded the whole pre-bump backlog behind a head-of-line poison
         // pill. Folding on demand uses current rules over immutable events and
         // never asks what version a queued row was written under.
-        // `PgKycProjector`/`PgKycObligationProjector` (K-34, fold-whole-stream
-        // + full-replace) are unchanged and are now called directly.
+        // `PgKycProjector` (K-34, fold-whole-stream + full-replace) is
+        // unchanged and is now called directly. Its obligation counterpart
+        // was removed D2.0 §5, 2026-08-22 (see `projection.rs`).
 
         Ok(AppendOutcome {
             seq: next_seq as u64,

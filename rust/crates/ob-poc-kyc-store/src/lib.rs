@@ -28,9 +28,7 @@ pub use manifest::{publish_assembly_manifest, publish_evaluation_manifest, Manif
 // No drainers, no effect-kind constants: the projection queue was removed
 // 2026-08-22 (see `projection.rs`'s module doc). The projectors are called
 // directly, on demand.
-pub use projection::{
-    ObligationProjectionStats, PgKycObligationProjector, PgKycProjector, ProjectionStats,
-};
+pub use projection::{PgKycProjector, ProjectionStats};
 pub use store::{AppendOutcome, PgKycEventStore};
 // TS.6 §1: read-side surface now lives in the append-free `ob-poc-kyc-read`
 // crate; re-exported so existing consumers are unchanged.

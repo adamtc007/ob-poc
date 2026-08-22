@@ -126,16 +126,16 @@ async fn w2_manifest_publishing() {
 
     // ── Assembly pack ────────────────────────────────────────────────────
     let assembly = assembly_lexicon();
-    // Universe pin: 19 `assembly_lexicon()` entries (TS.6 P1/P2 — 22 minus
-    // kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject, moved to evaluation_lexicon(); minus
-    // ubo.determination.apply-smo-fallback, retired TS.6 §5). This
+    // Universe pin: 16 `assembly_lexicon()` entries (19 post-TS.6-P1, minus
+    // `creation`/`satisfaction` DISSOLVED and `waiver` MOVED to
+    // evaluation_lexicon(), D2.0 §5, 2026-08-22). This
     // counts `LexiconEntry::build()` calls in lexicon.rs — NOT the same
-    // number as `declared_verb_universe()` (22, YAML-scanned across BOTH
+    // number as `declared_verb_universe()` (19, YAML-scanned across BOTH
     // packs, `kyc_pack_closure.rs`): lexicon coverage of the declared verb
     // set is intentionally partial (K-G6), so the two counts are expected
     // to differ, not drift-checked against each other. Bump consciously
     // alongside `kyc_pack_closure.rs`'s own lexicon-entry-count assertion.
-    assert_eq!(assembly.entries.len(), 19, "assembly_lexicon universe (see kyc_pack_closure)");
+    assert_eq!(assembly.entries.len(), 16, "assembly_lexicon universe (see kyc_pack_closure)");
     clear_prior_state(&pool, &assembly).await;
     assert_publish_roundtrip(&pool, &assembly, |mut conn| async move {
         publish_assembly_manifest(&mut conn, Some("w2-test")).await.unwrap()
@@ -144,11 +144,10 @@ async fn w2_manifest_publishing() {
 
     // ── Evaluation pack ──────────────────────────────────────────────────
     let evaluation = evaluation_lexicon();
-    // Universe pin: 2 `evaluation_lexicon()` entries (kyc_ubo.decide.subject.approve,
-    // kyc_ubo.decide.subject.reject — TS.6 P1/P2). decide.waive is NOT here yet — see
-    // `assembly_lexicon()`'s own note on why `kyc_ubo.assert.obligation.waiver` stays
-    // in Assembly pending obligation dissolution (D2.0).
-    assert_eq!(evaluation.entries.len(), 2, "evaluation_lexicon universe (see kyc_pack_closure)");
+    // Universe pin: 3 `evaluation_lexicon()` entries (kyc_ubo.decide.subject.approve,
+    // kyc_ubo.decide.subject.reject — TS.6 P1/P2 — plus kyc_ubo.decide.obligation.waiver,
+    // moved here from assembly_lexicon() D2.0 §5, 2026-08-22).
+    assert_eq!(evaluation.entries.len(), 3, "evaluation_lexicon universe (see kyc_pack_closure)");
     clear_prior_state(&pool, &evaluation).await;
     assert_publish_roundtrip(&pool, &evaluation, |mut conn| async move {
         publish_evaluation_manifest(&mut conn, Some("w2-test")).await.unwrap()

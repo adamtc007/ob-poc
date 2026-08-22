@@ -242,44 +242,28 @@ pub(crate) fn apply_one_obligation_event(
             }
         }
 
-        "kyc_ubo.assert.obligation.creation" => {
-            let Some(sid) = subject_id_from_event(event) else {
-                return state;
-            };
-            let Some(oid) = obligation_id_from_payload(p) else {
-                return state;
-            };
-
-            let basis = ObligationBasis {
-                role: str_field(p, "role").unwrap_or_else(|| "unknown".into()),
-                jurisdiction: str_field(p, "jurisdiction"),
-                cbu_role: str_field(p, "cbu_role"),
-                source_event_id: event.id,
-            };
-
-            state.obligations.insert(
-                oid,
-                ObligationTracks {
-                    obligation_id: oid,
-                    basis,
-                    identity: TrackState::Pending,
-                    screening: TrackState::Pending,
-                    risk: TrackState::Pending,
-                    originating_event_id: event.id,
-                },
-            );
-
-            state
-                .subjects
-                .entry(sid)
-                .or_insert_with(|| SubjectRollup {
-                    subject_id: sid,
-                    obligations: vec![],
-                })
-                .obligations
-                .push(oid);
-        }
-
+        // `kyc_ubo.assert.obligation.creation`/`.satisfaction`/`.waiver`
+        // dissolved D2.0 §5 (2026-08-22, K-G7): a run's findings ARE the
+        // record now — nobody hands over an obligation, nobody satisfies
+        // one, and a human waiving a failing check is now an Evaluation
+        // decision (`kyc_ubo.decide.obligation.waiver`) citing a run, never
+        // a fact-stream append. Falls to the catch-all below, same as any
+        // other retired FQN (`kyc.person.approve`/`.reject`, above).
+        // Reintroduction path, if ever needed: a NEW verb, in Assembly,
+        // with an explicit precondition attached from birth — never a bare
+        // fold-blind write again (same discipline as `kyc.role.assign`'s
+        // retirement comment, T0.3 K-G7).
+        //
+        // Consequence, disclosed not fixed this tranche (D2.0 P0 recon):
+        // `creation` was the ONLY writer of a new `ObligationTracks` entry.
+        // `Precondition::ObligationExists` still gates the three PERMANENT
+        // Assembly verbs `kyc_ubo.assert.entity.{identity,screening,risk}`
+        // (TS.6 §3) — with no path left to satisfy it, those three verbs are
+        // now permanently refused at append time. Redesigning their payload
+        // contract is out of this tranche's scope (D2.0 §5 names only the
+        // three obligation verbs); recorded in the state-of-play as an open
+        // finding, same precedent as TS.6 §5a leaving freeze's dead
+        // `EmitSpec` question open rather than silently expanding scope.
         "kyc_ubo.decide.determination.freeze" => {}
 
         "kyc_ubo.assert.entity.identity" => {
@@ -300,30 +284,6 @@ pub(crate) fn apply_one_obligation_event(
             if let Some(oid) = obligation_id_from_payload(p) {
                 if let Some(tracks) = state.obligations.get_mut(&oid) {
                     tracks.risk = track_state_from_event(event.id, p);
-                }
-            }
-        }
-
-        "kyc_ubo.assert.obligation.satisfaction" => {
-            if let Some(oid) = obligation_id_from_payload(p) {
-                if let Some(tracks) = state.obligations.get_mut(&oid) {
-                    tracks.identity = TrackState::Satisfied { by_event: event.id };
-                    tracks.screening = TrackState::Satisfied { by_event: event.id };
-                    tracks.risk = TrackState::Satisfied { by_event: event.id };
-                }
-            }
-        }
-        "kyc_ubo.assert.obligation.waiver" => {
-            let reason = str_field(p, "reason").unwrap_or_default();
-            if let Some(oid) = obligation_id_from_payload(p) {
-                if let Some(tracks) = state.obligations.get_mut(&oid) {
-                    let s = TrackState::Waived {
-                        by_event: event.id,
-                        reason,
-                    };
-                    tracks.identity = s.clone();
-                    tracks.screening = s.clone();
-                    tracks.risk = s;
                 }
             }
         }

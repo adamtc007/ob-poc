@@ -286,7 +286,7 @@ impl LexiconManifest {
 /// capability" — this pack builds the board of truth, writes only the fact
 /// stream, and has no write path to any decision record).
 ///
-/// 20 dsl.kyc verbs today (25 originally covered; `select-strategy`,
+/// 16 dsl.kyc verbs today (25 originally covered; `select-strategy`,
 /// `compute-fold`, and `pierce-nominee`'s own entries all retired TS.6 P2,
 /// K-G7 — piercing's precondition pair now reaches the stream via
 /// `assert-control`'s and `supersede`'s own entries, unchanged, composed by
@@ -294,10 +294,11 @@ impl LexiconManifest {
 /// retired from this manifest TS.6 P2 and moved to `evaluation_lexicon()` —
 /// see the note where they used to live, above): Phase-1/2 determination
 /// verbs, preconditions from birth per the K-G7 reintroduction discipline,
-/// plus 6 of the original 8 W5 obligation/person verbs (T6.0 closure,
-/// 2026-08-12 — `kyc_ubo.assert.obligation.waiver` stays here too, deferred per its own
-/// TS.6 note, pending obligation dissolution D2.0) plus 4 D1 type-registry
-/// moves (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8 — assert-type,
+/// plus 3 of the original 8 W5 obligation/person verbs still standing here
+/// (`kyc_ubo.assert.entity.{identity,screening,risk}` — TS.6 §3 keeps these
+/// PERMANENT Assembly facts; `creation`/`satisfaction` DISSOLVED and
+/// `waiver` MOVED to `evaluation_lexicon()`, D2.0 §5, 2026-08-22) plus 4 D1
+/// type-registry moves (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8 — assert-type,
 /// withdraw-member, correct-type, record-enquiry). This is the normative
 /// lexicon for the vertical slice (V&S Appendix A, phases 1–2) plus the W5
 /// obligation lifecycle plus the D1 type-registry axis.
@@ -494,17 +495,13 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // for all 8 — the Subject→role→obligation→evidence→decision chain
         // (§7.3) this taxonomy names explicitly includes the decision step,
         // which is what `person.approve`/`person.reject` are.
-        LexiconEntry::build(
-            "kyc_ubo.assert.obligation.creation",
-            "Create an obligation for a subject under a stated role basis (K-21, K-35)",
-            Taxonomy::Obligation,
-            smallvec![FoldId::ObligationGraph],
-            // T6.4 row 11 (⊗ cross-fold, the motivating case for the T6.1
-            // unified checker): subject must be registered.
-            vec![Precondition::SubjectRegistered],
-            AuthoritySpec::analyst(),
-            vec![],
-        ),
+        // D2.0 §5 (K-G7, RATIFIED 2026-08-22): `kyc_ubo.assert.obligation.creation`
+        // LexiconEntry DISSOLVED. "Nobody hands over an obligation; you run
+        // the checks and they fail. The finding is the record." Its
+        // precondition (SubjectRegistered) carried no independent
+        // information a check couldn't re-derive from the board directly.
+        // Reintroduction path: a new verb, in Assembly, with a precondition
+        // attached from birth — never bare again (K-G7 discipline).
         LexiconEntry::build(
             "kyc_ubo.assert.entity.identity",
             "Advance the identity verification track of an obligation",
@@ -539,34 +536,21 @@ pub fn assembly_lexicon() -> LexiconManifest {
             AuthoritySpec::analyst(),
             vec![],
         ),
-        LexiconEntry::build(
-            "kyc_ubo.assert.obligation.satisfaction",
-            "Mark all tracks on an obligation as satisfied (full KYC clearance)",
-            Taxonomy::Obligation,
-            smallvec![FoldId::ObligationGraph],
-            // T6.4 row 15 (⊗): same stud as row 12, reused.
-            vec![Precondition::ObligationExists],
-            AuthoritySpec::senior_analyst(),
-            vec![],
-        ),
-        LexiconEntry::build(
-            "kyc_ubo.assert.obligation.waiver",
-            "Waive an obligation (all tracks set to Waived with a recorded reason). \
-             TS.6 §4 names this the future `decide.waive` — deferred: waive still \
-             mutates live obligation-track fold state (`TrackState::Waived`, feeding \
-             `derive_subject_state`'s AllTerminal computation), so it cannot leave \
-             the fact stream until obligation dissolution (D2.0, unbuilt) removes \
-             the track model it writes to. Moving it now would silently break \
-             terminal-state derivation for any subject relying on a waiver.",
-            Taxonomy::Obligation,
-            smallvec![FoldId::ObligationGraph],
-            // T6.4 row 16 (⊗): same stud as row 12, reused. Waive's extra
-            // sensitivity is an AUTHORITY question (AuthoritySpec), a
-            // separate ruling — not a stud, per the ratified matrix.
-            vec![Precondition::ObligationExists],
-            AuthoritySpec::senior_analyst(),
-            vec![],
-        ),
+        // D2.0 §5 (K-G7, RATIFIED 2026-08-22): `kyc_ubo.assert.obligation.satisfaction`
+        // LexiconEntry DISSOLVED. "Nothing is satisfied; you assert the
+        // missing fact and re-run. The new run supersedes the old."
+        // Reintroduction path: none named — the run book replaces this
+        // capability entirely, not a future verb.
+        //
+        // `kyc_ubo.assert.obligation.waiver` LexiconEntry DISSOLVED here too
+        // (D2.0 §5) and MOVED to `evaluation_lexicon()` below as
+        // `kyc_ubo.decide.obligation.waiver` — the deferral this entry used
+        // to name ("cannot leave the fact stream until obligation
+        // dissolution removes the track model it writes to") is now
+        // resolved: obligation-track state (`TrackState::Waived` via this
+        // FQN specifically) no longer exists to protect. The one genuine
+        // act among the six obligation verbs: a human rules that a failing
+        // check does not apply, with reason and authority, citing the run.
         // `kyc.person.approve`/`kyc.person.reject` retired from this
         // manifest TS.6 P2 (K-G7) — renamed `kyc_ubo.decide.subject.approve`/`kyc_ubo.decide.subject.reject`
         // and moved to `evaluation_lexicon()` (`ob-poc-kyc-decide`, no
@@ -626,24 +610,23 @@ pub fn assembly_lexicon() -> LexiconManifest {
 
 /// Build the canonical Evaluation-pack `LexiconManifest` (TS.6 §1/§4).
 ///
-/// 2 verbs today: `kyc_ubo.decide.subject.approve`, `kyc_ubo.decide.subject.reject` (renamed from
+/// 3 verbs today: `kyc_ubo.decide.subject.approve`, `kyc_ubo.decide.subject.reject` (renamed from
 /// `kyc.person.approve`/`.reject`, TS.6 P2, landed with the structural
 /// crate split — `ob-poc-kyc-decide` has no dependency on
 /// `ob-poc-kyc-seam`, so this pack has no write path to the fact stream by
-/// construction). `decide.waive` (renamed from `kyc_ubo.assert.obligation.waiver`)
-/// stays in `assembly_lexicon()` for now — see that entry's own note; it is
-/// a live Assembly-fold mutation until obligation dissolution (D2.0)
-/// removes the obligation-track model, not yet a pure verdict.
+/// construction), and `kyc_ubo.decide.obligation.waiver` (moved here from
+/// `assembly_lexicon()`, D2.0 §5, 2026-08-22 — the obligation dissolution
+/// that entry's own former note was waiting on has now landed).
 ///
-/// Both entries declare `writes: []` and `preconditions: []` — deliberately.
-/// Neither writes to any substrate fold (they write to `kyc_decision_records`
-/// instead, entirely outside the pure in-memory `ControlState`/
-/// `ObligationState` model this manifest's checker enforces), and their
-/// real gating (K-23 `SubjectAllTerminal` for approve; the finality check
-/// for both) is a hand-rolled op-layer check against `kyc_decision_records`
-/// and the (read-only) obligation fold — the substrate's pure
-/// `check_control_preconditions` checker has no DB access and cannot
-/// express either check as a `Precondition` variant.
+/// All three entries declare `writes: []` and `preconditions: []` —
+/// deliberately. None writes to any substrate fold (they write to
+/// `kyc_decision_records` instead, entirely outside the pure in-memory
+/// `ControlState`/`ObligationState` model this manifest's checker
+/// enforces), and their real gating (K-23 `SubjectAllTerminal` for approve;
+/// the finality check for all three; a run citation for the verdict, D2.0
+/// §5) is a hand-rolled op-layer check against `kyc_decision_records` —
+/// the substrate's pure `check_control_preconditions` checker has no DB
+/// access and cannot express any of these as a `Precondition` variant.
 pub fn evaluation_lexicon() -> LexiconManifest {
     use smallvec::smallvec;
     let entries = vec![
@@ -663,6 +646,18 @@ pub fn evaluation_lexicon() -> LexiconManifest {
             "Reject a subject (K-23 — decision recorded in kyc_decision_records, \
              never the fact stream, never erased). Rejection deliberately allowed \
              at ANY stage (early rejection is a real compliance outcome).",
+            Taxonomy::Obligation,
+            smallvec![],
+            vec![],
+            AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc_ubo.decide.obligation.waiver",
+            "A human rules that a failing check does not apply, with reason and \
+             authority, citing the run (D2.0 §5, moved from \
+             `kyc_ubo.assert.obligation.waiver` 2026-08-22). Writes only to \
+             kyc_decision_records — never the fact stream.",
             Taxonomy::Obligation,
             smallvec![],
             vec![],

@@ -24,12 +24,20 @@
 //! `"ob-poc".kyc_decision_records` directly for a prior terminal decision on
 //! the subject before writing a new one.
 //!
-//! `kyc_ubo.assert.obligation.waiver` stays a fact-stream verb (`ob-poc-kyc-substrate`'s
-//! `assembly_lexicon()`, unrenamed) for now — see that entry's own doc
-//! comment. It still mutates live obligation-track fold state
-//! (`TrackState::Waived`), so it cannot leave the fact stream until
-//! obligation dissolution (D2.0, unbuilt) removes the track model it writes
-//! to.
+//! `kyc_ubo.decide.obligation.waiver` (D2.0 §5, moved here 2026-08-22 from
+//! `kyc_ubo.assert.obligation.waiver`, which dissolved alongside `creation`/
+//! `satisfaction`) lives in this crate too: a human rules that a failing
+//! check does not apply, with reason and authority, citing the run — never
+//! a fact-stream append.
+//!
+//! **D2.0 §5 basis correction:** `basis_json` used to cite an obligation-fold
+//! snapshot — no longer meaningful once `creation` (the only writer of a new
+//! `ObligationTracks` entry) is dissolved. A verdict now cites the
+//! `EvaluationRun` it relied on (§4/§6 `decide_cites_a_run`) — computed
+//! against `evaluation_lexicon`'s check catalogue (empty today; the
+//! catalogue's contents are D2.0 §7 Q2, explicitly out of scope here) and
+//! persisted to `"ob-poc".kyc_evaluation_runs` before the decision record
+//! that cites it is written.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -41,7 +49,11 @@ use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_postgres::ops::SemOsVerbOp;
 
 use ob_poc_kyc_read::PgKycEventReader;
-use ob_poc_kyc_substrate::{fold_obligations_versioned, FoldRegistry, SubjectId, SubjectOverallState, V1FoldImpl};
+use ob_poc_kyc_substrate::{
+    board_state_hash, fold_control, fold_obligations_versioned, fold_type_registry,
+    in_scope_check_ids, ApplicabilityCondition, BoardSnapshot, Check, EvaluationRun, FoldRegistry,
+    Hash, RunPins, SubjectId, V1FoldImpl,
+};
 
 // ── JSON arg extraction (local — `super::helpers` in `ob-poc` is
 // crate-private and this crate must not depend on the `ob-poc` binary
@@ -83,43 +95,126 @@ fn v1_registry() -> FoldRegistry {
     registry
 }
 
-/// Fold the obligation graph for `subject` from the live fact stream
-/// (a read, not a write — permitted under TS.6 §2's boundary: "Evaluation
-/// reads... its determination").
-async fn fold_obligations_for(
+/// Load the board (control + type registry + obligation state) for
+/// `subject` from the live fact stream — a read, not a write (permitted
+/// under TS.6 §2's boundary: "Evaluation reads... its determination").
+async fn load_board_state(
     scope: &mut dyn TransactionScope,
     subject: SubjectId,
-) -> Result<ob_poc_kyc_substrate::ObligationState> {
+) -> Result<(
+    ob_poc_kyc_substrate::ControlState,
+    ob_poc_kyc_substrate::TypeRegistryState,
+    ob_poc_kyc_substrate::ObligationState,
+)> {
     let events = PgKycEventReader::load_events(scope.executor(), subject)
         .await
         .map_err(|e| anyhow!("decide: load events failed: {e}"))?;
     let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-    fold_obligations_versioned(&refs, &v1_registry())
-        .map_err(|e| anyhow!("decide: obligation fold failed: {e}"))
+    let control = fold_control(&refs);
+    let type_registry = fold_type_registry(&refs);
+    let obligations = fold_obligations_versioned(&refs, &v1_registry())
+        .map_err(|e| anyhow!("decide: obligation fold failed: {e}"))?;
+    Ok((control, type_registry, obligations))
 }
 
-/// Build the `basis` JSON recorded on every decision record
-/// (`decide_verbs_cite_their_basis`, TS.6 §8) — the obligation-fold snapshot
-/// that informed the decision. Never empty: always names the overall state
-/// and every obligation folded, even when the subject has none yet.
-fn basis_json(
-    obligations: &ob_poc_kyc_substrate::ObligationState,
+/// No real checks exist yet — the check catalogue's contents are D2.0 §7
+/// Q2, explicitly out of scope for this tranche. This marker fixes the
+/// generic `Check` type parameter so the (real) in-scope-computation and
+/// run-construction machinery runs today, against an empty catalogue,
+/// rather than being left unwired until a catalogue exists.
+struct NoChecksYet;
+impl Check for NoChecksYet {
+    fn check_id(&self) -> &str {
+        unreachable!("NoChecksYet is never constructed — it only fixes the Check type parameter")
+    }
+    fn applicability(&self) -> &[ApplicabilityCondition] {
+        &[]
+    }
+}
+
+/// D2.0 §6 `checks_run_at_any_board_state`: compute and persist a fresh
+/// `EvaluationRun` for `subject`, against today's (empty) check catalogue.
+/// The founding property holds regardless of catalogue size — a run over
+/// ANY board state produces a run, with verdicts (here, trivially none),
+/// and no error.
+async fn compute_and_persist_run(
+    scope: &mut dyn TransactionScope,
     subject: SubjectId,
-) -> serde_json::Value {
-    let overall = obligations.derive_subject_state(subject);
-    let overall_name = match overall {
-        SubjectOverallState::AllTerminal => "AllTerminal",
-        SubjectOverallState::InProgress => "InProgress",
+    control: &ob_poc_kyc_substrate::ControlState,
+    type_registry: &ob_poc_kyc_substrate::TypeRegistryState,
+    trigger: &str,
+) -> Result<EvaluationRun> {
+    let board = BoardSnapshot { control, type_registry, determination: None };
+    let in_scope = in_scope_check_ids::<NoChecksYet>(&[], &board);
+    let now = chrono::Utc::now();
+    let pins = RunPins {
+        subject_root: subject,
+        board_state_hash: board_state_hash(&board),
+        evaluation_pack_version_hash: Hash::of_json(
+            &serde_json::json!({ "evaluation_lexicon_hash": ob_poc_kyc_substrate::evaluation_lexicon().hash.to_hex() }),
+        ),
+        valid_time: now,
+        knowledge_time: now,
+        trigger: trigger.to_string(),
+        in_scope_check_ids: in_scope,
     };
-    let obligation_ids: Vec<String> = obligations
-        .subjects
-        .get(&subject)
-        .map(|rollup| rollup.obligations.iter().map(|oid| oid.0.to_string()).collect())
-        .unwrap_or_default();
+    let run = EvaluationRun::new(Uuid::new_v4(), pins, vec![])
+        .map_err(|e| anyhow!("decide: run construction refused: {e}"))?;
+    persist_run(scope, &run).await?;
+    Ok(run)
+}
+
+async fn persist_run(scope: &mut dyn TransactionScope, run: &EvaluationRun) -> Result<()> {
+    sqlx::query(
+        r#"INSERT INTO "ob-poc".kyc_evaluation_runs
+           (run_id, subject_root, board_state_hash, evaluation_pack_version_hash,
+            valid_time, knowledge_time, trigger, in_scope_check_ids, findings)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+    )
+    .bind(run.run_id)
+    .bind(run.subject_root.0)
+    .bind(run.board_state_hash.to_hex())
+    .bind(run.evaluation_pack_version_hash.to_hex())
+    .bind(run.valid_time)
+    .bind(run.knowledge_time)
+    .bind(&run.trigger)
+    .bind(serde_json::to_value(&run.in_scope_check_ids).unwrap_or_default())
+    // `Finding` carries no `Serialize` today — every run's catalogue is
+    // empty (D2.0 §7 Q2 out of scope), so findings are always `[]`. Wiring
+    // real findings here is future work gated on a real check catalogue.
+    .bind(serde_json::json!([]))
+    .execute(scope.executor())
+    .await
+    .map_err(|e| anyhow!("decide: persist run failed: {e}"))?;
+    Ok(())
+}
+
+/// Build the `basis` JSON recorded on every decision record — cites the
+/// `EvaluationRun` the decision relied on (D2.0 §5 correction; replaces the
+/// obligation-fold snapshot, which stopped being meaningful once
+/// `kyc_ubo.assert.obligation.creation` — the only writer of a new
+/// `ObligationTracks` entry — dissolved, D2.0 §5).
+fn basis_json(run: &EvaluationRun) -> serde_json::Value {
     serde_json::json!({
-        "overall_state": overall_name,
-        "obligation_ids": obligation_ids,
+        "run_id": run.run_id,
+        "board_state_hash": run.board_state_hash.to_hex(),
+        "in_scope_check_ids": run.in_scope_check_ids,
     })
+}
+
+/// D2.0 §6 `decide_cites_a_run` — FALSIFIABLE: refuses to insert a decision
+/// record whose basis carries no `run_id`, rather than relying on a NOT
+/// NULL column no code path can ever violate (the defect the prior
+/// `decide_verbs_cite_their_basis` gate had — it tested an obligation-fold
+/// snapshot that was, in practice, always non-empty).
+fn assert_basis_cites_run(basis: &serde_json::Value) -> Result<()> {
+    match basis.get("run_id") {
+        Some(v) if !v.is_null() => Ok(()),
+        _ => Err(anyhow!(
+            "decide: basis does not cite a run — refusing to record an uncited verdict \
+             (decide_cites_a_run)"
+        )),
+    }
 }
 
 /// K-23 "decision is final" — query `kyc_decision_records` directly rather
@@ -158,6 +253,7 @@ async fn insert_decision_record(
     reason: Option<&str>,
     raw_args: &serde_json::Value,
 ) -> Result<Uuid> {
+    assert_basis_cites_run(&basis)?;
     let row = sqlx::query(
         r#"INSERT INTO "ob-poc".kyc_decision_records
            (subject_root, verb_fqn, decided_by, basis, reason, raw_args)
@@ -194,20 +290,34 @@ impl SemOsVerbOp for DecideApprove {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
 
-        let obligations = fold_obligations_for(scope, subject).await?;
-        // K-23 gate: all required obligation tracks terminal.
-        if obligations.derive_subject_state(subject) != SubjectOverallState::AllTerminal {
+        let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
+        let run = compute_and_persist_run(
+            scope,
+            subject,
+            &control,
+            &type_registry,
+            "kyc_ubo.decide.subject.approve",
+        )
+        .await?;
+
+        // K-23 gate: nothing in the run's work list (D2.0 §5 correction —
+        // replaces the dissolved obligation-fold `AllTerminal` check).
+        // Trivially satisfied today (the check catalogue is empty, D2.0 §7
+        // Q2 out of scope) — wired for real the moment a check exists.
+        if !run.work_list().is_empty() {
             return Err(anyhow!(
-                "kyc_ubo.decide.subject.approve rejected: subject {} obligations are not all terminal — \
-                 K-23 gate (determination and approval are separate; approval requires \
-                 every required obligation to reach a terminal state)",
+                "kyc_ubo.decide.subject.approve rejected: subject {} has {} failing/unevaluable \
+                 finding(s) in run {} — K-23 gate (determination and approval are separate; \
+                 approval requires the latest run's work list to be empty)",
                 subject.0,
+                run.work_list().len(),
+                run.run_id,
             ));
         }
 
         refuse_if_already_decided(scope, subject).await?;
 
-        let basis = basis_json(&obligations, subject);
+        let basis = basis_json(&run);
         let decided_by = ctx.principal.actor_id.clone();
         let decision_id = insert_decision_record(
             scope,
@@ -246,11 +356,19 @@ impl SemOsVerbOp for DecideReject {
 
         refuse_if_already_decided(scope, subject).await?;
 
-        // Rejection is deliberately allowed at ANY stage of the obligation
-        // graph (early rejection is a real compliance outcome) — the fold
-        // here is for the basis snapshot only, never a gate.
-        let obligations = fold_obligations_for(scope, subject).await?;
-        let basis = basis_json(&obligations, subject);
+        // Rejection is deliberately allowed at ANY stage (early rejection is
+        // a real compliance outcome) — the run here is for the basis
+        // citation only, never a gate.
+        let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
+        let run = compute_and_persist_run(
+            scope,
+            subject,
+            &control,
+            &type_registry,
+            "kyc_ubo.decide.subject.reject",
+        )
+        .await?;
+        let basis = basis_json(&run);
         let reason = json_extract_string_opt(args, "reason");
         let decided_by = ctx.principal.actor_id.clone();
         let decision_id = insert_decision_record(
@@ -270,8 +388,74 @@ impl SemOsVerbOp for DecideReject {
     }
 }
 
+// ── kyc_ubo.decide.obligation.waiver ────────────────────────────────────────
+
+/// D2.0 §5: moved here from `kyc_ubo.assert.obligation.waiver` (dissolved
+/// alongside `creation`/`satisfaction`). The one genuine act among the six
+/// former obligation verbs: a human rules that a failing check does not
+/// apply, with reason and authority, citing the run — never a fact-stream
+/// append.
+pub struct DecideObligationWaive;
+
+#[async_trait]
+impl SemOsVerbOp for DecideObligationWaive {
+    fn fqn(&self) -> &str {
+        "kyc_ubo.decide.obligation.waiver"
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let check_id = args
+            .get("check-id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing check-id argument"))?
+            .to_string();
+        let reason = args
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing reason argument"))?;
+
+        let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
+        let run = compute_and_persist_run(
+            scope,
+            subject,
+            &control,
+            &type_registry,
+            "kyc_ubo.decide.obligation.waiver",
+        )
+        .await?;
+
+        let basis = serde_json::json!({
+            "run_id": run.run_id,
+            "board_state_hash": run.board_state_hash.to_hex(),
+            "waived_check_id": check_id,
+        });
+        let decided_by = ctx.principal.actor_id.clone();
+        let decision_id = insert_decision_record(
+            scope,
+            subject,
+            "kyc_ubo.decide.obligation.waiver",
+            &decided_by,
+            basis,
+            Some(reason),
+            args,
+        )
+        .await?;
+
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({ "decision_id": decision_id }),
+        ))
+    }
+}
+
 /// Register this pack's ops into a `SemOsVerbOpRegistry`.
 pub fn register(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
     registry.register(std::sync::Arc::new(DecideApprove));
     registry.register(std::sync::Arc::new(DecideReject));
+    registry.register(std::sync::Arc::new(DecideObligationWaive));
 }

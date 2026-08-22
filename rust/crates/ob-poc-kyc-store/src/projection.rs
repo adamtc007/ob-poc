@@ -16,10 +16,7 @@
 
 use sqlx::PgConnection;
 
-use ob_poc_kyc_substrate::{
-    fold_control_versioned, fold_obligations_versioned, FoldRegistry, IntentEvent, SubjectId,
-    SubjectOverallState,
-};
+use ob_poc_kyc_substrate::{fold_control_versioned, FoldRegistry, IntentEvent, SubjectId};
 
 use crate::error::StoreError;
 use crate::store::PgKycEventStore;
@@ -88,106 +85,12 @@ impl PgKycProjector {
     }
 }
 
-// ── W6: Obligation-graph projection ──────────────────────────────────────────
-
-/// Rebuild stats for the obligation projection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ObligationProjectionStats {
-    pub obligations_written: usize,
-    pub subjects_written: usize,
-}
-
-/// Rebuilds the obligation-graph projection for a subject by folding the stream.
-/// Idempotent + convergent by construction (full replace from a deterministic fold).
-pub struct PgKycObligationProjector;
-
-impl PgKycObligationProjector {
-    pub async fn rebuild_obligations(
-        conn: &mut PgConnection,
-        registry: &FoldRegistry,
-        subject_root: SubjectId,
-    ) -> Result<ObligationProjectionStats, StoreError> {
-        let events = PgKycEventStore::load_events(conn, subject_root).await?;
-        let refs: Vec<&IntentEvent> = events.iter().collect();
-        let state = fold_obligations_versioned(&refs, registry)?;
-
-        // Full replace (idempotent).
-        sqlx::query(r#"DELETE FROM "ob-poc".kyc_obligation_projection WHERE subject_root = $1"#)
-            .bind(subject_root.0)
-            .execute(&mut *conn)
-            .await?;
-        sqlx::query(
-            r#"DELETE FROM "ob-poc".kyc_subject_rollup_projection WHERE subject_root = $1"#,
-        )
-        .bind(subject_root.0)
-        .execute(&mut *conn)
-        .await?;
-
-        let mut obl_count = 0usize;
-        for (oid, tracks) in &state.obligations {
-            let identity = tracks.identity.state_name();
-            let screening = tracks.screening.state_name();
-            let risk = tracks.risk.state_name();
-            sqlx::query(
-                r#"INSERT INTO "ob-poc".kyc_obligation_projection
-                   (subject_root, obligation_id, basis_role, basis_jurisdiction, basis_cbu_role,
-                    basis_source_event_id, identity_state, screening_state, risk_state, originating_event_id)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"#,
-            )
-            .bind(subject_root.0).bind(oid.0)
-            .bind(&tracks.basis.role)
-            .bind(&tracks.basis.jurisdiction)
-            .bind(&tracks.basis.cbu_role)
-            .bind(tracks.basis.source_event_id.0)
-            .bind(identity).bind(screening).bind(risk)
-            .bind(tracks.originating_event_id.0)
-            .execute(&mut *conn).await?;
-            obl_count += 1;
-        }
-
-        let mut subj_count = 0usize;
-        for (sid, rollup) in &state.subjects {
-            // `Approved`/`Rejected` retired from `SubjectOverallState` TS.6
-            // P2 (K-G7) — decisions live in `kyc_decision_records` now, not
-            // this fold, so `overall_state` can only ever be one of these
-            // two pre-decision values. `decision_event_id` is left
-            // permanently NULL rather than dropping the column (TS.6 P1
-            // ruling: non-destructive — a reader wanting the decision now
-            // joins `kyc_decision_records` instead).
-            //
-            // TS.6 §5 (2026-08-22): DERIVED, not read off a stored
-            // `rollup.overall_state` field. That field was only ever advanced
-            // by the retired approve/reject fold arms, so after P2 it was
-            // pinned at `InProgress` and this projection published
-            // `all_terminal = false` for subjects whose obligations were all
-            // terminal — while `kyc_ubo.decide.subject.approve`'s own K-23 gate, which calls
-            // `derive_subject_state`, correctly saw `AllTerminal`. One value,
-            // two authorities, disagreeing. The field is gone; this is the
-            // single authority.
-            let derived = state.derive_subject_state(*sid);
-            let (overall, decision_event_id): (&str, Option<uuid::Uuid>) = match &derived {
-                SubjectOverallState::AllTerminal => ("AllTerminal", None),
-                SubjectOverallState::InProgress => ("InProgress", None),
-            };
-            let all_terminal = matches!(derived, SubjectOverallState::AllTerminal);
-            sqlx::query(
-                r#"INSERT INTO "ob-poc".kyc_subject_rollup_projection
-                   (subject_root, overall_state, obligation_count, all_terminal, decision_event_id)
-                   VALUES ($1,$2,$3,$4,$5)"#,
-            )
-            .bind(sid.0)
-            .bind(overall)
-            .bind(rollup.obligations.len() as i32)
-            .bind(all_terminal)
-            .bind(decision_event_id)
-            .execute(&mut *conn)
-            .await?;
-            subj_count += 1;
-        }
-
-        Ok(ObligationProjectionStats {
-            obligations_written: obl_count,
-            subjects_written: subj_count,
-        })
-    }
-}
+// `PgKycObligationProjector`/`ObligationProjectionStats` REMOVED
+// (EOP-DD-KYCUBO-D2.0 §5, 2026-08-22): "the outbox removal (2026-08-22)
+// deleted the queue and drainers but left the obligation projection
+// standing... it goes with obligations." `kyc_ubo.assert.obligation.creation`
+// — the only writer of a new `ObligationTracks` entry — is dissolved, so
+// `kyc_obligation_projection`/`kyc_subject_rollup_projection` can never
+// again receive a row; the projector had nothing left to project.
+// Reintroduction path: none named — the run book (D2.0 §4) replaces this
+// capability, not a future projector.

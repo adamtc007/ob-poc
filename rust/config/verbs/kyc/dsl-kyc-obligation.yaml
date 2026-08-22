@@ -1,184 +1,16 @@
 domains:
-  kyc_ubo.assert.obligation:
-    description: KYC obligation graph — role-basis recording (W3) and obligation
-      lifecycle (W5). Assembly pack.
-    verbs:
-      # role.assign / role.withdraw retired 2026-08-12 (T0.3 K-G7 — fold-blind
-      # write: declared effect_class: append_fact / side_effects: state_write,
-      # registered and live, but zero match arm in apply_one_control_event or
-      # apply_one_obligation_event; events appended and were permanently
-      # invisible to every fold/projection/query — same defect signature as
-      # the already-remediated ubo.board-controller.override, 2026-07-15).
-      # K-21 explicitness is already fully met at obligation.create's required
-      # `role` arg. Reintroduction path (if T6 wants basis-before-obligation
-      # as enforced stud geometry): role.assign returns deliberately, with a
-      # precondition attached from birth — never bare again.
-      creation:
-        flavour: instance_adding
-        description: Create an obligation for a subject under a stated role basis
-          (K-21, K-35)
-        effect_class: append_fact
-        invocation_phrases:
-        - create obligation
-        - create KYC obligation
-        - open obligation
-        - raise obligation
-        - create a KYC obligation for this subject
-        - open an obligation track
-        - record new obligation
-        - raise a KYC obligation
-        - create identity obligation
-        - open an obligation for this person
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: kyc_obligation
-          tags:
-          - kyc
-          - obligation
-          - w5
-          - dsl-kyc
-          phase_tags:
-          - kyc
-          side_effects: state_write
-        args:
-        - name: subject-id
-          type: uuid
-          required: true
-          description: Subject for whom the obligation is raised
-        - name: obligation-id
-          type: uuid
-          required: false
-          description: Stable obligation identity (generated if omitted)
-        - name: role
-          type: string
-          required: true
-          description: Role that triggered this obligation (K-21)
-        - name: jurisdiction
-          type: string
-          required: false
-          description: Jurisdiction driving the requirement
-        - name: cbu-role
-          type: string
-          required: false
-          description: CBU/Deal role linking to exposure (K-24)
-        returns:
-          type: record
-          fields:
-          - name: obligation_id
-            type: uuid
-          - name: seq
-            type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-      satisfaction:
-        flavour: attribute_mutating
-        description: Mark all tracks on an obligation as satisfied (full KYC clearance)
-        effect_class: append_fact
-        invocation_phrases:
-        - satisfy obligation
-        - mark obligation satisfied
-        - complete obligation
-        - satisfy all tracks
-        - clear obligation
-        - mark this obligation as satisfied
-        - complete KYC obligation
-        - satisfy the obligation tracks
-        - all tracks satisfied
-        - close obligation as satisfied
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: kyc_obligation
-          tags:
-          - kyc
-          - obligation
-          - satisfy
-          - w5
-          - dsl-kyc
-          phase_tags:
-          - kyc
-          side_effects: state_write
-        args:
-        - name: obligation-id
-          type: uuid
-          required: true
-          description: The obligation to satisfy
-        returns:
-          type: record
-          fields:
-          - name: seq
-            type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-      waiver:
-        flavour: attribute_mutating
-        description: Waive an obligation (all tracks set to Waived with a recorded
-          reason)
-        effect_class: append_fact
-        invocation_phrases:
-        - waive obligation
-        - waive KYC obligation
-        - grant obligation waiver
-        - waive all tracks
-        - waive this obligation
-        - grant a waiver for this obligation
-        - record obligation waiver
-        - waive the obligation tracks
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: kyc_obligation
-          tags:
-          - kyc
-          - obligation
-          - waive
-          - w5
-          - dsl-kyc
-          phase_tags:
-          - kyc
-          side_effects: state_write
-        args:
-        - name: subject-id
-          type: uuid
-          required: true
-          description: Subject stream to append this obligation event to
-        - name: obligation-id
-          type: uuid
-          required: true
-          description: The obligation to waive
-        - name: reason
-          type: string
-          required: true
-          description: Reason for the waiver (K-35 traceability)
-        returns:
-          type: record
-          fields:
-          - name: seq
-            type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-      # person.approve/person.reject RETIRED from this domain TS.6 P2
-      # (K-G7) — renamed kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject and moved to the new
-      # `decide:` domain below (structural Evaluation-pack split,
-      # EOP-DD-KYCUBO-TS.6 §1: writes only to kyc_decision_records via
-      # ob-poc-kyc-decide, which has no dependency on ob-poc-kyc-seam, so it
-      # never reaches the fact stream).
+  # `kyc_ubo.assert.obligation` domain RETIRED (EOP-DD-KYCUBO-D2.0 §5, K-G7,
+  # 2026-08-22): `creation`/`satisfaction` DISSOLVED — "nobody hands over an
+  # obligation; you run the checks and they fail. The finding is the
+  # record." / "nothing is satisfied; you assert the missing fact and
+  # re-run. The new run supersedes the old." `waiver` MOVED to
+  # `kyc_ubo.decide.obligation.waiver`, below (the one genuine act among the
+  # three: a human rules that a failing check does not apply, with reason
+  # and authority, citing the run — an Evaluation decision, never a
+  # fact-stream append). role.assign/role.withdraw were already retired
+  # 2026-08-12 (T0.3 K-G7, fold-blind write) from this same domain.
+  # Reintroduction path for creation/satisfaction: none named — the run book
+  # (D2.0 §4) replaces this capability entirely, not a future verb.
 
   # ── TS.6 §3 relocation (2026-08-22) ────────────────────────────────────
   # `kyc_ubo.assert.entity.screening` / `kyc_ubo.assert.entity.identity` / `kyc_ubo.assert.entity.risk` were
@@ -456,6 +288,67 @@ domains:
           type: string
           required: false
           description: Reason for rejection
+        returns:
+          type: record
+          fields:
+          - name: decision_id
+            type: uuid
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+  kyc_ubo.decide.obligation:
+    description: KYC Evaluation-pack obligation waiver (D2.0 §5, moved from
+      kyc_ubo.assert.obligation.waiver 2026-08-22) — a human ruling that a
+      failing check does not apply, citing the run. Writes only to
+      kyc_decision_records, never the dsl.kyc fact stream.
+    verbs:
+      waiver:
+        flavour: attribute_mutating
+        description: Waive a failing check for a subject, citing the run and the
+          reason and authority for the waiver (D2.0 §5). Writes only to
+          kyc_decision_records — never the fact stream.
+        effect_class: append_fact
+        invocation_phrases:
+        - waive obligation
+        - waive KYC obligation
+        - grant obligation waiver
+        - waive this obligation
+        - grant a waiver for this obligation
+        - record obligation waiver
+        - waive this check
+        - grant a waiver for this check
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags:
+          - kyc
+          - decide
+          - obligation
+          - waive
+          - decision
+          - dsl-kyc
+          phase_tags:
+          - kyc
+          side_effects: state_write
+        args:
+        - name: subject-id
+          type: uuid
+          required: true
+          description: The subject the waiver applies to
+        - name: check-id
+          type: string
+          required: true
+          description: The check being waived, citing the run it was evaluated in
+        - name: reason
+          type: string
+          required: true
+          description: Reason and authority for the waiver (K-35 traceability)
         returns:
           type: record
           fields:
