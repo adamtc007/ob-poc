@@ -2,9 +2,19 @@
 //!
 //! The verb stream is the system of record; this projection is a materialized
 //! fold (K-34). The projector is the **only** writer of these rows.
+//!
+//! **No queue (2026-08-22 ruling).** These projectors are called directly, on
+//! demand. There is no outbox effect-kind, no fan-out from `append`, and no
+//! drainer. Events are immutable, so replay from any point yields the same
+//! fold — a snapshot rebuilt on demand from an immutable stream is always
+//! correct, and a queue telling you WHEN to rebuild adds nothing but a place
+//! to jam. It did jam: the drainers hard-errored on any event whose lexicon
+//! hash was absent from the `FoldRegistry`, and a failed drain left the row
+//! `pending` so the next claim took the same row — every manifest bump
+//! stranded the whole pre-bump backlog behind a head-of-line poison pill.
+//! Removing the trigger dissolves that failure mode by construction.
 
-use sqlx::{PgConnection, PgPool, Row};
-use uuid::Uuid;
+use sqlx::PgConnection;
 
 use ob_poc_kyc_substrate::{
     fold_control_versioned, fold_obligations_versioned, FoldRegistry, IntentEvent, SubjectId,
@@ -13,17 +23,6 @@ use ob_poc_kyc_substrate::{
 
 use crate::error::StoreError;
 use crate::store::PgKycEventStore;
-
-/// Outbox effect-kind for the control-edge projection.
-pub const CONTROL_EDGE_PROJECTION_EFFECT: &str = "kyc.projection.control_edges";
-
-/// Outbox effect-kind for the obligation-graph projection (W6).
-pub const OBLIGATION_PROJECTION_EFFECT: &str = "kyc.projection.obligations";
-
-/// Every projection effect-kind `append` fans out to. Each kind has its own
-/// drainer so there is no multi-consumer contention.
-pub const PROJECTION_EFFECT_KINDS: &[&str] =
-    &[CONTROL_EDGE_PROJECTION_EFFECT, OBLIGATION_PROJECTION_EFFECT];
 
 /// Outcome of a projection rebuild.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,91 +85,6 @@ impl PgKycProjector {
         Ok(ProjectionStats {
             edges_written: state.edges.len(),
         })
-    }
-}
-
-/// Self-contained outbox drainer for the control-edge projection.
-///
-/// Reuses the shared `outbox` table (the §5 drainer-reuses-the-outbox rule) but
-/// not the app-level `OutboxDrainerImpl` — the reuse-via-consumer integration is
-/// a cutover-time concern. Claims only [`CONTROL_EDGE_PROJECTION_EFFECT`] rows,
-/// so it never contends with other consumers.
-pub struct PgKycProjectionDrainer;
-
-impl PgKycProjectionDrainer {
-    /// Claim and process ONE pending control-edge projection effect, in a single
-    /// transaction: `FOR UPDATE SKIP LOCKED` claim → rebuild the subject's
-    /// projection → mark the row `done` → commit.
-    ///
-    /// At-least-once by construction: on any error the transaction rolls back and
-    /// the row stays `pending` (the convergent full-rebuild projector makes
-    /// reprocessing safe). The claimed row is row-locked (not a separate
-    /// `processing` state) for the rebuild's duration, so a crash needs no reaper.
-    /// Concurrent drainers `SKIP LOCKED` past each other's claims.
-    ///
-    /// Returns the re-projected subject, or `None` when the queue is empty.
-    pub async fn drain_once(
-        pool: &PgPool,
-        registry: &FoldRegistry,
-    ) -> Result<Option<SubjectId>, StoreError> {
-        let mut tx = pool.begin().await?;
-        let claimed = sqlx::query(
-            r#"SELECT id, payload FROM "public".outbox
-               WHERE effect_kind = $1 AND status = 'pending'
-               ORDER BY created_at
-               FOR UPDATE SKIP LOCKED
-               LIMIT 1"#,
-        )
-        .bind(CONTROL_EDGE_PROJECTION_EFFECT)
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        let Some(row) = claimed else {
-            tx.rollback().await?;
-            return Ok(None);
-        };
-
-        let id: Uuid = row.get("id");
-        let payload: serde_json::Value = row.get("payload");
-        let subject = payload
-            .get("subject_root")
-            .and_then(|v| v.as_str())
-            .and_then(|s| Uuid::parse_str(s).ok())
-            .map(SubjectId)
-            .ok_or_else(|| {
-                StoreError::Db(sqlx::Error::Decode(
-                    "outbox payload missing/invalid subject_root".into(),
-                ))
-            })?;
-
-        PgKycProjector::rebuild_control_edges(&mut tx, registry, subject).await?;
-
-        sqlx::query(
-            r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#,
-        )
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-
-        Ok(Some(subject))
-    }
-
-    /// Drain up to `max` rows, one transaction each. Returns the count processed
-    /// (stops early when the queue drains).
-    pub async fn drain_all(
-        pool: &PgPool,
-        registry: &FoldRegistry,
-        max: usize,
-    ) -> Result<usize, StoreError> {
-        let mut processed = 0;
-        while processed < max {
-            if Self::drain_once(pool, registry).await?.is_none() {
-                break;
-            }
-            processed += 1;
-        }
-        Ok(processed)
     }
 }
 
@@ -275,67 +189,5 @@ impl PgKycObligationProjector {
             obligations_written: obl_count,
             subjects_written: subj_count,
         })
-    }
-}
-
-/// Self-contained outbox drainer for the obligation-graph projection.
-pub struct PgKycObligationDrainer;
-
-impl PgKycObligationDrainer {
-    pub async fn drain_once(
-        pool: &PgPool,
-        registry: &FoldRegistry,
-    ) -> Result<Option<SubjectId>, StoreError> {
-        let mut tx = pool.begin().await?;
-        let claimed = sqlx::query(
-            r#"SELECT id, payload FROM "public".outbox
-               WHERE effect_kind = $1 AND status = 'pending'
-               ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1"#,
-        )
-        .bind(OBLIGATION_PROJECTION_EFFECT)
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        let Some(row) = claimed else {
-            tx.rollback().await?;
-            return Ok(None);
-        };
-        let id: Uuid = row.get("id");
-        let payload: serde_json::Value = row.get("payload");
-        let subject = payload
-            .get("subject_root")
-            .and_then(|v| v.as_str())
-            .and_then(|s| Uuid::parse_str(s).ok())
-            .map(SubjectId)
-            .ok_or_else(|| {
-                StoreError::Db(sqlx::Error::Decode(
-                    "outbox payload missing/invalid subject_root".into(),
-                ))
-            })?;
-
-        PgKycObligationProjector::rebuild_obligations(&mut tx, registry, subject).await?;
-        sqlx::query(
-            r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#,
-        )
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        Ok(Some(subject))
-    }
-
-    pub async fn drain_all(
-        pool: &PgPool,
-        registry: &FoldRegistry,
-        max: usize,
-    ) -> Result<usize, StoreError> {
-        let mut n = 0;
-        while n < max {
-            if Self::drain_once(pool, registry).await?.is_none() {
-                break;
-            }
-            n += 1;
-        }
-        Ok(n)
     }
 }

@@ -18,7 +18,6 @@
 
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, Row};
-use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     fold_control_versioned, fold_obligations_versioned, fold_type_registry, ControlState,
@@ -155,9 +154,18 @@ impl PgKycEventStore {
         .execute(&mut *conn)
         .await?;
 
-        // 5. Enqueue the projection effect(s) on the outbox, in the same txn (§3 step 5).
-        //    The drainer re-derives the subject's projections by folding the stream.
-        Self::enqueue_projection_effects(conn, event, next_seq).await?;
+        // §3 step 5 (the outbox fan-out) REMOVED 2026-08-22. Events are
+        // immutable, so replay from any point yields the same fold: a snapshot
+        // rebuilt on demand from an immutable stream is always correct, and a
+        // queue telling you WHEN to rebuild adds nothing but a place to jam.
+        // It jammed — the drainers hard-error on any event whose lexicon hash
+        // is not in the FoldRegistry, and a failed drain leaves the row
+        // `pending`, so the next claim takes the same row: any manifest bump
+        // stranded the whole pre-bump backlog behind a head-of-line poison
+        // pill. Folding on demand uses current rules over immutable events and
+        // never asks what version a queued row was written under.
+        // `PgKycProjector`/`PgKycObligationProjector` (K-34, fold-whole-stream
+        // + full-replace) are unchanged and are now called directly.
 
         Ok(AppendOutcome {
             seq: next_seq as u64,
@@ -166,35 +174,6 @@ impl PgKycEventStore {
         })
     }
 
-    /// Enqueue one outbox row per projection effect-kind for a freshly appended
-    /// event (the §3 step-5 fan-out). Keyed `subject:seq` so a retried append is
-    /// idempotent at the outbox (`ON CONFLICT DO NOTHING`); the projector is a
-    /// full-rebuild, so one "subject changed" notification per event suffices.
-    /// Runs in the append transaction — the effect commits atomically with the event.
-    async fn enqueue_projection_effects(
-        conn: &mut PgConnection,
-        event: &IntentEvent,
-        seq: i64,
-    ) -> Result<(), StoreError> {
-        let payload = serde_json::json!({ "subject_root": event.subject_root.0 });
-        let idem = format!("{}:{}", event.subject_root.0, seq);
-        for effect_kind in crate::projection::PROJECTION_EFFECT_KINDS {
-            sqlx::query(
-                r#"INSERT INTO "public".outbox
-                    (id, trace_id, envelope_version, effect_kind, payload, idempotency_key)
-                   VALUES ($1, $2, 1, $3, $4, $5)
-                   ON CONFLICT (idempotency_key, effect_kind) DO NOTHING"#,
-            )
-            .bind(Uuid::new_v4())
-            .bind(event.correlation_id)
-            .bind(*effect_kind)
-            .bind(&payload)
-            .bind(&idem)
-            .execute(&mut *conn)
-            .await?;
-        }
-        Ok(())
-    }
 }
 
 // ── Row ↔ IntentEvent mapping ─────────────────────────────────────────────────

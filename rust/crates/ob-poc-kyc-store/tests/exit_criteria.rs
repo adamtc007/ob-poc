@@ -15,7 +15,7 @@ use ob_poc_kyc_store::{
     CROSS_STREAM_OBLIGATION_CREATE, CROSS_STREAM_OBLIGATION_SUPERSEDE,
 };
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, AuthorityRef, EventId, FoldRegistry, IdemKey, IntentEvent, PersonId, Principal,
+    assembly_lexicon, AuthorityRef, EventId, FoldRegistry, IdemKey, IntentEvent, PersonId, Principal,
     SubjectId, TargetBinding, V1FoldImpl,
 };
 
@@ -33,7 +33,7 @@ async fn pool() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -47,7 +47,7 @@ fn register_event(subject: SubjectId, idem: &str) -> IntentEvent {
         serde_json::json!({}),
         chrono::Utc::now(),
     )
-    .with_lexicon_hash(phase1_lexicon().hash)
+    .with_lexicon_hash(assembly_lexicon().hash)
     .with_idempotency_key(IdemKey::new(idem))
 }
 
@@ -77,6 +77,13 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 }
 
 // ── exit 6: replay enqueues zero outbox effects ────────────────────────────────
+//
+// 2026-08-22: this criterion is now met BY CONSTRUCTION rather than by
+// discipline. The projection outbox fan-out is gone (`store.rs` §3 step 5, both
+// drainers, all three effect-kind constants), so neither append nor replay can
+// enqueue anything — there is no queue. The test's setup used to assert
+// `pending_after_append > 0` and then prove replay added no MORE; it now
+// asserts zero at both points, which is the stronger form of the same claim.
 
 #[tokio::test]
 async fn exit6_replay_no_redispatch() {
@@ -84,7 +91,8 @@ async fn exit6_replay_no_redispatch() {
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
 
-    // Append one event (which enqueues outbox projection effects).
+    // Append one event. This used to fan out one outbox row per projection
+    // effect-kind; it now writes the event and nothing else.
     let mut tx = pool.begin().await.unwrap();
     PgKycEventStore::append(&mut tx, &registry, &register_event(subject, "reg"), "(test-event)", |_, _, _| {
         Ok(())
@@ -96,9 +104,10 @@ async fn exit6_replay_no_redispatch() {
     let pending_after_append: i64 = sqlx::query_scalar(
         r#"SELECT count(*) FROM "public".outbox WHERE status='pending' AND idempotency_key LIKE $1"#,
     ).bind(format!("{}:%", subject.0)).fetch_one(&pool).await.unwrap();
-    assert!(
-        pending_after_append > 0,
-        "append must enqueue at least one projection effect"
+    assert_eq!(
+        pending_after_append, 0,
+        "append must enqueue NOTHING — the projection queue was removed \
+         2026-08-22; the projector folds the immutable stream on demand"
     );
 
     // Count outbox rows before "replay" (just load + fold — no append).
@@ -126,8 +135,10 @@ async fn exit6_replay_no_redispatch() {
             .unwrap();
     assert_eq!(
         before, after,
-        "exit 6: replay (load+fold) enqueues zero outbox effects"
+        "exit 6: replay (load+fold) enqueues zero outbox effects — and with \
+         the queue removed, so does append: `before == after == 0`"
     );
+    assert_eq!(after, 0, "exit 6, stronger form: the count is zero, not merely unchanged");
 
     cleanup(&pool, &[subject]).await;
 }

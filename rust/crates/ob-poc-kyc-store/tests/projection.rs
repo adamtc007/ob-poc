@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use ob_poc_kyc_store::{PgKycEventStore, PgKycProjector};
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, AuthorityRef, EdgeId, FoldRegistry, IdemKey, IntentEvent, Principal, SubjectId,
+    assembly_lexicon, AuthorityRef, EdgeId, FoldRegistry, IdemKey, IntentEvent, Principal, SubjectId,
     TargetBinding, V1FoldImpl,
 };
 
@@ -32,7 +32,7 @@ async fn pool() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -54,7 +54,7 @@ fn base(
             .unwrap()
             .with_timezone(&chrono::Utc),
     )
-    .with_lexicon_hash(phase1_lexicon().hash)
+    .with_lexicon_hash(assembly_lexicon().hash)
     .with_idempotency_key(IdemKey::new(idem))
 }
 
@@ -269,6 +269,111 @@ async fn projection_is_disposable_and_rebuilds_from_stream() {
         before,
         "rebuilt from stream, identical"
     );
+
+    cleanup(&pool, subject).await;
+}
+
+// ── The outbox removal (2026-08-22 ruling) ───────────────────────────────────
+//
+// "Events are immutable, so replay from any point in time yields the same fold.
+// A snapshot rebuilt on demand from an immutable stream is always correct; a
+// queue telling you WHEN to rebuild adds nothing but a place to jam."
+//
+// These two gates pin the two halves of that: the trigger is gone, and the
+// projector — the K-34 machinery the ruling explicitly KEEPS — still folds the
+// whole stream and full-replaces the subject's rows.
+
+/// `append` must not fan out to `public.outbox`. RED before the deletion: the
+/// §3 step-5 fan-out wrote one row per effect-kind per event, keyed
+/// `subject:seq`, so a 3-event stream left 6 pending rows behind — the backlog
+/// that (with the registry keyed on the CURRENT lexicon hash only) became a
+/// head-of-line poison pill the moment the manifest moved.
+#[tokio::test]
+async fn append_does_not_enqueue_projection_effects() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+    cleanup(&pool, subject).await;
+
+    append(&pool, &registry, &register(subject)).await;
+    let e1 = Uuid::new_v4();
+    append(&pool, &registry, &assert_control(subject, e1, "e1")).await;
+    append(&pool, &registry, &edge_op(subject, "ubo.edge.verify", e1, "v1")).await;
+
+    // Keyed `{subject}:{seq}` by the removed fan-out.
+    let outbox_rows: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM "public".outbox WHERE idempotency_key LIKE $1"#,
+    )
+    .bind(format!("{}:%", subject.0))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        outbox_rows, 0,
+        "append must not enqueue projection effects — the queue is gone \
+         (2026-08-22 ruling); the projector rebuilds on demand from the \
+         immutable stream instead",
+    );
+
+    cleanup(&pool, subject).await;
+}
+
+/// The KEPT half: fold-the-whole-stream + full-replace, over a genuinely
+/// multi-event stream, with the projection rebuilt at two different points and
+/// each rebuild reflecting exactly the stream as of that point. This is what
+/// makes the queue unnecessary — not an optimisation of it.
+#[tokio::test]
+async fn projector_rebuilds_from_a_multi_event_stream() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+    cleanup(&pool, subject).await;
+
+    let (e1, e2) = (Uuid::new_v4(), Uuid::new_v4());
+    append(&pool, &registry, &register(subject)).await;
+    append(&pool, &registry, &assert_control(subject, e1, "e1")).await;
+    append(&pool, &registry, &assert_control(subject, e2, "e2")).await;
+
+    // Rebuild #1 — the stream as of three events.
+    assert_eq!(rebuild(&pool, &registry, subject).await, 2);
+    let after_two_edges = projection_rows(&pool, subject).await;
+    assert_eq!(after_two_edges.len(), 2);
+    assert_eq!(status_of(&pool, subject, e1).await, "Asserted");
+
+    // Extend the stream, then rebuild #2 over the WHOLE stream.
+    // K-11 evidence ratchet: `verify` only advances an already-Evidenced edge.
+    append(
+        &pool,
+        &registry,
+        &edge_op(subject, "ubo.edge.attach-evidence", e1, "ev1"),
+    )
+    .await;
+    append(&pool, &registry, &edge_op(subject, "ubo.edge.verify", e1, "v1")).await;
+    append(
+        &pool,
+        &registry,
+        &edge_op(subject, "ubo.edge.supersede", e2, "s2"),
+    )
+    .await;
+    assert_eq!(rebuild(&pool, &registry, subject).await, 2);
+
+    // Full REPLACE, not append: still two rows, both re-derived.
+    let after_transitions = projection_rows(&pool, subject).await;
+    assert_eq!(
+        after_transitions.len(),
+        2,
+        "full replace — the rebuild must not accumulate rows"
+    );
+    assert_eq!(status_of(&pool, subject, e1).await, "Verified");
+    assert_eq!(status_of(&pool, subject, e2).await, "Superseded");
+    assert_ne!(
+        after_two_edges, after_transitions,
+        "the second rebuild must reflect the later stream, not the first snapshot"
+    );
+
+    // Rebuilding again over the unchanged stream is a no-op (convergent).
+    rebuild(&pool, &registry, subject).await;
+    assert_eq!(projection_rows(&pool, subject).await, after_transitions);
 
     cleanup(&pool, subject).await;
 }

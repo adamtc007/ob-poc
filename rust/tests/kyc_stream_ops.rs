@@ -14,8 +14,8 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
 use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectRegister, UboEdgeAssertControl};
-use ob_poc_kyc_store::{PgKycProjectionDrainer, CONTROL_EDGE_PROJECTION_EFFECT};
-use ob_poc_kyc_substrate::{phase1_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
+use ob_poc_kyc_store::PgKycProjector;
+use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -33,7 +33,7 @@ async fn connect() -> PgPool {
 
 fn v1_registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -82,13 +82,6 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
         .execute(pool)
         .await;
     }
-    let _ = sqlx::query(
-        r#"DELETE FROM "public".outbox WHERE effect_kind = $1 AND idempotency_key LIKE $2"#,
-    )
-    .bind(CONTROL_EDGE_PROJECTION_EFFECT)
-    .bind(format!("{}:%", subject.0))
-    .execute(pool)
-    .await;
 }
 
 #[tokio::test]
@@ -175,10 +168,14 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
         "as_of flowed from the context, frozen at entry"
     );
 
-    // 3. The append enqueued a projection effect; the drainer projects the edge.
-    PgKycProjectionDrainer::drain_all(&pool, &v1_registry(), 100)
+    // 3. Project the subject on demand — no queue (2026-08-22 ruling): the
+    //    append no longer fans out to the outbox, and the projector folds the
+    //    whole immutable stream whenever a caller wants the snapshot.
+    let mut conn = pool.acquire().await.unwrap();
+    PgKycProjector::rebuild_control_edges(&mut conn, &v1_registry(), subject)
         .await
         .unwrap();
+    drop(conn);
     let edges: i64 = sqlx::query_scalar(
         r#"SELECT count(*) FROM "ob-poc".kyc_control_edge_projection WHERE subject_root = $1 AND status = 'Asserted'"#,
     )

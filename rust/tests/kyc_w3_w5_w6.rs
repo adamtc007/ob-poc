@@ -16,10 +16,7 @@ use ob_poc::domain_ops::kyc_stream_ops::{
 };
 // kyc.person.approve renamed decide.approve TS.6 P2 — moved to ob-poc-kyc-decide.
 use ob_poc_kyc_decide::DecideApprove;
-use ob_poc_kyc_store::{
-    PgKycObligationProjector, PgKycProjector, CONTROL_EDGE_PROJECTION_EFFECT,
-    OBLIGATION_PROJECTION_EFFECT,
-};
+use ob_poc_kyc_store::{PgKycObligationProjector, PgKycProjector};
 use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -87,15 +84,6 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
         .execute(pool)
         .await;
     }
-    for ek in [CONTROL_EDGE_PROJECTION_EFFECT, OBLIGATION_PROJECTION_EFFECT] {
-        let _ = sqlx::query(
-            r#"DELETE FROM "public".outbox WHERE effect_kind=$1 AND idempotency_key LIKE $2"#,
-        )
-        .bind(ek)
-        .bind(format!("{}:%", subject.0))
-        .execute(pool)
-        .await;
-    }
 }
 
 async fn dispatch(
@@ -148,21 +136,14 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     )
     .await;
 
-    // W6: project THIS subject.
+    // W6: project THIS subject, on demand.
     //
-    // Deliberately the per-subject projectors, not `drain_*::drain_all`.
-    // `drain_all` claims from the shared `public.outbox` queue globally
-    // (`ORDER BY created_at ... SKIP LOCKED LIMIT 1`), so it folds whatever
-    // other subjects happen to be pending — in a long-lived dev database that
-    // is a months-deep backlog spanning every historical lexicon version. The
-    // `FoldRegistry` here registers only the CURRENT `assembly_lexicon().hash`,
-    // so any claimed event from an older manifest hard-errors with
-    // `UnregisteredLexiconHash` (D2 total dispatch) and fails this test for
-    // reasons that have nothing to do with W3/W5/W6.
-    //
-    // This test's subject is the obligation lifecycle for the subject it just
-    // built, so it projects exactly that subject. The global drainers keep
-    // their own coverage in `crates/ob-poc-kyc-store/tests/drainer.rs`.
+    // There is no queue any more (2026-08-22 ruling — the outbox fan-out and
+    // both drainers are gone). This used to call `drain_all`, which claimed
+    // from the shared `public.outbox` GLOBALLY, so it folded whatever other
+    // subjects were pending — in a long-lived dev database, a months-deep
+    // backlog spanning every historical lexicon version, against a registry
+    // holding only the current hash. That is the jam the ruling removed.
     let mut conn = pool.acquire().await.unwrap();
     PgKycProjector::rebuild_control_edges(&mut conn, &registry, subject)
         .await

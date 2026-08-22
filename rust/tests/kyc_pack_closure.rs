@@ -71,6 +71,9 @@ const KYC_STREAM_OPS_SRC: &str = include_str!("../src/domain_ops/kyc_stream_ops.
 // intersection below (a declared verb registered somewhere this test didn't
 // used to look must not manufacture a false K-G4 "missing_ops" red).
 const KYC_DECIDE_OPS_SRC: &str = include_str!("../crates/ob-poc-kyc-decide/src/lib.rs");
+const KYC_STORE_SRC: &str = include_str!("../crates/ob-poc-kyc-store/src/store.rs");
+const KYC_PROJECTION_SRC: &str = include_str!("../crates/ob-poc-kyc-store/src/projection.rs");
+const KYC_STORE_LIB_SRC: &str = include_str!("../crates/ob-poc-kyc-store/src/lib.rs");
 const LEXICON_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/lexicon.rs");
 const CONTROL_FOLD_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/fold/control.rs");
 const OBLIGATION_FOLD_SRC: &str =
@@ -2042,5 +2045,78 @@ async fn retired_verbs_are_gone_from_the_search_index() {
         kyc_orphans.is_empty(),
         "retired KYC/UBO verbs still discoverable in the search index — \
          prune verb_pattern_embeddings + verb_centroids for: {kyc_orphans:#?}"
+    );
+}
+
+/// The projection queue is gone (2026-08-22 ruling): no drainer type, no
+/// outbox effect-kind constant, no fan-out from `append`.
+///
+/// Grep-proof rather than compile-proof on purpose. `dead_code = "deny"`
+/// cannot see a re-introduced drainer that a test calls, and the K-G7 lesson
+/// (and the TS.6 Item-4 embedding-orphan lesson right after it) is that a
+/// retired thing comes back through whatever surface nobody is scanning. The
+/// KEPT half — `rebuild_control_edges`/`rebuild_obligations`, the K-34
+/// fold-whole-stream + full-replace machinery — is asserted PRESENT here, so
+/// this gate cannot be satisfied by deleting the projector too.
+#[test]
+fn projection_queue_is_gone() {
+    const BANNED: &[(&str, &str)] = &[
+        ("PgKycProjectionDrainer", "control-edge drainer type"),
+        ("PgKycObligationDrainer", "obligation drainer type"),
+        ("CONTROL_EDGE_PROJECTION_EFFECT", "control-edge effect kind"),
+        ("OBLIGATION_PROJECTION_EFFECT", "obligation effect kind"),
+        ("PROJECTION_EFFECT_KINDS", "the fan-out's effect-kind list"),
+        ("enqueue_projection_effects", "the append fan-out itself"),
+        ("kyc.projection.control_edges", "control-edge effect-kind string"),
+        ("kyc.projection.obligations", "obligation effect-kind string"),
+    ];
+    let sources: &[(&str, &str)] = &[
+        ("store.rs", KYC_STORE_SRC),
+        ("projection.rs", KYC_PROJECTION_SRC),
+        ("lib.rs", KYC_STORE_LIB_SRC),
+    ];
+
+    let mut found: Vec<String> = Vec::new();
+    for (file, src) in sources {
+        for line in src.lines() {
+            // Retirement notes are allowed to NAME what they retired; only
+            // live code counts. (Same carve-out shape as `retired_verbs_are_gone`.)
+            let t = line.trim_start();
+            if t.starts_with("//") {
+                continue;
+            }
+            for (sym, what) in BANNED {
+                if line.contains(sym) {
+                    found.push(format!("{file}: {what} (`{sym}`) — {}", line.trim()));
+                }
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "the projection queue was removed 2026-08-22; these symbols are back \
+         in live code: {found:#?}"
+    );
+
+    // The KEPT half must still be there — this gate must not be satisfiable
+    // by deleting the projector along with its trigger.
+    for kept in [
+        "pub struct PgKycProjector",
+        "pub async fn rebuild_control_edges",
+        "pub struct PgKycObligationProjector",
+        "pub async fn rebuild_obligations",
+    ] {
+        assert!(
+            KYC_PROJECTION_SRC.contains(kept),
+            "K-34 machinery must survive the queue removal; missing: {kept}"
+        );
+    }
+    // Full-replace semantics, specifically: the rebuild DELETEs the subject's
+    // rows before re-inserting from the fold.
+    assert_eq!(
+        KYC_PROJECTION_SRC.matches("DELETE FROM").count(),
+        3,
+        "full-replace: one DELETE per projected table (control edges, \
+         obligations, subject rollup)"
     );
 }
