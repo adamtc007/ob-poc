@@ -178,3 +178,71 @@ async fn every_geometry_rule_is_reachable_from_the_write_path() {
         eprintln!("[{label}] refused as expected: {}", result.unwrap_err());
     }
 }
+
+// ── TS.5 §4: the wiring half of R5/R6 (added 2026-08-22) ────────────────────
+//
+// §4 ratifies that every rule component gets a wiring test through the
+// PRODUCTION ENTRY POINT, not the function directly — that is the countermeasure
+// for "built but not wired", the defect family member TS.5 itself named.
+//
+// The 2026-08-22 reconciliation found the R5/R6 gates in
+// `crates/ob-poc-kyc-substrate/tests/ts5_geometry_enforcement.rs` call
+// `check_preconditions` directly. That function IS the shared chokepoint (TS.5
+// §1), so those gates are correct about the RULE — but they cannot see the op.
+// A regression that stopped `UboEdgeAssertControl` from routing through
+// `check_preconditions`, or that made the op fail closed on an unevaluable
+// triple before ever reaching it, would leave that suite green while R5/R6 were
+// broken in production. These two drive the real governed op instead.
+//
+// R5/R6 are ADMIT cases, so their wiring test asserts the op ADMITS. That is
+// the direction CTN-2e cares about: enforcement narrows what may be ASSERTED,
+// never what may be ALLEGED.
+
+/// R6, wired: an endpoint with NO type asserted at all must still be admitted
+/// by the real op — geometry is unevaluable, and unevaluable admits.
+#[tokio::test]
+async fn untyped_endpoint_admits_at_the_op() {
+    let pool = pool().await;
+    let subject = Uuid::new_v4();
+    let a = Uuid::new_v4();
+    let b = Uuid::new_v4();
+
+    let mut scope = Scope::begin(&pool).await;
+    register(&mut scope, subject, a).await;
+    register(&mut scope, subject, b).await;
+    // Deliberately NO assert_type for either endpoint.
+    let verdict = assert_control(&mut scope, subject, a, b, "voting_rights").await;
+    scope.rollback().await;
+
+    assert!(
+        verdict.is_ok(),
+        "R6: an untyped endpoint must ADMIT at the governed op (geometry \
+         unevaluable, CTN-2e) — a fail-closed regression here is invisible to \
+         the pure gate, which calls check_preconditions directly: {verdict:?}"
+    );
+}
+
+/// R5, wired: an ALLEGED (unproven) endpoint type must still be admitted by the
+/// real op. Enforcement narrows what may be asserted, never what may be alleged.
+#[tokio::test]
+async fn alleged_type_admits_at_the_op() {
+    let pool = pool().await;
+    let subject = Uuid::new_v4();
+    let person = Uuid::new_v4();
+    let corp = Uuid::new_v4();
+
+    let mut scope = Scope::begin(&pool).await;
+    register(&mut scope, subject, person).await;
+    register(&mut scope, subject, corp).await;
+    // `assert_type` records an ALLEGED type — nothing here proves it.
+    assert_type(&mut scope, subject, person, "natural_person").await;
+    assert_type(&mut scope, subject, corp, "private_limited_company").await;
+    let verdict = assert_control(&mut scope, subject, person, corp, "voting_rights").await;
+    scope.rollback().await;
+
+    assert!(
+        verdict.is_ok(),
+        "R5: a geometrically-legal triple on merely-ALLEGED types must ADMIT at \
+         the governed op: {verdict:?}"
+    );
+}

@@ -126,6 +126,34 @@ pub struct LegalMove {
     pub move_id: MoveId,
     pub verb_fqn: VerbFqn,
     pub target: TargetBinding,
+    /// The specific `(from, kind, to)` triple this move proposes, for the two
+    /// geometry-gated edge verbs. `None` for every other verb.
+    ///
+    /// **TS.5 R2, closed 2026-08-22.** The board used to emit ONE bare-subject
+    /// candidate per geometry-gated verb, so there was nowhere to put a triple
+    /// — and a per-triple gate with nothing per-triple to gate is a
+    /// contradiction. TS.1 §1 defines the legal move set as *derived from* the
+    /// type geometry, which decides possibility "between two types"; a move set
+    /// derived from that is per-triple by construction.
+    ///
+    /// The triple lives HERE and not on `TargetBinding` deliberately:
+    /// `TargetBinding` answers "what does this event target" — for
+    /// `assert.edge.control` that is a freshly-minted `edge_id`, not the
+    /// endpoints. The triple is what the board PROPOSES, i.e. payload. Putting
+    /// it in `TargetBinding` would conflate the two and ripple through every
+    /// event, the append path and the projections.
+    pub proposed_edge: Option<ProposedEdge>,
+}
+
+/// A `(from, kind, to)` triple the board is offering as a legal move.
+/// `kind_wire` is the wire string from `EDGE_KIND_WIRE_VALUES` — the same
+/// vocabulary the real op accepts, so a caller can lift it straight into the
+/// payload it submits.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ProposedEdge {
+    pub from: EntityId,
+    pub to: EntityId,
+    pub kind_wire: String,
 }
 
 /// The full set of legal moves at one folded state, canonically ordered
@@ -203,46 +231,33 @@ fn is_geometry_gated(verb_fqn: &str) -> bool {
     matches!(verb_fqn, "kyc_ubo.assert.edge.control" | "kyc_ubo.assert.edge.economic-interest")
 }
 
-/// TS.1 §1's FIRST constraint layer, as an existence check: does there
-/// exist at least one geometrically-possible (source, kind, target) triple
-/// among the subject's currently-registered, currently-typed group members?
-/// An entity with no type assertion at all has no derivable permitted-pipe
-/// set (TS.0 §2 P3: "the proven type determines pipes") — such an entity
-/// contributes nothing here until `assert-type` has fired for it, which is
-/// a real, intended refusal, not a bug: `enumerate_placement_set` cannot
-/// admit a linkage move it cannot evaluate.
+/// TS.5 R2 (closed 2026-08-22): there is no separate existence scan any more.
+/// `geometrically_possible(state, type_registry) -> bool` is DELETED, not
+/// rewritten. It asked "does ANY legal triple exist among typed members
+/// anywhere" and could not ask "is THIS triple legal", because the probe event
+/// it gated carried `payload: Null` — so the geometry precondition found no
+/// triple, returned `Unevaluable`, and admitted by the CTN-2e default. The
+/// coarse scan was bolted on top to compensate.
 ///
-/// **TS.5 R2:** iterates the same ASSERTABLE `EdgeKind` wire values the real
-/// op accepts (`EDGE_KIND_WIRE_VALUES`), not raw `Pipe`s — `EconomicInterest`
-/// classifies through the target type exactly as the write path does — and
-/// evaluates each triple via `fold::control::evaluate_type_geometry`, the
-/// SAME function `check_preconditions`'s `TypeGeometryPermits` arm calls at
-/// the write path. One evaluation function, two call sites, no duplicate
-/// logic to drift out of sync (the defect this whole tranche exists to close).
-fn geometrically_possible(state: &ControlState, type_registry: &TypeRegistryState) -> bool {
-    use crate::fold::control::{evaluate_type_geometry, GeometryEvaluation};
-
-    let members: Vec<EntityId> = state.registered_entity_ids.iter().copied().collect();
-    for &from in &members {
-        if type_registry.type_of(from).is_none() {
-            continue;
-        }
-        for &to in &members {
-            if from == to {
-                continue;
-            }
-            if type_registry.type_of(to).is_none() {
-                continue;
-            }
-            for wire in crate::fold::control::EDGE_KIND_WIRE_VALUES {
-                let kind = crate::fold::control::edge_kind_from_wire(wire);
-                if matches!(evaluate_type_geometry(from, to, &kind, type_registry), GeometryEvaluation::Permitted) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+/// The replacement probes ONE EVENT PER PERMITTED TRIPLE, with the triple in
+/// the payload, so `check_preconditions` evaluates the real triple. Preview and
+/// append then consult the same geometry for the same triple **by
+/// construction** — not because two functions were kept in step, which is
+/// exactly the drift R1's single-chokepoint design exists to prevent.
+///
+/// An entity with no type assertion contributes no candidate here (TS.0 §2 P3:
+/// "the proven type determines pipes"). That is a real, intended silence in the
+/// PREVIEW, not a refusal: R5/R6 are untouched, and an untyped endpoint the
+/// caller names explicitly still ADMITS at the append, recording
+/// geometry-unevaluable. Enforcement narrows what may be ASSERTED; the board
+/// simply cannot propose a triple it has no types to evaluate.
+fn geometry_probe_payload(from: EntityId, to: EntityId, kind_wire: &str) -> serde_json::Value {
+    serde_json::json!({
+        "from_entity_id": from.0.to_string(),
+        "to_entity_id": to.0.to_string(),
+        "edge_id": uuid::Uuid::nil().to_string(),
+        "kind": kind_wire,
+    })
 }
 
 fn entity_move_id(verb_fqn: &str, entity: EntityId) -> MoveId {
@@ -291,6 +306,7 @@ fn type_registry_candidates(
             move_id: move_id_for(RECORD_ENQUIRY, &subject_target),
             verb_fqn: VerbFqn(RECORD_ENQUIRY.to_string()),
             target: subject_target,
+            proposed_edge: None,
         });
     }
 
@@ -312,6 +328,7 @@ fn type_registry_candidates(
                     move_id: entity_move_id(ASSERT_TYPE, entity),
                     verb_fqn: VerbFqn(ASSERT_TYPE.to_string()),
                     target: target.clone(),
+                    proposed_edge: None,
                 });
             }
         }
@@ -327,6 +344,7 @@ fn type_registry_candidates(
                     move_id: entity_move_id(WITHDRAW_MEMBER, entity),
                     verb_fqn: VerbFqn(WITHDRAW_MEMBER.to_string()),
                     target: target.clone(),
+                    proposed_edge: None,
                 });
             }
         }
@@ -341,6 +359,7 @@ fn type_registry_candidates(
                     move_id: entity_move_id(CORRECT_TYPE, entity),
                     verb_fqn: VerbFqn(CORRECT_TYPE.to_string()),
                     target: target.clone(),
+                    proposed_edge: None,
                 });
             }
         }
@@ -352,6 +371,7 @@ fn type_registry_candidates(
                 move_id: entity_move_id(TYPE_SCOPED_ATTACH_EVIDENCE, entity),
                 verb_fqn: VerbFqn(TYPE_SCOPED_ATTACH_EVIDENCE.to_string()),
                 target,
+                proposed_edge: None,
             });
         }
     }
@@ -390,7 +410,57 @@ pub fn enumerate_placement_set(
             // loop's single bare-subject probe target.
             continue;
         }
-        if is_geometry_gated(fqn) && !geometrically_possible(state, type_registry) {
+        if is_geometry_gated(fqn) {
+            // TS.5 R2: one probe per candidate triple, each carrying the triple
+            // in its payload, so `check_preconditions` evaluates THAT triple.
+            // `economic-interest` classifies its kind from the target type and
+            // ignores any `kind` field (`geometry_triple_for_event`), so
+            // enumerating wire values for it would produce 17 identical
+            // triples — pairs only.
+            let members: Vec<EntityId> = state.registered_entity_ids.iter().copied().collect();
+            let wires: &[&str] = if fqn == "kyc_ubo.assert.edge.economic-interest" {
+                &["economic_interest"]
+            } else {
+                crate::fold::control::EDGE_KIND_WIRE_VALUES
+            };
+            for &from in &members {
+                if type_registry.type_of(from).is_none() {
+                    continue;
+                }
+                for &to in &members {
+                    if from == to || type_registry.type_of(to).is_none() {
+                        continue;
+                    }
+                    for wire in wires {
+                        let target = TargetBinding::for_subject(subject);
+                        let mut probe = probe_event(subject, fqn, target.clone());
+                        probe.payload = geometry_probe_payload(from, to, wire);
+                        if check_preconditions(entry, state, obligation, type_registry, &probe)
+                            .is_err()
+                        {
+                            continue;
+                        }
+                        let proposed = ProposedEdge {
+                            from,
+                            to,
+                            kind_wire: (*wire).to_string(),
+                        };
+                        let id = MoveId(format!(
+                            "{fqn}::triple:{}:{wire}:{}",
+                            from.0, to.0
+                        ));
+                        candidates.insert(
+                            id.clone(),
+                            LegalMove {
+                                move_id: id,
+                                verb_fqn: entry.fqn.clone(),
+                                target,
+                                proposed_edge: Some(proposed),
+                            },
+                        );
+                    }
+                }
+            }
             continue;
         }
         let targets: Vec<TargetBinding> = if is_edge_scoped(fqn) {
@@ -413,6 +483,7 @@ pub fn enumerate_placement_set(
                         move_id: id,
                         verb_fqn: entry.fqn.clone(),
                         target,
+                        proposed_edge: None,
                     },
                 );
             }
@@ -430,6 +501,7 @@ pub fn enumerate_placement_set(
             move_id: abstain_id,
             verb_fqn: VerbFqn(NONE_OF_THE_ABOVE.to_string()),
             target: TargetBinding::default(),
+            proposed_edge: None,
         },
     );
 

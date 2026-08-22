@@ -182,16 +182,19 @@ mod tests {
                 move_id: MoveId("kyc_ubo.assert.subject.register::subject".to_string()),
                 verb_fqn: VerbFqn("kyc_ubo.assert.subject.register".to_string()),
                 target: TargetBinding::for_subject(subject),
+                proposed_edge: None,
             },
             LegalMove {
                 move_id: MoveId("kyc_ubo.assert.subject.structure-class::subject".to_string()),
                 verb_fqn: VerbFqn("kyc_ubo.assert.subject.structure-class".to_string()),
                 target: TargetBinding::for_subject(subject),
+                proposed_edge: None,
             },
             LegalMove {
                 move_id: PlacementSet::abstain_move_id(),
                 verb_fqn: VerbFqn(NONE_OF_THE_ABOVE.to_string()),
                 target: TargetBinding::default(),
+                proposed_edge: None,
             },
         ];
         PlacementSet {

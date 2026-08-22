@@ -118,8 +118,19 @@ fn preview_and_append_agree() {
     let lexicon = assembly_lexicon();
     let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
 
-    // Half 1 — no legal pair: two NaturalPerson-typed members. A person is
-    // NEVER a target (TS.1 §2), so no pipe can land on either as `to`.
+    // Half 1 — a board on which the GEOMETRY-REFUSED kinds must be refused by
+    // both sides. Two NaturalPerson-typed members: a person is never a target
+    // (TS.1 §2), so `voting_rights` cannot land on either as `to`.
+    //
+    // TS.5 R2 (2026-08-22): this half previously asserted the board offers
+    // `assert-control` NOWHERE here, on the premise "no legal pair exists".
+    // That premise was FALSE and the assertion was itself an instance of the
+    // divergence R2 exists to prevent — the append ADMITS
+    // `person --economic_interest--> person2` on this very board (Unevaluable,
+    // R6/CTN-2e; see `illegal_triple_is_not_offered`). The existence scan said
+    // "no move" while the append said "admit", and the gate recorded that as
+    // correct. Reported before fixed, per R4. It now asserts the AGREEMENT
+    // property per triple, which is what R2 actually rules.
     {
         let subject = subject();
         let a = EntityId(Uuid::new_v4());
@@ -133,8 +144,16 @@ fn preview_and_append_agree() {
         let obligation = ObligationState::default();
 
         let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
-        let offered = board.moves.iter().any(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control");
-        assert!(!offered, "board should NOT offer assert-control — no legal pair exists");
+        let offered_voting = board
+            .moves
+            .iter()
+            .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+            .filter_map(|m| m.proposed_edge.as_ref())
+            .any(|t| t.kind_wire == "voting_rights");
+        assert!(
+            !offered_voting,
+            "board must not offer a voting_rights triple — a person is never a target"
+        );
 
         let event = assert_control_event(subject, a, b, "voting_rights");
         let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
@@ -155,8 +174,14 @@ fn preview_and_append_agree() {
         let obligation = ObligationState::default();
 
         let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
-        let offered = board.moves.iter().any(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control");
-        assert!(offered, "board SHOULD offer assert-control — a legal pair exists");
+        // The SPECIFIC triple, not merely the verb — the whole point of R2.
+        let offered = board
+            .moves
+            .iter()
+            .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+            .filter_map(|m| m.proposed_edge.as_ref())
+            .any(|t| t.from == person && t.to == corp && t.kind_wire == "voting_rights");
+        assert!(offered, "board SHOULD offer person --voting_rights--> corp");
 
         let event = assert_control_event(subject, person, corp, "voting_rights");
         let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
@@ -320,4 +345,142 @@ fn type_correction_still_cascades() {
     let correction = correct_type_event(subject, corp, "sicav", &invalidated);
     let type_registry2 = fold_type_registry(&[&reg1, &reg2, &t1, &t2, &correction]);
     assert!(type_registry2.determination_stale, "correction must mark the determination stale");
+}
+
+// ── TS.5 R2, closed 2026-08-22 ──────────────────────────────────────────────
+//
+// The 2026-08-22 reconciliation proved R2 was NOT closed: `geometrically_
+// possible` took no (from, kind, to) and asked only "does ANY legal triple
+// exist among typed members anywhere". `preview_and_append_agree` above passed
+// because it tests only the two EXTREMES — a board with no legal pair, and a
+// board with a legal pair which it then submits. It never submits a DIFFERENT
+// triple on a board that passed the existence gate, which is the only shape
+// that can catch the defect.
+
+/// Build a MIXED board: person, person2 (both natural persons) and corp.
+/// `person --VotingShares--> corp` is legal; `person --VotingRights--> person2`
+/// is not (a person is never a target, TS.1 §2).
+fn mixed_board() -> (SubjectId, EntityId, EntityId, EntityId, Vec<IntentEvent>) {
+    let subject = subject();
+    let person = EntityId(Uuid::new_v4());
+    let person2 = EntityId(Uuid::new_v4());
+    let corp = EntityId(Uuid::new_v4());
+    let evs = vec![
+        register_event(subject, person),
+        register_event(subject, person2),
+        register_event(subject, corp),
+        assert_type_event(subject, person, "natural_person"),
+        assert_type_event(subject, person2, "natural_person"),
+        assert_type_event(subject, corp, "private_limited_company"),
+    ];
+    (subject, person, person2, corp, evs)
+}
+
+/// The specific case the reconciliation reproduced: on a board where a legal
+/// pair exists, the illegal triple must NOT be offered.
+#[test]
+fn illegal_triple_is_not_offered() {
+    let lexicon = assembly_lexicon();
+    let (subject, person, person2, corp, evs) = mixed_board();
+    let refs: Vec<&IntentEvent> = evs.iter().collect();
+    let control = fold_control(&refs);
+    let type_registry = fold_type_registry(&refs);
+    let obligation = ObligationState::default();
+
+    let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+
+    let offered_triples: Vec<(EntityId, EntityId, String)> = board
+        .moves
+        .iter()
+        .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+        .filter_map(|m| m.proposed_edge.as_ref())
+        .map(|t| (t.from, t.to, t.kind_wire.clone()))
+        .collect();
+
+    assert!(
+        !offered_triples.is_empty(),
+        "the board must offer the legal triple(s) — a gate that offers nothing \
+         is not a fix"
+    );
+    assert!(
+        offered_triples
+            .iter()
+            .any(|(f, t, k)| *f == person && *t == corp && k == "voting_rights"),
+        "person --voting_rights--> corp is legal and must be offered; got {offered_triples:?}"
+    );
+    // Scoped to GEOMETRY-REFUSED kinds, not "any kind". `economic_interest`
+    // into a natural person is deliberately NOT refused: TS.2 §3 names no pipe
+    // for it, so `classify_economic_interest` returns no pipe at all and
+    // `evaluate_type_geometry` reports `Unevaluable`, which ADMITS under
+    // R6/CTN-2e. D1 corrective-tranche Item 4 (2026-08-21) made that explicit —
+    // "an open question, not silently resolved" — after it had previously
+    // defaulted to `NonVotingShares`, a guess dressed up as a flagged value.
+    // Asserting the board must offer NOTHING person→person would therefore be
+    // asserting against a ratified ruling, not for R2.
+    assert!(
+        !offered_triples
+            .iter()
+            .any(|(f, t, k)| *f == person && *t == person2 && k == "voting_rights"),
+        "person --voting_rights--> person2 is NOT a move (person is never a \
+         target, TS.1 §2) and must not be offered; got {offered_triples:?}"
+    );
+}
+
+/// The gate `preview_and_append_agree` should have been: over a board holding
+/// BOTH legal and illegal pairs, for EVERY candidate triple the board offers a
+/// move IFF the append admits it. Both directions — an offered-but-refused
+/// triple is the preview-vs-reality divergence R2 exists to prevent, and an
+/// admitted-but-unoffered triple is a board hiding a legal move.
+#[test]
+fn preview_and_append_agree_for_every_triple() {
+    use ob_poc_kyc_substrate::EDGE_KIND_WIRE_VALUES;
+
+    let lexicon = assembly_lexicon();
+    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let (subject, person, person2, corp, evs) = mixed_board();
+    let refs: Vec<&IntentEvent> = evs.iter().collect();
+    let control = fold_control(&refs);
+    let type_registry = fold_type_registry(&refs);
+    let obligation = ObligationState::default();
+
+    let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+    let offered: std::collections::BTreeSet<(EntityId, EntityId, String)> = board
+        .moves
+        .iter()
+        .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+        .filter_map(|m| m.proposed_edge.as_ref())
+        .map(|t| (t.from, t.to, t.kind_wire.clone()))
+        .collect();
+
+    let members = [person, person2, corp];
+    let mut disagreements: Vec<String> = Vec::new();
+    let mut checked = 0usize;
+    for &from in &members {
+        for &to in &members {
+            if from == to {
+                continue;
+            }
+            for wire in EDGE_KIND_WIRE_VALUES {
+                checked += 1;
+                let is_offered = offered.contains(&(from, to, (*wire).to_string()));
+                let event = assert_control_event(subject, from, to, wire);
+                let admits =
+                    check_preconditions(entry, &control, &obligation, &type_registry, &event)
+                        .is_ok();
+                if is_offered != admits {
+                    disagreements.push(format!(
+                        "{from:?} --{wire}--> {to:?}: offered={is_offered} admitted={admits}"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(checked >= 6 * 17, "the sample must be the full triple space; checked {checked}");
+    assert!(
+        disagreements.is_empty(),
+        "preview and append must agree for EVERY triple (TS.5 R2), not just the \
+         two extremes; {} of {checked} disagreed:\n{}",
+        disagreements.len(),
+        disagreements.join("\n")
+    );
 }

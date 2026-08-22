@@ -65,7 +65,9 @@ pub use lexicon::{
     assembly_lexicon, evaluation_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition,
     Taxonomy,
 };
-pub use placement::{enumerate_placement_set, LegalMove, MoveId, PlacementSet, NONE_OF_THE_ABOVE};
+pub use placement::{
+    enumerate_placement_set, LegalMove, MoveId, PlacementSet, ProposedEdge, NONE_OF_THE_ABOVE,
+};
 pub use preview::preview;
 pub use render::render_intent_event_to_sexpr;
 pub use types::{
