@@ -7,12 +7,8 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
-use ob_poc::domain_ops::kyc_stream_ops::{
-    KycObligationCreate, KycSubjectRegister, ScreeningComplete, ScreeningReviewHit,
-};
-use ob_poc_kyc_store::PgKycEventStore;
-use ob_poc_kyc_substrate::{fold_obligations, ObligationId, SubjectId, TrackState};
+use dsl_runtime::{TransactionScope, VerbExecutionContext};
+use ob_poc::domain_ops::kyc_stream_ops::ScreeningComplete;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -41,9 +37,6 @@ impl Scope {
             id: TransactionScopeId::new(),
         }
     }
-    async fn commit(self) {
-        self.tx.commit().await.unwrap();
-    }
 }
 impl TransactionScope for Scope {
     fn scope_id(&self) -> TransactionScopeId {
@@ -55,18 +48,6 @@ impl TransactionScope for Scope {
     fn pool(&self) -> &PgPool {
         &self.pool
     }
-}
-
-async fn dispatch(
-    op: &dyn SemOsVerbOp,
-    args: serde_json::Value,
-    pool: &PgPool,
-) -> VerbExecutionOutcome {
-    let mut ctx = VerbExecutionContext::default();
-    let mut scope = Scope::begin(pool).await;
-    let out = op.execute(&args, &mut ctx, &mut scope).await.expect("op");
-    scope.commit().await;
-    out
 }
 
 /// Legacy fixture: one throwaway CBU + entity + case + workstream, deleted in
@@ -175,117 +156,19 @@ async fn cleanup_fixture(pool: &PgPool, f: &Fixture) {
         .await;
 }
 
-async fn cleanup_stream(pool: &PgPool, subject: SubjectId) {
-    for t in ["kyc_intent_events", "kyc_subject_streams"] {
-        let _ = sqlx::query(&format!(
-            r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
-        ))
-        .bind(subject.0)
-        .execute(pool)
-        .await;
-    }
-}
-
-async fn screening_track_for(pool: &PgPool, subject: SubjectId, obligation_id: Uuid) -> TrackState {
-    let mut conn = pool.acquire().await.expect("conn");
-    let events = PgKycEventStore::load_events(&mut conn, subject)
-        .await
-        .expect("load_events");
-    let refs: Vec<_> = events.iter().collect();
-    let state = fold_obligations(&refs);
-    state
-        .obligations
-        .get(&ObligationId(obligation_id))
-        .expect("obligation present in fold")
-        .screening
-        .clone()
-}
-
-#[tokio::test]
-async fn screening_complete_clear_fans_out_satisfied_to_open_obligation() {
-    let pool = pool().await;
-    let fixture = seed_fixture(&pool).await;
-    let subject = SubjectId(fixture.entity_id);
-
-    dispatch(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
-        &pool,
-    )
-    .await;
-    let obligation_id = Uuid::new_v4();
-    dispatch(
-        &KycObligationCreate,
-        serde_json::json!({ "subject-id": subject.0, "obligation-id": obligation_id, "role": "beneficial_owner" }),
-        &pool,
-    )
-    .await;
-
-    let screening_id = seed_screening(&pool, fixture.workstream_id, "SANCTIONS").await;
-
-    dispatch(
-        &ScreeningComplete,
-        serde_json::json!({ "screening-id": screening_id, "status": "CLEAR" }),
-        &pool,
-    )
-    .await;
-
-    let track = screening_track_for(&pool, subject, obligation_id).await;
-    assert!(
-        matches!(track, TrackState::Satisfied { .. }),
-        "expected Satisfied, got {track:?}"
-    );
-
-    let (status,): (String,) =
-        sqlx::query_as(r#"SELECT status FROM "ob-poc".screenings WHERE screening_id = $1"#)
-            .bind(screening_id)
-            .fetch_one(&pool)
-            .await
-            .expect("screening row");
-    assert_eq!(status, "CLEAR", "legacy screenings row must still be written");
-
-    cleanup_stream(&pool, subject).await;
-    cleanup_fixture(&pool, &fixture).await;
-}
-
-#[tokio::test]
-async fn screening_review_hit_confirmed_fans_out_rejected() {
-    let pool = pool().await;
-    let fixture = seed_fixture(&pool).await;
-    let subject = SubjectId(fixture.entity_id);
-
-    dispatch(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
-        &pool,
-    )
-    .await;
-    let obligation_id = Uuid::new_v4();
-    dispatch(
-        &KycObligationCreate,
-        serde_json::json!({ "subject-id": subject.0, "obligation-id": obligation_id, "role": "director" }),
-        &pool,
-    )
-    .await;
-
-    let screening_id = seed_screening(&pool, fixture.workstream_id, "PEP").await;
-
-    dispatch(
-        &ScreeningReviewHit,
-        serde_json::json!({ "screening-id": screening_id, "status": "HIT_CONFIRMED", "notes": "confirmed PEP match" }),
-        &pool,
-    )
-    .await;
-
-    let track = screening_track_for(&pool, subject, obligation_id).await;
-    assert!(
-        matches!(track, TrackState::Rejected { .. }),
-        "expected Rejected, got {track:?}"
-    );
-
-    cleanup_stream(&pool, subject).await;
-    cleanup_fixture(&pool, &fixture).await;
-}
+// `screening_complete_clear_fans_out_satisfied_to_open_obligation` and
+// `screening_review_hit_confirmed_fans_out_rejected` RETIRED (D2.0 §5,
+// 2026-08-22, disclosed consequence — NOT a D2.0-named deletion): both
+// seeded an obligation via `KycObligationCreate` for the W5 fan-out
+// (`apply_screening_outcome_to_obligations`) to find. `creation` — the only
+// writer of a new `ObligationTracks` entry — is dissolved, so no obligation
+// can ever exist for the fan-out to iterate again: the entire W5
+// screening-hook fan-out feature (EOP-DD-KYCUBO-004, landed 2026-08-17) is
+// now silently inert for any subject registered from this tranche forward.
+// Recorded in the state-of-play, not silently left for a future reader to
+// rediscover as a mystery no-op. `screening_complete_unrecognized_status_
+// fails_closed_without_writing`, below, is independent of obligations and
+// still proves real behavior (input validation ahead of any fold read).
 
 #[tokio::test]
 async fn screening_complete_unrecognized_status_fails_closed_without_writing() {

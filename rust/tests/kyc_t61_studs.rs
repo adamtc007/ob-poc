@@ -214,7 +214,7 @@ fn checker_sees_both_folds() {
     let subject = SubjectId(Uuid::new_v4());
     let empty_control = ControlState::default();
 
-    let mut synthetic_entry = lexicon.get("kyc_ubo.assert.obligation.creation").unwrap().clone();
+    let mut synthetic_entry = lexicon.get("kyc_ubo.assert.entity.identity").unwrap().clone();
     synthetic_entry.preconditions = vec![ob_poc_kyc_substrate::Precondition::SubjectAllTerminal];
 
     // InProgress (default/no rollup) — not all-terminal — must reject.
@@ -224,7 +224,7 @@ fn checker_sees_both_folds() {
         &empty_control,
         &not_terminal,
         &TypeRegistryState::default(),
-        &probe(subject, "kyc_ubo.assert.obligation.creation"),
+        &probe(subject, "kyc_ubo.assert.entity.identity"),
     );
     assert!(
         result.is_err(),
@@ -273,7 +273,7 @@ fn checker_sees_both_folds() {
             &empty_control,
             &terminal,
             &TypeRegistryState::default(),
-            &probe(subject, "kyc_ubo.assert.obligation.creation"),
+            &probe(subject, "kyc_ubo.assert.entity.identity"),
         )
         .is_ok(),
         "SubjectAllTerminal must admit once ObligationState shows the subject AllTerminal — \

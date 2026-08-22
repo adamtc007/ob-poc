@@ -221,17 +221,22 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_21() {
+fn verb_universe_is_exactly_19() {
     // TS.6 P1/P2: kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject
     // and moved to a new `decide:` domain block in the SAME YAML file
     // (dsl-kyc-obligation.yaml) — a rename+relocation, not a retirement, so
     // this count is unchanged at 22 (declared_verb_universe() scans both
     // files' domains, not just `kyc:`).
+    //
+    // D2.0 §5 (2026-08-22): `creation`/`satisfaction` DISSOLVED (21→19).
+    // `waiver` renamed+relocated to `kyc_ubo.decide.obligation.waiver` in
+    // the same YAML file — a relocation, not a count change.
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        21,
-        "dsl.kyc verb count drifted from the post-TS.6-§5 21 (25 post-D1, \
+        19,
+        "dsl.kyc verb count drifted from the post-D2.0 19 (21 post-TS.6-§5, \
+         minus creation/satisfaction DISSOLVED) (25 post-D1, \
          minus the retired select-strategy, compute-fold, and pierce-nominee \
          verb declarations) — update the T0.3 audit and every other pinned \
          test in this file, not just this assertion: {fqns:#?}"
@@ -242,10 +247,8 @@ fn verb_universe_is_exactly_21() {
 
 #[test]
 fn assembly_pack_is_exactly_known() {
-    // TS.6 §3/§4: the 20 `assembly_lexicon()` entries — 22 declared dsl.kyc
-    // verbs minus the 2 evaluation-pack verdicts. Includes `kyc.obligation.
-    // waive`, deferred here pending D2.0 (TS.6 §3's amended row 13) rather
-    // than renamed to `decide.waive`.
+    // D2.0 §5 (2026-08-22): the 16 `assembly_lexicon()` entries — `creation`/
+    // `satisfaction` DISSOLVED, `waiver` MOVED to `evaluation_lexicon()`.
     let expected: BTreeSet<String> = [
         "kyc_ubo.assert.subject.register",
         "kyc_ubo.assert.subject.structure-class",
@@ -260,12 +263,9 @@ fn assembly_pack_is_exactly_known() {
         "kyc_ubo.assert.edge.supersession",
         "kyc_ubo.assert.edge.reconciliation",
         "kyc_ubo.decide.determination.freeze",
-        "kyc_ubo.assert.obligation.creation",
         "kyc_ubo.assert.entity.identity",
         "kyc_ubo.assert.entity.screening",
         "kyc_ubo.assert.entity.risk",
-        "kyc_ubo.assert.obligation.satisfaction",
-        "kyc_ubo.assert.obligation.waiver",
     ]
     .into_iter()
     .map(String::from)
@@ -279,12 +279,16 @@ fn assembly_pack_is_exactly_known() {
 
 #[test]
 fn evaluation_pack_is_exactly_known() {
-    // TS.6 §4: only the 2 landed verdicts. `decide.waive` is NOT here —
-    // `kyc_ubo.assert.obligation.waiver` stays in assembly_lexicon() pending D2.0.
-    let expected: BTreeSet<String> = ["kyc_ubo.decide.subject.approve", "kyc_ubo.decide.subject.reject"]
-        .into_iter()
-        .map(String::from)
-        .collect();
+    // D2.0 §5 (2026-08-22): the 2 landed verdicts plus `kyc_ubo.decide.
+    // obligation.waiver`, moved here from assembly_lexicon().
+    let expected: BTreeSet<String> = [
+        "kyc_ubo.decide.subject.approve",
+        "kyc_ubo.decide.subject.reject",
+        "kyc_ubo.decide.obligation.waiver",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
     let actual: BTreeSet<String> = evaluation_lexicon().entries.keys().cloned().collect();
     assert_eq!(
         actual, expected,
@@ -426,21 +430,19 @@ fn retired_verbs_are_gone() {
 #[test]
 fn stream_governed_family_covers_every_declared_verb() {
     let globs = stream_governed_globs();
-    // 7 → 5 (four-segment rename, RATIFIED 2026-08-22). A conscious drop, not
-    // drift: the five surviving globs are the five stream-governed
-    // `kyc_ubo.<capability>.<domain>.*` families. The two that went were
-    // already VACUOUS under the old scheme — `kyc.role.*` (assign/withdraw
-    // retired 2026-08-12, K-G7) and `kyc.person.*` (approve/reject became
-    // `kyc_ubo.decide.subject.*` in the Evaluation pack, which is not
-    // stream-governed at all). A vacuous glob has nothing to rename INTO, so
-    // renaming them would have manufactured two families matching zero verbs
-    // under a scheme that never knew them. `kyc_ubo.decide.subject.*` is
-    // deliberately absent for the same reason the Evaluation pack exists;
-    // `kyc_ubo.decide.determination.*` (freeze, the one Assembly verdict) is
-    // present because it IS stream-governed.
+    // 7 → 5 (four-segment rename, RATIFIED 2026-08-22) → 4 (D2.0 §5,
+    // 2026-08-22: `kyc_ubo.assert.obligation.*` removed outright, not just
+    // left vacuous, once it was actually EMPTY — `.creation`/`.satisfaction`
+    // dissolved (K-G7) and `.waiver` moved to the Evaluation-plane
+    // `kyc_ubo.decide.obligation.waiver`, so no verb could ever match this
+    // glob again). The two-glob drop from 7→5 was a conscious keep-vacuous
+    // move (see the `kyc.role.*`/`kyc.person.*` note below); this 5→4 drop
+    // is a conscious REMOVE, because the same domain segment
+    // (`assert.obligation`) has zero remaining stream-governed members —
+    // there is nothing left to leave in place.
     assert_eq!(
         globs.len(),
-        5,
+        4,
         "stream_governed.verb_families count drifted from the audited 7: {globs:#?}"
     );
     // The kyc.role.* glob is vacuous after the K-G7 retirement (no live verb
@@ -452,9 +454,14 @@ fn stream_governed_family_covers_every_declared_verb() {
     // loop below — they are NOT stream-governed any more (ob-poc-kyc-decide
     // never writes to the fact stream at all), so "must be covered by a
     // stream_governed family glob" does not apply to them by design.
+    // kyc_ubo.decide.obligation.waiver (D2.0 §5, moved here 2026-08-22) is
+    // excluded for the identical reason — same crate, same non-write.
 
     for fqn in declared_verb_universe() {
-        if fqn == "kyc_ubo.decide.subject.approve" || fqn == "kyc_ubo.decide.subject.reject" {
+        if fqn == "kyc_ubo.decide.subject.approve"
+            || fqn == "kyc_ubo.decide.subject.reject"
+            || fqn == "kyc_ubo.decide.obligation.waiver"
+        {
             continue;
         }
         let covered = globs.iter().any(|g| match g.strip_suffix(".*") {
@@ -486,14 +493,18 @@ fn every_declared_verb_has_a_registered_op() {
     // `ob-poc-kyc-decide` instead) — `registered_op_fqns()` now scans both
     // source files, so the total count is unchanged at 24 (a relocation,
     // not a net registration change).
+    //
+    // D2.0 §5 (2026-08-22): `KycObligationCreate`/`KycObligationSatisfy`
+    // DISSOLVED (23→21). `KycObligationWaive` MOVED to `ob-poc-kyc-decide`
+    // as `DecideObligationWaive` — still counted once, so no further change.
     let declared = kyc_stream_ops_declared_universe();
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        23,
+        21,
         "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
-         ops co-hosted in kyc_stream_ops.rs, and kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject \
-         in ob-poc-kyc-decide) drifted from 23: {registered:#?}"
+         ops co-hosted in kyc_stream_ops.rs, and kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject/ \
+         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 21: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -563,7 +574,7 @@ fn newly_covered_entries_are_fqn_correct_and_render_safe() {
     let assembly = assembly_lexicon();
     let evaluation = evaluation_lexicon();
     for (fqn, lexicon) in [
-        ("kyc_ubo.assert.obligation.creation", &assembly),
+        ("kyc_ubo.assert.entity.identity", &assembly),
         ("kyc_ubo.decide.subject.approve", &evaluation),
     ] {
         let entry = lexicon
@@ -613,7 +624,13 @@ fn fold_blind_verbs_are_exactly_known() {
         // verb that was never fold-eligible to begin with, so they're
         // excluded from this universe rather than allow-listed as an
         // exception to a defect class they don't belong to.
-        .filter(|fqn| fqn != "kyc_ubo.decide.subject.approve" && fqn != "kyc_ubo.decide.subject.reject")
+        // kyc_ubo.decide.obligation.waiver (D2.0 §5, 2026-08-22) is excluded
+        // for the identical reason — moved to the same never-appends crate.
+        .filter(|fqn| {
+            fqn != "kyc_ubo.decide.subject.approve"
+                && fqn != "kyc_ubo.decide.subject.reject"
+                && fqn != "kyc_ubo.decide.obligation.waiver"
+        })
         .filter(|fqn| {
             !control_arms.contains(fqn)
                 && !obligation_arms.contains(fqn)
@@ -797,22 +814,22 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
 
     // T6.4 (2026-08-12, obligation/person family — EOP-DD-KYCUBO-KIT-T6
     // matrix rows 11-18, every row cross-fold via the T6.1 unified checker).
-    expected.insert(
-        "kyc_ubo.assert.obligation.creation".to_string(),
-        vec![Precondition::SubjectRegistered],
-    );
+    // D2.0 §5 (2026-08-22): `creation` (row 11) DISSOLVED — no lexicon entry
+    // left to pin here. `satisfaction` (row 15) DISSOLVED; `waiver` (row 16)
+    // MOVED to `evaluation_lexicon()` (`kyc_ubo.decide.obligation.waiver`,
+    // `preconditions: []` — see `evaluation_pack_is_exactly_known`'s note on
+    // why Evaluation entries carry none). The 3 remaining Assembly
+    // obligation-fact verbs below keep `ObligationExists`.
+    //
     // `Precondition::SubjectNotDecided` retired TS.6 P2 (K-G7) alongside
     // `kyc.person.approve`/`.reject` (renamed `kyc_ubo.decide.subject.approve`/`.reject`,
     // moved to `ob-poc-kyc-decide` — no lexicon entry here any more, no
     // substrate Precondition either; their finality guard now queries
-    // `kyc_decision_records` directly). The 5 obligation verbs below keep
-    // only `ObligationExists`.
+    // `kyc_decision_records` directly).
     for fqn in [
         "kyc_ubo.assert.entity.identity",
         "kyc_ubo.assert.entity.screening",
         "kyc_ubo.assert.entity.risk",
-        "kyc_ubo.assert.obligation.satisfaction",
-        "kyc_ubo.assert.obligation.waiver",
     ] {
         expected.insert(fqn.to_string(), vec![Precondition::ObligationExists]);
     }
@@ -836,9 +853,11 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
 
     assert_eq!(
         actual.len(),
-        19,
-        "assembly_lexicon() entry count drifted from the post-TS.6-P1 20 \
-         lexicon-covered verbs (25 post-D1, minus the retired select-strategy, \
+        16,
+        "assembly_lexicon() entry count drifted from the post-D2.0 16 \
+         lexicon-covered verbs (19 post-TS.6-P1, minus creation/satisfaction \
+         DISSOLVED and waiver MOVED to evaluation_lexicon(), D2.0 §5) \
+         (25 post-D1, minus the retired select-strategy, \
          compute-fold, and pierce-nominee entries, minus kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject \
          moved to evaluation_lexicon())"
     );
@@ -2107,24 +2126,32 @@ fn projection_queue_is_gone() {
 
     // The KEPT half must still be there — this gate must not be satisfiable
     // by deleting the projector along with its trigger.
-    for kept in [
-        "pub struct PgKycProjector",
-        "pub async fn rebuild_control_edges",
-        "pub struct PgKycObligationProjector",
-        "pub async fn rebuild_obligations",
-    ] {
+    //
+    // `PgKycObligationProjector`/`rebuild_obligations` REMOVED (D2.0 §5,
+    // 2026-08-22, distinct from the queue removal this test otherwise
+    // guards): "the outbox removal deleted the queue and drainers but left
+    // the obligation projection standing... it goes with obligations."
+    // `creation` — the only writer of a new `ObligationTracks` entry — is
+    // dissolved, so that projector had nothing left to project.
+    for kept in ["pub struct PgKycProjector", "pub async fn rebuild_control_edges"] {
         assert!(
             KYC_PROJECTION_SRC.contains(kept),
             "K-34 machinery must survive the queue removal; missing: {kept}"
         );
     }
+    for gone in ["pub struct PgKycObligationProjector", "pub async fn rebuild_obligations"] {
+        assert!(
+            !KYC_PROJECTION_SRC.contains(gone),
+            "D2.0 §5 removed the obligation projection; found it back: {gone}"
+        );
+    }
     // Full-replace semantics, specifically: the rebuild DELETEs the subject's
-    // rows before re-inserting from the fold.
+    // rows before re-inserting from the fold. Only the control-edge
+    // projection survives D2.0 §5, so exactly one DELETE remains.
     assert_eq!(
         KYC_PROJECTION_SRC.matches("DELETE FROM").count(),
-        3,
-        "full-replace: one DELETE per projected table (control edges, \
-         obligations, subject rollup)"
+        1,
+        "full-replace: one DELETE for the surviving control-edge projection"
     );
 }
 
@@ -2360,8 +2387,11 @@ async fn no_legacy_fqns_remain_in_the_search_index() {
     .fetch_one(&pool)
     .await
     .expect("count new");
+    // D2.0 §5 (2026-08-22): creation/satisfaction DISSOLVED (21→19) — gone
+    // from the index entirely, not renamed. waiver's new FQN is still
+    // counted once.
     assert_eq!(
-        indexed, 21,
-        "all 21 renamed verbs must be discoverable under the new scheme"
+        indexed, 19,
+        "the 19 surviving renamed verbs must be discoverable under the new scheme"
     );
 }

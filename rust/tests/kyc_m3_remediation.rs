@@ -13,16 +13,11 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycObligationCreate, KycSubjectClassifyStructure, KycSubjectRegister,
-    UboDeterminationFreeze, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAssertEconomicInterest, UboEdgeReconcileConflict,
 };
-// kyc.person.approve renamed kyc_ubo.decide.subject.approve TS.6 P2 — moved to ob-poc-kyc-decide.
-use ob_poc_kyc_decide::DecideApprove;
 use ob_poc_kyc_store::PgKycEventStore;
-use ob_poc_kyc_substrate::{
-    fold_obligations_versioned, assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl,
-};
+use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -82,21 +77,6 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> se
     }
 }
 
-/// Dispatch a verb op without unwrapping — for tests asserting rejection.
-async fn run_fallible(
-    op: &dyn SemOsVerbOp,
-    args: serde_json::Value,
-    pool: &PgPool,
-) -> anyhow::Result<serde_json::Value> {
-    let mut ctx = VerbExecutionContext::default();
-    let mut scope = Scope::begin(pool).await;
-    let out = op.execute(&args, &mut ctx, &mut scope).await?;
-    scope.commit().await;
-    Ok(match out {
-        dsl_runtime::VerbExecutionOutcome::Record(v) => v,
-        other => serde_json::to_value(format!("{other:?}")).unwrap(),
-    })
-}
 
 async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
     for s in subjects {
@@ -272,52 +252,18 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
     cleanup(&pool, &[subject]).await;
 }
 
-// ── M3.2 — K-23 gate: person.approve must reject non-terminal obligations (R2) ─
-
-#[tokio::test]
-async fn m3_2_person_approve_rejects_when_obligations_not_terminal() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": true,
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycObligationCreate,
-        serde_json::json!({
-            "subject-id": subject.0, "role": "director", "jurisdiction": "LU",
-        }),
-        &pool,
-    )
-    .await;
-    // Deliberately leave identity/screening/risk tracks Pending — no update-* calls.
-
-    let result = run_fallible(
-        &DecideApprove,
-        serde_json::json!({
-            "subject-id": subject.0,
-        }),
-        &pool,
-    )
-    .await;
-
-    assert!(
-        result.is_err(),
-        "approve must be rejected while obligations are not all terminal (K-23)"
-    );
-    let msg = result.unwrap_err().to_string();
-    assert!(
-        msg.contains("K-23"),
-        "error should name the K-23 gate; got: {msg}"
-    );
-
-    cleanup(&pool, &[subject]).await;
-}
+// ── M3.2 — RETIRED (EOP-DD-KYCUBO-D2.0 §5, 2026-08-22) ─────────────────────
+//
+// `m3_2_person_approve_rejects_when_obligations_not_terminal` tested the
+// obligation-fold-based K-23 gate ("reject while an obligation track is
+// still Pending"). `kyc_ubo.assert.obligation.creation` — the only writer
+// of a new `ObligationTracks` entry — is dissolved, so that mechanism no
+// longer exists to test: `decide.approve`'s K-23 gate now cites an
+// `EvaluationRun`'s work list (see `tests/kyc_verb_coverage.rs`'s
+// `decide_cites_a_run`), which is trivially empty against today's empty
+// check catalogue (D2.0 §7 Q2, out of scope) — this exact test, run
+// unmodified against the new gate, would now assert the OPPOSITE of what
+// actually happens (approve succeeds, not fails).
 
 // ── M3.3 — structure_class round-trip (R3 payload-key bug) ────────────────────
 
@@ -515,45 +461,10 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
 // The sibling round-trip gates below (cbu-role, structure-class) still cover
 // the defect CLASS for the args that remain.
 
-#[tokio::test]
-async fn cbu_role_round_trips_through_the_obligation_fold() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycObligationCreate,
-        serde_json::json!({
-            "subject-id": subject.0, "role": "shareholder", "cbu-role": "investor",
-        }),
-        &pool,
-    )
-    .await;
-
-    let mut conn = pool.acquire().await.expect("acquire connection");
-    let events = PgKycEventStore::load_events(&mut conn, subject)
-        .await
-        .expect("load events");
-    let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-    let mut registry = FoldRegistry::new();
-    registry.register(assembly_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
-    let state = fold_obligations_versioned(&refs, &registry).expect("fold obligations");
-
-    let cbu_roles: Vec<Option<String>> = state
-        .obligations
-        .values()
-        .map(|t| t.basis.cbu_role.clone())
-        .collect();
-    assert!(
-        cbu_roles.iter().any(|r| r.as_deref() == Some("investor")),
-        "cbu-role (kebab, YAML arg name) must reach ObligationBasis.cbu_role \
-         (snake_case, what the fold reads) — got cbu_roles={cbu_roles:?}",
-    );
-
-    cleanup(&pool, &[subject]).await;
-}
+// `cbu_role_round_trips_through_the_obligation_fold` RETIRED (D2.0 §5,
+// 2026-08-22): it proved `kyc_ubo.assert.obligation.creation`'s kebab→snake
+// payload normalization (`cbu-role`→`cbu_role`) reached `ObligationBasis`.
+// `creation` is dissolved, so there is no live write path left to guard —
+// same disposition as the already-retired `smo_person_id` sibling gate,
+// above. `structure_class_round_trips_through_the_control_fold` (if present
+// elsewhere in this suite) still covers the defect CLASS for a surviving verb.

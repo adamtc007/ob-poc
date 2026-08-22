@@ -1,5 +1,8 @@
-//! 100% live-DB integration coverage for all 20 dsl.kyc verbs
-//! (kyc.role.assign/withdraw retired 2026-08-12, T0.3 K-G7 fold-blind write).
+//! 100% live-DB integration coverage for the dsl.kyc verb surface
+//! (kyc.role.assign/withdraw retired 2026-08-12, T0.3 K-G7 fold-blind write;
+//! `kyc_ubo.assert.obligation.creation`/`.satisfaction` DISSOLVED and
+//! `.waiver` MOVED to `kyc_ubo.decide.obligation.waiver`, D2.0 §5,
+//! 2026-08-22).
 //!
 //! Each verb is exercised via its `SemOsVerbOp` through a real
 //! `VerbExecutionContext` and `TransactionScope`. The test commits to the
@@ -7,14 +10,15 @@
 //! Verbs with preconditions run in natural dependency order
 //! (assert → attach-evidence → verify, etc.).
 //!
-//! Five verbs are already proven in dedicated test files:
+//! Verbs already proven in dedicated test files:
 //!   kyc_ubo.assert.edge.control          → tests/kyc_stream_ops.rs
 //!   kyc_ubo.assert.subject.register             → tests/kyc_stream_ops.rs + kyc_w3_w5_w6.rs
-//!   kyc_ubo.assert.obligation.creation            → tests/kyc_w3_w5_w6.rs
-//!   kyc_ubo.assert.obligation.satisfaction           → tests/kyc_w3_w5_w6.rs
-//!   kyc.person.approve               → tests/kyc_w3_w5_w6.rs
 //!
-//! This file covers the remaining 15.
+//! `coverage_kyc_obligation_update_identity/screening/risk` below now assert
+//! REFUSAL, not success — the disclosed D2.0 P0 consequence: with `creation`
+//! dissolved (the only writer of a new `ObligationTracks` entry),
+//! `Precondition::ObligationExists` can never again be satisfied for these
+//! three verbs. Recorded, not silently left to bit-rot as a mystery failure.
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -22,16 +26,14 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycObligationCreate, KycObligationSatisfy, KycObligationUpdateIdentity, KycObligationUpdateRisk,
-    KycObligationUpdateScreening, KycObligationWaive,
-    KycSubjectClassifyStructure, KycSubjectRegister,
-    UboDeterminationFreeze, UboEdgeAssertControl,
+    KycObligationUpdateIdentity, KycObligationUpdateRisk, KycObligationUpdateScreening,
+    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence, UboEdgeReconcileConflict,
     UboEdgeSupersede, UboEdgeVerify,
 };
 // kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject TS.6 P2 — moved
-// to ob-poc-kyc-decide.
-use ob_poc_kyc_decide::{DecideApprove, DecideReject};
+// to ob-poc-kyc-decide. kyc_ubo.decide.obligation.waiver moved there too, D2.0 §5.
+use ob_poc_kyc_decide::{DecideApprove, DecideObligationWaive, DecideReject};
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -89,6 +91,18 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> se
     serde_json::to_value(format!("{:?}", out)).unwrap()
 }
 
+/// Dispatch a verb op expecting refusal; commits nothing (rolls back).
+async fn run_expect_err(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> String {
+    let mut ctx = VerbExecutionContext::default();
+    let mut scope = Scope::begin(pool).await;
+    let err = op
+        .execute(&args, &mut ctx, &mut scope)
+        .await
+        .expect_err(&format!("{} was expected to be refused", op.fqn()));
+    scope.tx.rollback().await.unwrap();
+    err.to_string()
+}
+
 /// Assert `verb_fqn` appears in kyc_intent_events for subject.
 async fn assert_event(pool: &PgPool, subject: SubjectId, verb_fqn: &str) {
     let count: i64 = sqlx::query_scalar(
@@ -137,6 +151,8 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
             // kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject write here now, not the fact
             // stream (TS.6 P2) — cleaned up alongside the other tables.
             "kyc_decision_records",
+            // D2.0 §4 run book — same cleanup story.
+            "kyc_evaluation_runs",
         ] {
             let _ = sqlx::query(&format!(
                 r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
@@ -405,104 +421,94 @@ async fn coverage_kyc_subject_classify_structure() {
 
 // ── Obligation lifecycle (kyc.obligation.*) ───────────────────────────────────
 
+/// D2.0 P0 disclosed consequence: `creation` (the only writer of a new
+/// `ObligationTracks` entry) is dissolved, so `Precondition::ObligationExists`
+/// can never again be satisfied — `update-identity` is now permanently
+/// refused for any obligation-id, real or fabricated.
 #[tokio::test]
 async fn coverage_kyc_obligation_update_identity() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let obligation_id = Uuid::new_v4();
     run(
         &KycSubjectRegister,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
         &pool,
     )
     .await;
-    run(
-        &KycObligationCreate,
-        serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "role": "beneficial_owner",
-        }),
-        &pool,
-    )
-    .await;
-    run(
+    let err = run_expect_err(
         &KycObligationUpdateIdentity,
         serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "state": "satisfied",
+            "subject-id": subject.0, "obligation-id": Uuid::new_v4(), "state": "satisfied",
         }),
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.entity.identity").await;
+    assert!(
+        err.to_lowercase().contains("obligation") && err.to_lowercase().contains("not found"),
+        "expected an ObligationExists refusal now that obligation.creation is dissolved: {err}"
+    );
     cleanup(&pool, &[subject]).await;
 }
 
+/// Same disclosed consequence as `update-identity`, above.
 #[tokio::test]
 async fn coverage_kyc_obligation_update_screening() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let obligation_id = Uuid::new_v4();
     run(
         &KycSubjectRegister,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
         &pool,
     )
     .await;
-    run(
-        &KycObligationCreate,
-        serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "role": "investor",
-        }),
-        &pool,
-    )
-    .await;
-    run(
+    let err = run_expect_err(
         &KycObligationUpdateScreening,
         serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "state": "satisfied",
+            "subject-id": subject.0, "obligation-id": Uuid::new_v4(), "state": "satisfied",
         }),
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.entity.screening").await;
+    assert!(
+        err.to_lowercase().contains("obligation") && err.to_lowercase().contains("not found"),
+        "expected an ObligationExists refusal now that obligation.creation is dissolved: {err}"
+    );
     cleanup(&pool, &[subject]).await;
 }
 
+/// Same disclosed consequence as `update-identity`, above.
 #[tokio::test]
 async fn coverage_kyc_obligation_update_risk() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let obligation_id = Uuid::new_v4();
     run(
         &KycSubjectRegister,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
         &pool,
     )
     .await;
-    run(
-        &KycObligationCreate,
-        serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "role": "controller",
-        }),
-        &pool,
-    )
-    .await;
-    run(
+    let err = run_expect_err(
         &KycObligationUpdateRisk,
         serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "state": "in_progress",
+            "subject-id": subject.0, "obligation-id": Uuid::new_v4(), "state": "in_progress",
         }),
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.entity.risk").await;
+    assert!(
+        err.to_lowercase().contains("obligation") && err.to_lowercase().contains("not found"),
+        "expected an ObligationExists refusal now that obligation.creation is dissolved: {err}"
+    );
     cleanup(&pool, &[subject]).await;
 }
 
+/// `kyc_ubo.decide.obligation.waiver` (moved from `kyc_ubo.assert.obligation.waiver`,
+/// D2.0 §5) — writes only to `kyc_decision_records`, citing the run, never
+/// the fact stream.
 #[tokio::test]
-async fn coverage_kyc_obligation_waive() {
+async fn coverage_kyc_decide_obligation_waiver() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let obligation_id = Uuid::new_v4();
     run(
         &KycSubjectRegister,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
@@ -510,18 +516,16 @@ async fn coverage_kyc_obligation_waive() {
     )
     .await;
     run(
-        &KycObligationCreate,
+        &DecideObligationWaive,
         serde_json::json!({
-            "subject-id": subject.0, "obligation-id": obligation_id, "role": "intermediate_entity",
+            "subject-id": subject.0,
+            "check-id": "sanctions.screen",
+            "reason": "entity is regulated financial institution — simplified due diligence applies",
         }),
         &pool,
     )
     .await;
-    run(&KycObligationWaive, serde_json::json!({
-        "subject-id": subject.0, "obligation-id": obligation_id,
-        "reason": "entity is regulated financial institution — simplified due diligence applies",
-    }), &pool).await;
-    assert_event(&pool, subject, "kyc_ubo.assert.obligation.waiver").await;
+    assert_decision_record(&pool, subject, "kyc_ubo.decide.obligation.waiver").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -550,109 +554,78 @@ async fn coverage_kyc_person_reject() {
     cleanup(&pool, &[subject]).await;
 }
 
-/// TS.6 §8 `decide_verbs_cite_their_basis`: every verdict records what it
-/// relied on — a non-empty obligation-fold snapshot, never a bare stamp.
-/// Exercises both landed verdicts: `kyc_ubo.decide.subject.approve` (basis reflects an
-/// AllTerminal obligation) and `kyc_ubo.decide.subject.reject` (basis reflects a subject
-/// with no obligations yet — rejection is allowed at any stage, but the
-/// basis must still be recorded, not omitted because there was "nothing to
-/// cite").
+/// D2.0 §6 `decide_cites_a_run` — replaces TS.6 §8's
+/// `decide_verbs_cite_their_basis` (which cited an obligation-fold snapshot,
+/// meaningless once `creation` dissolved). Every verdict now cites the
+/// `EvaluationRun` it relied on: `basis.run_id` names a row in
+/// `kyc_evaluation_runs`, and the cited run's `board_state_hash` matches
+/// what `run_id` row actually recorded — not just present, but genuinely
+/// the run that ran. Exercises both landed verdicts: `kyc_ubo.decide.subject.approve`
+/// (gate trivially passes today — the check catalogue is empty, D2.0 §7 Q2
+/// out of scope) and `kyc_ubo.decide.subject.reject` (citation recorded even though
+/// rejection is allowed at any stage).
 #[tokio::test]
-async fn decide_verbs_cite_their_basis() {
+async fn decide_cites_a_run() {
     let pool = pool().await;
 
-    // kyc_ubo.decide.subject.approve — basis must reflect the AllTerminal obligation.
-    let approve_subject = SubjectId(Uuid::new_v4());
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": approve_subject.0, "is_natural_person": true }),
-        &pool,
-    )
-    .await;
-    let obligation_id = Uuid::new_v4();
-    run(
-        &KycObligationCreate,
-        serde_json::json!({
-            "subject-id": approve_subject.0,
-            "obligation-id": obligation_id,
-            "role": "beneficial_owner",
-            "jurisdiction": "LU",
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycObligationSatisfy,
-        serde_json::json!({ "subject-id": approve_subject.0, "obligation-id": obligation_id }),
-        &pool,
-    )
-    .await;
-    run(
-        &DecideApprove,
-        serde_json::json!({ "subject-id": approve_subject.0 }),
-        &pool,
-    )
-    .await;
+    for (subject, op, fqn, extra_args) in [
+        (
+            SubjectId(Uuid::new_v4()),
+            &DecideApprove as &dyn SemOsVerbOp,
+            "kyc_ubo.decide.subject.approve",
+            serde_json::json!({}),
+        ),
+        (
+            SubjectId(Uuid::new_v4()),
+            &DecideReject as &dyn SemOsVerbOp,
+            "kyc_ubo.decide.subject.reject",
+            serde_json::json!({ "reason": "sanctions match confirmed" }),
+        ),
+    ] {
+        run(
+            &KycSubjectRegister,
+            serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+            &pool,
+        )
+        .await;
+        let mut args = serde_json::json!({ "subject-id": subject.0 });
+        for (k, v) in extra_args.as_object().unwrap() {
+            args[k] = v.clone();
+        }
+        run(op, args, &pool).await;
 
-    let approve_basis: serde_json::Value = sqlx::query_scalar(
-        r#"SELECT basis FROM "ob-poc".kyc_decision_records
-           WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.decide.subject.approve'"#,
-    )
-    .bind(approve_subject.0)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(
-        approve_basis.get("overall_state").and_then(|v| v.as_str()),
-        Some("AllTerminal"),
-        "kyc_ubo.decide.subject.approve's basis must cite the AllTerminal obligation state it relied on: {approve_basis:?}"
-    );
-    let approve_obligation_ids = approve_basis
-        .get("obligation_ids")
-        .and_then(|v| v.as_array())
-        .expect("basis.obligation_ids must be an array");
-    assert_eq!(
-        approve_obligation_ids.len(),
-        1,
-        "kyc_ubo.decide.subject.approve's basis must name the obligation it relied on: {approve_basis:?}"
-    );
+        let basis: serde_json::Value = sqlx::query_scalar(&format!(
+            r#"SELECT basis FROM "ob-poc".kyc_decision_records
+               WHERE subject_root = $1 AND verb_fqn = '{fqn}'"#
+        ))
+        .bind(subject.0)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let run_id: Uuid = basis
+            .get("run_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .unwrap_or_else(|| panic!("{fqn}'s basis must cite a run_id: {basis:?}"));
 
-    // kyc_ubo.decide.subject.reject — no obligations exist yet, but the basis must still be
-    // a real (non-empty) snapshot, not an omitted/null citation.
-    let reject_subject = SubjectId(Uuid::new_v4());
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": reject_subject.0, "is_natural_person": true }),
-        &pool,
-    )
-    .await;
-    run(
-        &DecideReject,
-        serde_json::json!({
-            "subject-id": reject_subject.0,
-            "reason": "sanctions match confirmed",
-        }),
-        &pool,
-    )
-    .await;
+        let (recorded_hash, recorded_subject): (String, Uuid) = sqlx::query_as(
+            r#"SELECT board_state_hash, subject_root FROM "ob-poc".kyc_evaluation_runs
+               WHERE run_id = $1"#,
+        )
+        .bind(run_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap_or_else(|e| panic!("{fqn} cited run {run_id} but no such row exists in kyc_evaluation_runs: {e}"));
+        assert_eq!(
+            recorded_subject, subject.0,
+            "{fqn}'s cited run must belong to the subject it decided about"
+        );
+        assert_eq!(
+            basis.get("board_state_hash").and_then(|v| v.as_str()),
+            Some(recorded_hash.as_str()),
+            "{fqn}'s basis.board_state_hash must match the cited run's own recorded hash"
+        );
 
-    let reject_basis: serde_json::Value = sqlx::query_scalar(
-        r#"SELECT basis FROM "ob-poc".kyc_decision_records
-           WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.decide.subject.reject'"#,
-    )
-    .bind(reject_subject.0)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(
-        reject_basis.get("overall_state").and_then(|v| v.as_str()),
-        Some("InProgress"),
-        "kyc_ubo.decide.subject.reject's basis must still cite the (empty) obligation state, not omit citation: {reject_basis:?}"
-    );
-    assert!(
-        reject_basis.get("obligation_ids").is_some(),
-        "kyc_ubo.decide.subject.reject's basis must name the obligation_ids key even when empty: {reject_basis:?}"
-    );
-
-    cleanup(&pool, &[approve_subject, reject_subject]).await;
+        cleanup(&pool, &[subject]).await;
+    }
 }
