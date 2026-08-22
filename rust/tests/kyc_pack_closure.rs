@@ -50,7 +50,8 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, check_preconditions, fold_control_versioned, phase1_lexicon,
+    check_control_preconditions, check_preconditions, fold_control_versioned, assembly_lexicon,
+    evaluation_lexicon,
     AuthorityRef, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
     DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId, EventId, FoldRegistry,
     FoundationCouncilStrategy, FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy,
@@ -64,6 +65,13 @@ const DSL_KYC_OBLIGATION_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc-
 const SCREENING_YAML: &str = include_str!("../config/verbs/screening.yaml");
 const KYC_DAG_YAML: &str = include_str!("../config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml");
 const KYC_STREAM_OPS_SRC: &str = include_str!("../src/domain_ops/kyc_stream_ops.rs");
+// TS.6 P1/P2: decide.approve/decide.reject moved to ob-poc-kyc-decide — a
+// second source file this test's `registered_op_fqns()` must scan, same
+// widening principle as `kyc_stream_ops_declared_universe()`'s screening.yaml
+// intersection below (a declared verb registered somewhere this test didn't
+// used to look must not manufacture a false K-G4 "missing_ops" red).
+const KYC_DECIDE_OPS_SRC: &str = include_str!("../crates/ob-poc-kyc-decide/src/lib.rs");
+const LEXICON_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/lexicon.rs");
 const CONTROL_FOLD_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/fold/control.rs");
 const OBLIGATION_FOLD_SRC: &str =
     include_str!("../crates/ob-poc-kyc-substrate/src/fold/obligation.rs");
@@ -75,13 +83,14 @@ const TYPE_REGISTRY_FOLD_SRC: &str =
 /// Parse `domains: { <domain>: { verbs: { <verb>: ... } } }` from a dsl.kyc
 /// verb YAML file — a plain line-scan (2-space domain keys, 6-space verb
 /// keys) rather than a full YAML parse, matching the fixed hand-authored
-/// indentation of these two files (verified: exactly 2 domain lines + 17 verb
+/// indentation of these two files (verified: exactly 2 domain lines + 16 verb
 /// lines in dsl-kyc.yaml, 1 domain line + 8 verb lines in
-/// dsl-kyc-obligation.yaml — 25 total, post K-G7 retirement of
+/// dsl-kyc-obligation.yaml — 24 total, post K-G7 retirement of
 /// kyc.role.assign/withdraw (2026-08-12), the TS.4 `ubo.edge.pierce-nominee`
-/// addition (K-8, full-kit-citizenship reintroduction discipline), and the D1
+/// addition (K-8, full-kit-citizenship reintroduction discipline), the D1
 /// `kyc.subject.{assert-type,correct-type,withdraw-member,record-enquiry}`
-/// addition (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8)).
+/// addition (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8), and the TS.6 P2 retirement
+/// of `ubo.determination.select-strategy`).
 fn extract_verb_fqns(yaml: &str) -> BTreeSet<String> {
     let mut fqns = BTreeSet::new();
     let mut domain: Option<&str> = None;
@@ -121,9 +130,9 @@ fn declared_verb_universe() -> BTreeSet<String> {
 /// declaration anywhere still surfaces as `phantom_ops` below, and a
 /// declaration whose op is deleted from `kyc_stream_ops.rs` still surfaces
 /// too (the entry drops out of the intersection, `declared_verb_universe()`'s
-/// base 25 is untouched, so it becomes a `phantom_ops` orphan). K-G3
+/// base 22 is untouched, so it becomes a `phantom_ops` orphan). K-G3
 /// (`stream_governed_family_covers_every_declared_verb`) and
-/// `verb_universe_is_exactly_25` intentionally keep using the narrower
+/// `verb_universe_is_exactly_22` intentionally keep using the narrower
 /// `declared_verb_universe()` — they measure the dsl.kyc stream-governed
 /// family specifically, not "every op this file happens to host".
 fn kyc_stream_ops_declared_universe() -> BTreeSet<String> {
@@ -152,11 +161,12 @@ fn stream_governed_globs() -> Vec<String> {
     globs
 }
 
-/// `fn fqn(&self) -> &str { "..." }` string literals from kyc_stream_ops.rs.
-fn registered_op_fqns() -> BTreeSet<String> {
+/// `fn fqn(&self) -> &str { "..." }` string literals from `src` (a source
+/// file's text, scanned line-by-line).
+fn fqns_from_op_src(src: &str) -> BTreeSet<String> {
     let marker = "fn fqn(&self) -> &str {";
     let mut fqns = BTreeSet::new();
-    let mut lines = KYC_STREAM_OPS_SRC.lines();
+    let mut lines = src.lines();
     while let Some(line) = lines.next() {
         if line.trim() == marker {
             if let Some(next) = lines.next() {
@@ -167,6 +177,15 @@ fn registered_op_fqns() -> BTreeSet<String> {
             }
         }
     }
+    fqns
+}
+
+/// Registered `SemOsVerbOp` FQNs across BOTH kyc_stream_ops.rs and
+/// ob-poc-kyc-decide (TS.6 P1/P2 — decide.approve/decide.reject moved out of
+/// the former into the latter).
+fn registered_op_fqns() -> BTreeSet<String> {
+    let mut fqns = fqns_from_op_src(KYC_STREAM_OPS_SRC);
+    fqns.extend(fqns_from_op_src(KYC_DECIDE_OPS_SRC));
     fqns
 }
 
@@ -199,16 +218,205 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_25() {
+fn verb_universe_is_exactly_22() {
+    // TS.6 P1/P2: kyc.person.approve/.reject renamed decide.approve/.reject
+    // and moved to a new `decide:` domain block in the SAME YAML file
+    // (dsl-kyc-obligation.yaml) — a rename+relocation, not a retirement, so
+    // this count is unchanged at 22 (declared_verb_universe() scans both
+    // files' domains, not just `kyc:`).
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        25,
-        "dsl.kyc verb count drifted from the post-D1 25 (21 post-TS.4 + the \
-         4 D1 type-registry moves, EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8) — \
-         update the T0.3 audit and every other pinned test in this file, not \
-         just this assertion: {fqns:#?}"
+        22,
+        "dsl.kyc verb count drifted from the post-TS.6-P2 22 (25 post-D1, \
+         minus the retired select-strategy, compute-fold, and pierce-nominee \
+         verb declarations) — update the T0.3 audit and every other pinned \
+         test in this file, not just this assertion: {fqns:#?}"
     );
+}
+
+// ── TS.6 §8: pack-membership, boundary, and retirement gates ───────────────
+
+#[test]
+fn assembly_pack_is_exactly_known() {
+    // TS.6 §3/§4: the 20 `assembly_lexicon()` entries — 22 declared dsl.kyc
+    // verbs minus the 2 evaluation-pack verdicts. Includes `kyc.obligation.
+    // waive`, deferred here pending D2.0 (TS.6 §3's amended row 13) rather
+    // than renamed to `decide.waive`.
+    let expected: BTreeSet<String> = [
+        "kyc.subject.register",
+        "kyc.subject.classify-structure",
+        "kyc.subject.assert-type",
+        "kyc.subject.correct-type",
+        "kyc.subject.withdraw-member",
+        "kyc.subject.record-enquiry",
+        "ubo.edge.assert-control",
+        "ubo.edge.assert-economic-interest",
+        "ubo.edge.attach-evidence",
+        "ubo.edge.verify",
+        "ubo.edge.supersede",
+        "ubo.edge.reconcile-conflict",
+        "ubo.determination.apply-smo-fallback",
+        "ubo.determination.freeze",
+        "kyc.obligation.create",
+        "kyc.obligation.update-identity",
+        "kyc.obligation.update-screening",
+        "kyc.obligation.update-risk",
+        "kyc.obligation.satisfy",
+        "kyc.obligation.waive",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let actual: BTreeSet<String> = assembly_lexicon().entries.keys().cloned().collect();
+    assert_eq!(
+        actual, expected,
+        "assembly_lexicon() membership drifted (TS.6 §8 assembly_pack_is_exactly_known)"
+    );
+}
+
+#[test]
+fn evaluation_pack_is_exactly_known() {
+    // TS.6 §4: only the 2 landed verdicts. `decide.waive` is NOT here —
+    // `kyc.obligation.waive` stays in assembly_lexicon() pending D2.0.
+    let expected: BTreeSet<String> = ["decide.approve", "decide.reject"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let actual: BTreeSet<String> = evaluation_lexicon().entries.keys().cloned().collect();
+    assert_eq!(
+        actual, expected,
+        "evaluation_lexicon() membership drifted (TS.6 §8 evaluation_pack_is_exactly_known)"
+    );
+}
+
+#[test]
+fn relocated_facts_are_in_assembly() {
+    // TS.6 §3: three obligation-namespace verbs are observations about the
+    // world, not work-item updates — the quiet win of the pack split. Must
+    // live in Assembly and never appear in Evaluation.
+    let assembly = assembly_lexicon();
+    let evaluation = evaluation_lexicon();
+    for fqn in [
+        "kyc.obligation.update-screening",
+        "kyc.obligation.update-identity",
+        "kyc.obligation.update-risk",
+    ] {
+        assert!(
+            assembly.get(fqn).is_some(),
+            "{fqn} must be a member of assembly_lexicon() (TS.6 §3 relocation)"
+        );
+        assert!(
+            evaluation.get(fqn).is_none(),
+            "{fqn} must not be a member of evaluation_lexicon()"
+        );
+    }
+}
+
+#[test]
+fn evaluation_pack_cannot_write_facts() {
+    // TS.6 §8's structural gate, made a discoverable `cargo test` rather than
+    // only a hand-run shell script (`scripts/check_kyc_decide_deps.sh`,
+    // which this duplicates in Rust so CI's normal test run catches drift):
+    // `ob-poc-kyc-decide` must have zero dependency, direct or transitive, on
+    // ANY crate exposing a dsl.kyc fact-stream append.
+    //
+    // WIDENED 2026-08-22. The original list named only `ob-poc-kyc-seam` —
+    // the sole GOVERNED chokepoint, but NOT the only crate-level write path.
+    // `ob-poc-kyc-store::PgKycEventStore::append` is `pub` and is the real
+    // append (stream lock, seq allocation, INSERT into kyc_intent_events).
+    // The reconciliation proved the gap by execution: a probe inside the
+    // evaluation pack appended a real event with `ob-poc-kyc-seam` nowhere in
+    // its tree, while this test still passed. The gate forbade the wrong edge.
+    //
+    // The evaluation pack now depends on `ob-poc-kyc-read`, which contains no
+    // append at all — so the property holds by construction, and this test is
+    // FALSIFIABLE: re-add `ob-poc-kyc-store` to
+    // `crates/ob-poc-kyc-decide/Cargo.toml` and it goes red (RED-proven
+    // 2026-08-22).
+    let output = std::process::Command::new("cargo")
+        .args(["tree", "-p", "ob-poc-kyc-decide"])
+        .output()
+        .expect("run cargo tree");
+    assert!(
+        output.status.success(),
+        "cargo tree -p ob-poc-kyc-decide failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let tree = String::from_utf8_lossy(&output.stdout);
+    for forbidden in [
+        "ob-poc-kyc-seam",
+        "ob_poc_kyc_seam",
+        "ob-poc-kyc-store",
+        "ob_poc_kyc_store",
+    ] {
+        assert!(
+            !tree.contains(forbidden),
+            "ob-poc-kyc-decide must never depend on {forbidden} — it exposes a \
+             fact-stream append (TS.6 §8 evaluation_pack_cannot_write_facts). \
+             Depend on ob-poc-kyc-read instead. Dep tree:\n{tree}"
+        );
+    }
+}
+
+#[test]
+fn retired_verbs_are_gone() {
+    // K-G7 grep-proof pattern: no live YAML declaration, op registration, or
+    // LexiconEntry remains for any TS.6-retired verb.
+    //
+    // YAML verb keys are written relative to their domain (e.g. `ubo:` +
+    // `determination.select-strategy:`, `kyc:` + `person.approve:`), so a
+    // bare-key substring check is correct here and doesn't need the domain
+    // prefix reconstructed.
+    for needle in [
+        "person.approve:",
+        "person.reject:",
+        "determination.select-strategy:",
+        "determination.compute-fold:",
+        "edge.pierce-nominee:",
+    ] {
+        assert!(
+            !DSL_KYC_YAML.contains(needle),
+            "retired verb declaration {needle} still present in dsl-kyc.yaml"
+        );
+        assert!(
+            !DSL_KYC_OBLIGATION_YAML.contains(needle),
+            "retired verb declaration {needle} still present in dsl-kyc-obligation.yaml"
+        );
+    }
+
+    // Struct-definition form, not a bare name substring — `kyc_stream_ops.rs`
+    // deliberately keeps a retirement comment mentioning `KycPersonApprove`/
+    // `KycPersonReject` by name (mirroring `lexicon.rs`'s pierce-nominee
+    // commentary), which a bare substring check would false-fail against.
+    for needle in [
+        "struct KycPersonApprove",
+        "struct KycPersonReject",
+        "struct UboDeterminationSelectStrategy",
+        "struct UboDeterminationComputeFold",
+        "struct UboEdgePierceNominee",
+    ] {
+        assert!(
+            !KYC_STREAM_OPS_SRC.contains(needle),
+            "retired op struct {needle} still present in kyc_stream_ops.rs"
+        );
+    }
+
+    // Quoted-literal check (not bare substring) so this doesn't false-fail
+    // against `pierce-nominee`'s own retirement commentary, which
+    // deliberately mentions its retired FQN in prose (lexicon.rs ~line 415).
+    // select-strategy/compute-fold have no such retained prose mention as a
+    // double-quoted Rust string literal, so checking for the exact
+    // `LexiconEntry::build(...)` first-argument form is safe.
+    for needle in [
+        "\"ubo.determination.select-strategy\"",
+        "\"ubo.determination.compute-fold\"",
+    ] {
+        assert!(
+            !LEXICON_SRC.contains(needle),
+            "retired LexiconEntry {needle} still present in lexicon.rs"
+        );
+    }
 }
 
 // ── K-G3: unmapped move ─────────────────────────────────────────────────────
@@ -225,8 +433,16 @@ fn stream_governed_family_covers_every_declared_verb() {
     // matches it) — left in kyc_dag.yaml deliberately: governance-block
     // edits are a separate conscious change from verb retirement, and the
     // glob costs nothing to leave (it covers zero verbs, not a wrong verb).
+    // kyc.person.* is likewise now vacuous (TS.6 P1/P2): decide.approve/
+    // decide.reject don't match it and are deliberately excluded from this
+    // loop below — they are NOT stream-governed any more (ob-poc-kyc-decide
+    // never writes to the fact stream at all), so "must be covered by a
+    // stream_governed family glob" does not apply to them by design.
 
     for fqn in declared_verb_universe() {
+        if fqn == "decide.approve" || fqn == "decide.reject" {
+            continue;
+        }
         let covered = globs.iter().any(|g| match g.strip_suffix(".*") {
             Some(prefix) => fqn.starts_with(prefix) && fqn[prefix.len()..].starts_with('.'),
             None => false,
@@ -247,13 +463,23 @@ fn every_declared_verb_has_a_registered_op() {
     // `screening.review-hit` are correctly declared (`screening.yaml`) and
     // correctly registered (`kyc_stream_ops.rs`), but this test's declared
     // side never read `screening.yaml`. See `kyc_stream_ops_declared_universe`.
+    // TS.6 P2 (K-G7) retired `UboDeterminationSelectStrategy`'s registration
+    // (27→26), then `UboDeterminationComputeFold`'s (26→25), then
+    // `UboEdgePierceNominee`'s (25→24 — folded into a macro composing
+    // `UboEdgeAssertControl` + `UboEdgeSupersede`, both already registered).
+    // TS.6 P1/P2 then moved `KycPersonApprove`/`KycPersonReject` OUT of this
+    // file entirely (renamed `DecideApprove`/`DecideReject`, registered in
+    // `ob-poc-kyc-decide` instead) — `registered_op_fqns()` now scans both
+    // source files, so the total count is unchanged at 24 (a relocation,
+    // not a net registration change).
     let declared = kyc_stream_ops_declared_universe();
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        27,
+        24,
         "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
-         ops co-hosted in kyc_stream_ops.rs) drifted from 27: {registered:#?}"
+         ops co-hosted in kyc_stream_ops.rs, and decide.approve/decide.reject \
+         in ob-poc-kyc-decide) drifted from 24: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -277,10 +503,18 @@ fn lexicon_manifest_coverage_gap_is_exactly_known() {
     // T6.1+). This row flips from pinning a RED-honest open gap to pinning
     // genuine closure — an empty uncovered set is now the correct, not the
     // aspirational, assertion.
-    let lexicon = phase1_lexicon();
+    //
+    // TS.6 P1/P2: `kyc.person.approve`/`.reject` (renamed `decide.approve`/
+    // `.reject`) moved out of `assembly_lexicon()` into `evaluation_lexicon()`
+    // — still declared in the same two YAML files `declared_verb_universe()`
+    // scans, so coverage is checked against the union of both lexicons, not
+    // `assembly_lexicon()` alone (a verb belongs to exactly one pack; "not in
+    // Assembly" is correct for these two, not a gap).
+    let assembly = assembly_lexicon();
+    let evaluation = evaluation_lexicon();
     let uncovered: BTreeSet<String> = declared_verb_universe()
         .into_iter()
-        .filter(|fqn| lexicon.get(fqn).is_none())
+        .filter(|fqn| assembly.get(fqn).is_none() && evaluation.get(fqn).is_none())
         .collect();
 
     assert!(
@@ -306,8 +540,18 @@ fn lexicon_manifest_coverage_gap_is_exactly_known() {
 /// asserted-around).
 #[test]
 fn newly_covered_entries_are_fqn_correct_and_render_safe() {
-    let lexicon = phase1_lexicon();
-    for fqn in ["kyc.obligation.create", "kyc.person.approve"] {
+    // `kyc.person.approve` renamed `decide.approve` TS.6 P2 — its entry now
+    // lives in `evaluation_lexicon()`, not `assembly_lexicon()` (it no
+    // longer reaches the fact stream at all, so there is nothing for
+    // `render_intent_event_to_sexpr` to render in practice — this loop
+    // still proves the entry itself is fqn-correct and render-safe, which
+    // is all it ever asserted).
+    let assembly = assembly_lexicon();
+    let evaluation = evaluation_lexicon();
+    for (fqn, lexicon) in [
+        ("kyc.obligation.create", &assembly),
+        ("decide.approve", &evaluation),
+    ] {
         let entry = lexicon
             .get(fqn)
             .unwrap_or_else(|| panic!("{fqn} must be lexicon-covered after T6.0"));
@@ -346,6 +590,16 @@ fn fold_blind_verbs_are_exactly_known() {
 
     let fold_blind: BTreeSet<String> = declared_verb_universe()
         .into_iter()
+        // decide.approve/decide.reject (TS.6 P1/P2) are not fold-blind in
+        // the K-G7 sense — that finding is about a verb that DOES append to
+        // the fact stream but whose event no fold ever reads back (a
+        // defect: a write that silently goes nowhere). decide.* verbs never
+        // append to the fact stream AT ALL (ob-poc-kyc-decide has no
+        // dependency on ob-poc-kyc-seam) — "fold-blind" doesn't apply to a
+        // verb that was never fold-eligible to begin with, so they're
+        // excluded from this universe rather than allow-listed as an
+        // exception to a defect class they don't belong to.
+        .filter(|fqn| fqn != "decide.approve" && fqn != "decide.reject")
         .filter(|fqn| {
             !control_arms.contains(fqn)
                 && !obligation_arms.contains(fqn)
@@ -355,20 +609,18 @@ fn fold_blind_verbs_are_exactly_known() {
 
     // kyc.role.assign/withdraw (the K-G7 finding) were retired 2026-08-12
     // rather than wired in — see dsl-kyc-obligation.yaml's retirement
-    // comment. ubo.determination.compute-fold remains the sole allow-listed
-    // fold-inert verb (effect_class: read_snapshot — it projects, it does
-    // not mutate; fold-blind by design, not by omission). The open K-G7 gap
-    // is now empty — a genuine closure, not a pinned-open gap like K-G6.
-    let expected: BTreeSet<String> = ["ubo.determination.compute-fold"]
-        .into_iter()
-        .map(String::from)
-        .collect();
+    // comment. `ubo.determination.compute-fold` — the one allow-listed
+    // fold-inert verb (effect_class: read_snapshot, fold-blind by design) —
+    // was itself retired TS.6 P2 (K-G7): it was a derivation dressed as a
+    // verb, carrying no precondition `freeze` doesn't already declare
+    // independently, so there was nothing to preserve by keeping it. The
+    // set is now empty with no by-design exception left to allow-list.
+    let expected: BTreeSet<String> = BTreeSet::new();
 
     assert_eq!(
         fold_blind, expected,
-        "K-G7 fold-blind verb set changed — this set is expected EMPTY of \
-         open gaps post-retirement (only the by-design compute-fold entry \
-         remains); any other member is a regression"
+        "K-G7 fold-blind verb set changed — expected fully empty post-\
+         compute-fold-retirement (TS.6 P2); any member is a regression"
     );
 }
 
@@ -414,19 +666,21 @@ fn structure_class_valid_values() -> Vec<String> {
     inner.split(',').map(|s| s.trim().to_string()).collect()
 }
 
-/// Pin (K-G5): as of the T6 row-9 fix (2026-08-17) the map is fully studded —
-/// every one of the 21 dsl.kyc verbs, including `kyc.subject.register`, now
-/// carries a stud — and ALL 11 structure classes have a strategy behind them
-/// (the guard set is total). **Updated by TS.5 (2026-08-22):** `ubo.edge.
-/// assert-control`/`assert-economic-interest`/`pierce-nominee` each gain
+/// Pin (K-G5): as of the T6 row-9 fix (2026-08-17) the map was fully
+/// studded — every stud-bearing verb, including `kyc.subject.register`,
+/// carries a stud — and ALL 11 structure classes have a strategy behind
+/// them (the guard set is total). **Updated by TS.5 (2026-08-22):**
+/// `ubo.edge.assert-control`/`assert-economic-interest` each gain
 /// `Precondition::TypeGeometryPermits` — TS.1 §1's type-geometry layer was
 /// declared but never actually reachable from this checker until TS.5; this
-/// pin's widening records that, not a drift.
+/// pin's widening records that, not a drift. (`ubo.edge.pierce-nominee` also
+/// carried this at the time — its own entry was retired TS.6 P2, folded
+/// into the two verbs already listed here.)
 /// Authoring a precondition, or a new `DeterminationStrategy`, is a CONSCIOUS
 /// edit here, not a silent pass or a silent break.
 #[test]
 fn precondition_and_strategy_coverage_is_exactly_known() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let actual: BTreeMap<String, Vec<Precondition>> = lexicon
         .entries
         .values()
@@ -438,35 +692,24 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "ubo.edge.verify".to_string(),
         vec![Precondition::EvidenceCited],
     );
-    expected.insert(
-        "ubo.determination.compute-fold".to_string(),
-        vec![
-            Precondition::ReconciledProjection,
-            Precondition::StrategySelected,
-        ],
-    );
     // T6.1(c) (2026-08-12): the fail-closed strategy guard (matrix rows
-    // 6a/8a) — `select-strategy` gets `StructureClassSupported`; `freeze`
-    // gets it ADDED to its existing two (defense in depth — the guard holds
-    // even if select-strategy is bypassed). The strategy-COUNT pin below (2)
-    // is unchanged — this is a precondition-map change, not a new
-    // `DeterminationStrategy`.
-    // T6.3 row 6 (2026-08-12) widens select-strategy's sole 6a precondition
-    // into the full documented order: subject registered -> structure
-    // classified -> structure class supported.
-    expected.insert(
-        "ubo.determination.select-strategy".to_string(),
-        vec![
-            Precondition::SubjectRegistered,
-            Precondition::StructureClassified,
-            Precondition::StructureClassSupported,
-        ],
-    );
+    // 6a/8a), originally split across `select-strategy` (6a) and `freeze`
+    // (8a, defense in depth). TS.6 P2 (K-G7) RETIRED `select-strategy` —
+    // the strategy is now DERIVED from `structure_class`
+    // (`strategy_for_structure_class`), never separately asserted, so
+    // `StructureClassSupported` alone gates readiness on `freeze`.
+    // `ubo.determination.compute-fold` (which also carried this pair) was
+    // ITSELF retired TS.6 P2 as a derivation dressed as a verb, redundant
+    // with `freeze`'s own independent declaration — no entry survives it
+    // here. The strategy-COUNT pin below (2) is unchanged — this is a
+    // precondition-map change, not a new `DeterminationStrategy`. The
+    // `StructureClassified`/bare `SubjectRegistered` variants that used to
+    // attach to `select-strategy` remain evaluable T6.1(b) machinery,
+    // unattached to any entry today.
     expected.insert(
         "ubo.determination.freeze".to_string(),
         vec![
             Precondition::ReconciledProjection,
-            Precondition::StrategySelected,
             Precondition::StructureClassSupported,
         ],
     );
@@ -508,32 +751,25 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "ubo.edge.reconcile-conflict".to_string(),
         vec![Precondition::SubjectRegistered],
     );
-    // TS.4 (EOP-DD-KYCUBO-KIT-TS0 §2.6): the K-8 pierce verb, preconditions
-    // FROM BIRTH (the K-G7 reintroduction discipline) — subject registered +
-    // target edge exists + active (matrix rows 3/4 vocabulary). The "target
-    // is actually a nominee edge" check has NO precondition primitive; it is
-    // enforced op-layer, fail-closed (kyc_stream_ops.rs, per the §2.6 note).
-    // TS.5 §6 Q2 (2026-08-22): pierce-nominee also asserts a NEW (nominator,
-    // kind, pierced-edge's-`to`) triple — the same geometry gate as the two
-    // verbs above, added to this pin at the same time.
-    expected.insert(
-        "ubo.edge.pierce-nominee".to_string(),
-        vec![
-            Precondition::SubjectRegistered,
-            Precondition::EdgeExists,
-            Precondition::EdgeActive,
-            Precondition::TypeGeometryPermits,
-        ],
-    );
+    // "ubo.edge.pierce-nominee" LexiconEntry RETIRED (TS.6 P2, K-G7,
+    // 2026-08-22) — no entry survives it here. Its precondition set (subject
+    // registered + target edge exists + active + geometry, TS.5 §6 Q2)
+    // decomposes exactly across `ubo.edge.assert-control`'s entry (above:
+    // SubjectRegistered, NoDuplicateActiveEdge, TypeGeometryPermits) and
+    // `ubo.edge.supersede`'s entry (below: EdgeExists, EdgeActive); the
+    // "target is actually a nominee edge" check (no precondition primitive)
+    // moved to assert-control's op-layer, gated on its new `pierced-from`
+    // arg.
 
     // T6.3 (2026-08-12, determination-family remainder — EOP-DD-KYCUBO-KIT-T6
-    // matrix rows 7, 9, 10; row 6 is folded into select-strategy above; row 8
-    // is the unchanged 8a freeze guard, asserted below).
+    // matrix rows 7, 9, 10; row 6 (`select-strategy`) RETIRED by TS.6 P2 —
+    // see the note above `freeze`; row 8 is the unchanged 8a freeze guard,
+    // asserted above).
     expected.insert(
         "ubo.determination.apply-smo-fallback".to_string(),
         vec![
             Precondition::ReconciledProjection,
-            Precondition::StrategySelected,
+            Precondition::StructureClassSupported,
         ],
     );
     // row 9 (`kyc.subject.register`) CLOSED (2026-08-17, corrects
@@ -557,6 +793,12 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "kyc.obligation.create".to_string(),
         vec![Precondition::SubjectRegistered],
     );
+    // `Precondition::SubjectNotDecided` retired TS.6 P2 (K-G7) alongside
+    // `kyc.person.approve`/`.reject` (renamed `decide.approve`/`.reject`,
+    // moved to `ob-poc-kyc-decide` — no lexicon entry here any more, no
+    // substrate Precondition either; their finality guard now queries
+    // `kyc_decision_records` directly). The 5 obligation verbs below keep
+    // only `ObligationExists`.
     for fqn in [
         "kyc.obligation.update-identity",
         "kyc.obligation.update-screening",
@@ -564,25 +806,8 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "kyc.obligation.satisfy",
         "kyc.obligation.waive",
     ] {
-        expected.insert(
-            fqn.to_string(),
-            vec![
-                Precondition::ObligationExists,
-                Precondition::SubjectNotDecided,
-            ],
-        );
+        expected.insert(fqn.to_string(), vec![Precondition::ObligationExists]);
     }
-    expected.insert(
-        "kyc.person.approve".to_string(),
-        vec![
-            Precondition::SubjectAllTerminal,
-            Precondition::SubjectNotDecided,
-        ],
-    );
-    expected.insert(
-        "kyc.person.reject".to_string(),
-        vec![Precondition::SubjectNotDecided],
-    );
 
     // D1 (EOP-DD-KYCUBO-TS.1 §3, moves 2/6/7/8): assert-type carries only
     // EntityRegistered; withdraw-member/correct-type additionally carry
@@ -603,16 +828,21 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
 
     assert_eq!(
         actual.len(),
-        25,
-        "phase1_lexicon() entry count drifted from the post-D1 25 \
-         lexicon-covered verbs (21 post-TS.4 + the 4 D1 type-registry moves)"
+        20,
+        "assembly_lexicon() entry count drifted from the post-TS.6-P1 20 \
+         lexicon-covered verbs (25 post-D1, minus the retired select-strategy, \
+         compute-fold, and pierce-nominee entries, minus decide.approve/decide.reject \
+         moved to evaluation_lexicon())"
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of the T6 row-9 fix (2026-08-17), every one of the \
-         21 dsl.kyc verbs carries a stud (verify, compute-fold, select-strategy, freeze, the 5 \
-         edge-family verbs, pierce-nominee, apply-smo-fallback, register, classify-structure, \
-         and all 8 obligation/person verbs); any other change is either matrix progress (update \
+        "K-G5 precondition map changed — as of TS.6 P1/P2 (2026-08-22, select-strategy, \
+         compute-fold, and pierce-nominee's own entry all retired; kyc.person.approve/.reject \
+         moved out to evaluation_lexicon() as decide.approve/.reject), every one of the 16 \
+         remaining dsl.kyc verbs with a stud carries it (verify, freeze, the 5 edge-family \
+         verbs, apply-smo-fallback, register, classify-structure, and the 6 obligation \
+         verbs — piercing's precondition pair now reaches the stream via assert-control's \
+         and supersede's own entries); any other change is either matrix progress (update \
          the T0.3 audit) or a regression"
     );
 
@@ -803,7 +1033,7 @@ fn implemented_class_split_matches_strategy_arms() {
 
 fn registry() -> FoldRegistry {
     let mut r = FoldRegistry::new();
-    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     r
 }
 
@@ -835,7 +1065,7 @@ fn edge_status_lifecycle_is_fully_reachable() {
     let to = EntityId(uuid::Uuid::new_v4());
     let edge = EdgeId(uuid::Uuid::new_v4());
     let as_of = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-    let lexicon_hash = phase1_lexicon().hash;
+    let lexicon_hash = assembly_lexicon().hash;
     let reg = registry();
 
     let assert_event = make_event(
@@ -963,11 +1193,11 @@ fn stream_append_wiring(src: &str) -> BTreeMap<String, Option<String>> {
 /// Extract fqns wired via the inline `let entry = lexicon.get("<fqn>")` →
 /// `check_preconditions(entry, ...)` / `check_control_preconditions(entry,
 /// ...)` shape (`ubo.edge.assert-control`'s hand-rolled `append_in_scope`
-/// closure, and `ubo.determination.compute-fold`'s read-path precondition
-/// check — the Part A A3 fix). Looks ahead a bounded window (25 lines, well
-/// past both real call sites' distance) for the checker call, stopping
-/// early at the next `lexicon.get(` so a miss can never be misattributed to
-/// the wrong fqn.
+/// closure — the Part A A3 fix; `ubo.determination.compute-fold`'s own such
+/// call site was retired along with the verb, TS.6 P2). Looks ahead a
+/// bounded window (25 lines, well past the real call site's distance) for
+/// the checker call, stopping early at the next `lexicon.get(` so a miss
+/// can never be misattributed to the wrong fqn.
 fn inline_lexicon_get_wiring(src: &str) -> BTreeSet<String> {
     let marker = ".get(\"";
     let mut out = BTreeSet::new();
@@ -1002,7 +1232,7 @@ fn inline_lexicon_get_wiring(src: &str) -> BTreeSet<String> {
 /// drive-through in this pure file).
 #[test]
 fn every_precondition_carrying_verb_is_reached_by_the_checker() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let precondition_carrying: BTreeSet<String> = lexicon
         .entries
         .values()
@@ -1031,15 +1261,15 @@ fn every_precondition_carrying_verb_is_reached_by_the_checker() {
     );
 
     // Sanity: the scanner itself must not be vacuously trivial — it must
-    // have found at least the 4 pre-T6.2 wired verbs (verify, select-strategy,
-    // freeze, and compute-fold post the A3 fix) as a floor, or a scanner bug
-    // (not a real gap) could be silently passing this test by finding nothing
-    // to check in the first place.
+    // have found at least the 3 pre-T6.2 wired verbs (verify,
+    // apply-smo-fallback, freeze) as a floor, or a scanner bug (not a real
+    // gap) could be silently passing this test by finding nothing to check
+    // in the first place. (`select-strategy`/`compute-fold` retired TS.6
+    // P2 — dropped from this floor list.)
     for known_wired in [
         "ubo.edge.verify",
-        "ubo.determination.select-strategy",
+        "ubo.determination.apply-smo-fallback",
         "ubo.determination.freeze",
-        "ubo.determination.compute-fold",
     ] {
         assert!(
             precondition_carrying.contains(known_wired),
@@ -1057,7 +1287,7 @@ fn every_precondition_carrying_verb_is_reached_by_the_checker() {
 /// re-implementation.
 #[test]
 fn precondition_carrying_verbs_actually_enforce_their_stud() {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let subject = SubjectId(uuid::Uuid::new_v4());
     let as_of = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
     let empty_obligation = ObligationState::default();
@@ -1120,18 +1350,16 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         "verify must admit an edge with evidence attached"
     );
 
-    // ubo.determination.select-strategy — StructureClassSupported.
-    // T6.3 row 6: select-strategy also carries SubjectRegistered +
-    // StructureClassified, so fixtures set `registered: true`.
-    // TS.4 rework (the old "unsupported-class exemplar" is RETIRED — there
-    // is no strategy-less class left): the guard set is now TOTAL, so this
-    // sub-test pins (i) totality — every one of the 11 StructureClass
-    // variants is admitted — and (ii) the fail-closed floor — a subject
-    // with NO recorded class (which is exactly what an unknown/garbage
-    // wire string folds to, `structure_class_from_payload` → None) still
-    // blocks. The guard is retained, not retired: it now fail-closes the
-    // unknown-class case rather than a named class.
-    let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
+    // ubo.determination.freeze — ReconciledProjection + StructureClassSupported.
+    // TS.6 P2 (K-G7) retired `select-strategy` AND `compute-fold`;
+    // `StructureClassSupported` (the T6.1(c)/TS.4 fail-closed guard) now
+    // lives solely on `freeze`. This sub-test pins (i) totality — every one
+    // of the 11 StructureClass variants is admitted (given reconciliation
+    // too, since freeze also carries `ReconciledProjection`) — and
+    // (ii) the fail-closed floor — a subject with NO recorded class (which
+    // is exactly what an unknown/garbage wire string folds to,
+    // `structure_class_from_payload` → None) still blocks.
+    let freeze_entry_for_totality = lexicon.get("ubo.determination.freeze").unwrap();
     let all_classes = [
         StructureClass::PrivateCompany,
         StructureClass::MultiTierHoldingGroup,
@@ -1153,83 +1381,64 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     for class in all_classes {
         let supported = ControlState {
             registered: true,
+            reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
             structure_class: Some(class.clone()),
             ..Default::default()
         };
         assert!(
-            check_preconditions(
-                select_entry,
+            check_control_preconditions(
+                freeze_entry_for_totality,
                 &supported,
-                &empty_obligation,
                 &TypeRegistryState::default(),
                 &probe(
-                    "ubo.determination.select-strategy",
+                    "ubo.determination.freeze",
                     TargetBinding::for_subject(subject)
                 ),
             )
             .is_ok(),
-            "select-strategy must admit every implemented structure class \
+            "freeze must admit every implemented structure class \
              post-TS.4 (totality); {class:?} was blocked"
         );
     }
     // The fail-closed floor: no class (= what a garbage wire string folds
-    // to) still blocks, even with registration satisfied.
+    // to) still blocks, even with registration+reconciliation satisfied.
     let unclassified = ControlState {
         registered: true,
+        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         structure_class: None,
         ..Default::default()
     };
     assert!(
-        check_preconditions(
-            select_entry,
+        check_control_preconditions(
+            freeze_entry_for_totality,
             &unclassified,
-            &empty_obligation,
             &TypeRegistryState::default(),
             &probe(
-                "ubo.determination.select-strategy",
+                "ubo.determination.freeze",
                 TargetBinding::for_subject(subject)
             ),
         )
         .is_err(),
-        "select-strategy must still fail-close on a subject with no recorded \
+        "freeze must still fail-close on a subject with no recorded \
          structure class (unknown wire strings fold to None)"
     );
 
-    // ubo.determination.compute-fold — ReconciledProjection + StrategySelected
-    // (the A3 fix): an unreconciled/unstrategized state must block; a
-    // reconciled+strategized one must admit.
-    let compute_fold_entry = lexicon.get("ubo.determination.compute-fold").unwrap();
+    // ubo.determination.freeze — ReconciledProjection alone: an
+    // unreconciled state must block even with a supported class set.
     let not_ready = ControlState::default();
     assert!(
         check_control_preconditions(
-            compute_fold_entry,
+            freeze_entry_for_totality,
             &not_ready,
             &TypeRegistryState::default(),
             &probe(
-                "ubo.determination.compute-fold",
+                "ubo.determination.freeze",
                 TargetBinding::for_subject(subject)
             ),
         )
         .is_err(),
-        "compute-fold must block before reconcile-conflict + select-strategy have fired (K-14)"
-    );
-    let ready = ControlState {
-        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
-        selected_strategy: Some("ownership_prong_strategy".to_string()),
-        ..Default::default()
-    };
-    assert!(
-        check_control_preconditions(
-            compute_fold_entry,
-            &ready,
-            &TypeRegistryState::default(),
-            &probe(
-                "ubo.determination.compute-fold",
-                TargetBinding::for_subject(subject)
-            ),
-        )
-        .is_ok(),
-        "compute-fold must admit once reconcile-conflict + select-strategy have fired"
+        "freeze must block before reconcile-conflict + a supported structure class have \
+         fired (K-14)"
     );
 }
 
@@ -1657,10 +1866,10 @@ fn new_edge_kinds_are_not_traversed_as_control() {
 fn op_layer_only_studs_are_exactly_known() {
     // (a) Both lexicon entries now declare the promoted Preconditions — the
     // studs are lexicon/Precondition-declared, no longer op-layer-only.
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let withdraw_entry = lexicon
         .get("kyc.subject.withdraw-member")
-        .expect("kyc.subject.withdraw-member must be in phase1_lexicon()");
+        .expect("kyc.subject.withdraw-member must be in assembly_lexicon()");
     assert_eq!(
         withdraw_entry.preconditions,
         vec![Precondition::EntityRegistered, Precondition::MembershipActive],
@@ -1670,7 +1879,7 @@ fn op_layer_only_studs_are_exactly_known() {
     );
     let correct_entry = lexicon
         .get("kyc.subject.correct-type")
-        .expect("kyc.subject.correct-type must be in phase1_lexicon()");
+        .expect("kyc.subject.correct-type must be in assembly_lexicon()");
     assert_eq!(
         correct_entry.preconditions,
         vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],

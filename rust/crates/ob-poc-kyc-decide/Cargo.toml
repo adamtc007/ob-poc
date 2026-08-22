@@ -1,0 +1,37 @@
+[package]
+name = "ob-poc-kyc-decide"
+version = "0.1.0"
+edition = "2021"
+description = "KYC/UBO Evaluation-pack verdicts (decide.approve, decide.reject). TS.6 §1/§4: writes only to kyc_decision_records, never the fact stream — structurally, by depending on ob-poc-kyc-read (which has no append) rather than on any crate that exposes one. Dep-gate: scripts/check_kyc_decide_deps.sh."
+
+# Evaluation pack: reads the Assembly-built fact stream (via ob-poc-kyc-read
+# + ob-poc-kyc-substrate's pure fold) but CANNOT write to it.
+#
+# This crate must NEVER depend on any crate exposing a fact-stream append —
+# `ob-poc-kyc-store` (PgKycEventStore::append) or `ob-poc-kyc-seam`
+# (append_in_scope). It depends on `ob-poc-kyc-read`, which has no append at
+# all, so the boundary is a property of the dependency graph rather than of
+# what each op's body happens to call (EOP-DD-KYCUBO-TS.6 §1).
+#
+# The 2026-08-22 reconciliation proved the earlier arrangement did not hold:
+# this crate depended on ob-poc-kyc-store, and a probe inside it appended a
+# real event with ob-poc-kyc-seam nowhere in its tree.
+[dependencies]
+ob-poc-kyc-substrate = { path = "../ob-poc-kyc-substrate" }
+ob-poc-kyc-read = { path = "../ob-poc-kyc-read" }
+dsl-runtime = { path = "../dsl-runtime" }
+sem_os_postgres = { path = "../sem_os_postgres" }
+sem_os_core.workspace = true
+anyhow = "1.0"
+async-trait = "0.1"
+serde_json = "1.0"
+sqlx = { version = ">=0.8.6, <0.9", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+uuid = { version = "1.4", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[lints.rust]
+unreachable_pub = "deny"
+dead_code = "deny"

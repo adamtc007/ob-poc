@@ -4133,6 +4133,8 @@ dependencies = [
  "ob-poc-diagnostics",
  "ob-poc-entity-linking",
  "ob-poc-journey",
+ "ob-poc-kyc-decide",
+ "ob-poc-kyc-read",
  "ob-poc-kyc-seam",
  "ob-poc-kyc-store",
  "ob-poc-kyc-substrate",
@@ -4438,6 +4440,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "ob-poc-kyc-decide"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dsl-runtime",
+ "ob-poc-kyc-read",
+ "ob-poc-kyc-substrate",
+ "sem_os_core",
+ "sem_os_postgres",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "ob-poc-kyc-read"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "ob-poc-kyc-substrate",
+ "serde_json",
+ "sqlx",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "ob-poc-kyc-seam"
 version = "0.1.0"
 dependencies = [
@@ -4460,6 +4492,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "hex",
+ "ob-poc-kyc-read",
  "ob-poc-kyc-substrate",
  "serde_json",
  "sha2 0.10.9",
@@ -4611,6 +4644,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "syn 2.0.114",
  "uuid",
 ]
 

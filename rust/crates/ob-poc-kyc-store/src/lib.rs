@@ -24,10 +24,13 @@ pub use cross_stream::{
     CrossStreamEnqueueOutcome, CROSS_STREAM_OBLIGATION_CREATE, CROSS_STREAM_OBLIGATION_SUPERSEDE,
 };
 pub use error::StoreError;
-pub use manifest::{publish_manifest, ManifestPublishOutcome};
+pub use manifest::{publish_assembly_manifest, publish_evaluation_manifest, ManifestPublishOutcome};
 pub use projection::{
     ObligationProjectionStats, PgKycObligationDrainer, PgKycObligationProjector,
     PgKycProjectionDrainer, PgKycProjector, ProjectionStats, CONTROL_EDGE_PROJECTION_EFFECT,
     OBLIGATION_PROJECTION_EFFECT,
 };
-pub use store::{load_source_text_history, AppendOutcome, PgKycEventStore};
+pub use store::{AppendOutcome, PgKycEventStore};
+// TS.6 §1: read-side surface now lives in the append-free `ob-poc-kyc-read`
+// crate; re-exported so existing consumers are unchanged.
+pub use ob_poc_kyc_read::{load_source_text_history, PgKycEventReader};

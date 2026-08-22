@@ -67,7 +67,12 @@ semantic-decision-contracts.workspace = true
 # KYC/UBO durable verb-stream stack (EOP-DD-KYCUBO-002) — stream-backed verb ops live in domain_ops
 ob-poc-kyc-substrate = { path = "crates/ob-poc-kyc-substrate" }
 ob-poc-kyc-store = { path = "crates/ob-poc-kyc-store" }
+ob-poc-kyc-read = { path = "crates/ob-poc-kyc-read" }
 ob-poc-kyc-seam = { path = "crates/ob-poc-kyc-seam" }
+# TS.6 P1/P2: Evaluation-pack verdicts (decide.approve, decide.reject) — no
+# dependency on ob-poc-kyc-seam, by construction (see the crate's own doc
+# comment and scripts/check_kyc_decide_deps.sh).
+ob-poc-kyc-decide = { path = "crates/ob-poc-kyc-decide" }
 # T4 (EOP-PLAN-KYCUBO-KIT-001): kyc_workbook recognition parses staged DSL
 # text with the real workspace lexer/parser (tier-0 deterministic matching).
 dsl-parser = { path = "crates/dsl-parser" }
@@ -343,8 +348,11 @@ members = [
     "crates/ob-poc-kyc-substrate",
     # KYC/UBO durable store (membrane) — EOP-DD-KYCUBO-002 (the only sqlx crate in the stack)
     "crates/ob-poc-kyc-store",
+    "crates/ob-poc-kyc-read",
     # KYC/UBO runtime<->store seam — EOP-DD-KYCUBO-002 §4 (the only KYC crate touching dsl-runtime)
     "crates/ob-poc-kyc-seam",
+    # KYC/UBO Evaluation-pack verdicts — TS.6 §1/§4 (must never depend on ob-poc-kyc-seam)
+    "crates/ob-poc-kyc-decide",
     "crates/ob-poc-agent",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",

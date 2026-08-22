@@ -1,0 +1,20 @@
+[package]
+name = "ob-poc-kyc-read"
+version = "0.1.0"
+edition = "2021"
+description = "Read-only access to the dsl.kyc fact stream (kyc_intent_events). Contains NO append path — that is the entire point: crates that must not be able to write a fact (the TS.6 Evaluation pack) depend on this instead of ob-poc-kyc-store, so the write boundary is a property of the dependency graph rather than of each op's body. Dep-gate: scripts/check_kyc_decide_deps.sh."
+
+# EOP-DD-KYCUBO-TS.6 §1. This crate must NEVER gain a fact-stream write.
+# `ob-poc-kyc-store` depends on it and re-exports these reads, so every
+# existing `PgKycEventStore::load_events` caller is unaffected.
+[dependencies]
+ob-poc-kyc-substrate = { path = "../ob-poc-kyc-substrate" }
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1.0"
+sqlx = { version = ">=0.8.6, <0.9", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+thiserror = "1.0"
+uuid = { version = "1.4", features = ["v4", "serde"] }
+
+[lints.rust]
+unreachable_pub = "deny"
+dead_code = "deny"
