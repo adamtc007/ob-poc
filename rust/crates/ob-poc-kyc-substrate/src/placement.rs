@@ -33,17 +33,30 @@
 //! declaration-drift gap is a lexicon-closure problem, not a placement-set
 //! problem, and is out of this module's scope.
 //!
-//! **TS.1 §5 re-key (D1 tranche, EOP-DD-KYCUBO-TS.1).** The K-G5 gap above
-//! is now closed for the two edge-asserting verbs: `type_geometry_gate`
-//! runs FIRST, ahead of the existing stud probe (`check_preconditions`),
-//! for `ubo.edge.assert-control`/`ubo.edge.assert-economic-interest` only
-//! — TS.1 §1's two constraint layers, in order ("type geometry decides
-//! whether a linkage kind is possible at all... the studs already ratified
-//! then constrain whether a possible move is legal in this position").
-//! `check_type_geometry` (`crate::geometry`) returns `GeometryError`, a
-//! type with no relationship to `KycError` (`check_preconditions`'s error)
-//! — the two constraint layers are structurally, not just textually,
-//! distinct (TS.1 §6 `type_geometry_refuses_impossible_linkage`).
+//! **TS.1 §5 re-key (D1 tranche, EOP-DD-KYCUBO-TS.1) — CORRECTED by TS.5
+//! (2026-08-22).** This block previously named a function,
+//! `type_geometry_gate`, that was never actually built anywhere in the
+//! crate — the K-G5 gap it claimed to close was, in fact, still open:
+//! `geometrically_possible` (below) was an EXISTENCE-only scan ("does any
+//! legal triple exist among typed registered members anywhere"), and
+//! `check_preconditions` — the real append-path oracle this generator also
+//! uses — never called `check_type_geometry` at all. Proven live against
+//! Postgres 2026-08-21 (an illegal `ManagementMandate`/natural-person edge
+//! appended through the real governed op). **EOP-DD-KYCUBO-TS.5 (RATIFIED
+//! 2026-08-22) closes it for real:** `Precondition::TypeGeometryPermits`
+//! (R1) is now a genuine `check_preconditions` arm — attached to
+//! `ubo.edge.assert-control`, `ubo.edge.assert-economic-interest`, and
+//! `ubo.edge.pierce-nominee` (TS.5 §6 Q1/Q2) — so both this generator and
+//! the real append path are covered BY CONSTRUCTION, through the one
+//! function both already called. `geometrically_possible` (R2) now calls
+//! the identical evaluation helper (`fold::control::evaluate_type_geometry`)
+//! the precondition arm uses, rather than a parallel hand-rolled scan, so
+//! the two cannot drift apart again. `check_type_geometry`
+//! (`crate::geometry`) still returns `GeometryError`, distinct from
+//! `KycError` (`check_preconditions`'s error) — the two constraint layers
+//! are structurally, not just textually, distinct (TS.1 §6
+//! `type_geometry_refuses_impossible_linkage`; TS.5 §5
+//! `geometry_refusal_is_distinguishable_from_stud_refusal`).
 //!
 //! **The four genuinely new TS.1 §3 moves** (`assert-type`, `correct-type`,
 //! `withdraw-member`, `record-enquiry` — moves 2, 7, 6, 8) NOW join the
@@ -76,7 +89,6 @@ use crate::event::IntentEvent;
 use crate::fold::control::{check_control_preconditions, check_preconditions, ControlState};
 use crate::fold::obligation::ObligationState;
 use crate::fold::type_registry::TypeRegistryState;
-use crate::geometry::{check_type_geometry, LinkageSource, ALL_PIPES};
 use crate::lexicon::LexiconManifest;
 use crate::types::{
     AuthorityRef, EdgeId, EntityId, Hash, Principal, SubjectId, TargetBinding, VerbFqn,
@@ -187,24 +199,39 @@ fn is_geometry_gated(verb_fqn: &str) -> bool {
 }
 
 /// TS.1 §1's FIRST constraint layer, as an existence check: does there
-/// exist at least one geometrically-possible (source, pipe, target) triple
+/// exist at least one geometrically-possible (source, kind, target) triple
 /// among the subject's currently-registered, currently-typed group members?
 /// An entity with no type assertion at all has no derivable permitted-pipe
 /// set (TS.0 §2 P3: "the proven type determines pipes") — such an entity
 /// contributes nothing here until `assert-type` has fired for it, which is
 /// a real, intended refusal, not a bug: `enumerate_placement_set` cannot
 /// admit a linkage move it cannot evaluate.
+///
+/// **TS.5 R2:** iterates the same ASSERTABLE `EdgeKind` wire values the real
+/// op accepts (`EDGE_KIND_WIRE_VALUES`), not raw `Pipe`s — `EconomicInterest`
+/// classifies through the target type exactly as the write path does — and
+/// evaluates each triple via `fold::control::evaluate_type_geometry`, the
+/// SAME function `check_preconditions`'s `TypeGeometryPermits` arm calls at
+/// the write path. One evaluation function, two call sites, no duplicate
+/// logic to drift out of sync (the defect this whole tranche exists to close).
 fn geometrically_possible(state: &ControlState, type_registry: &TypeRegistryState) -> bool {
+    use crate::fold::control::{evaluate_type_geometry, GeometryEvaluation};
+
     let members: Vec<EntityId> = state.registered_entity_ids.iter().copied().collect();
     for &from in &members {
-        let Some(from_type) = type_registry.type_of(from) else { continue };
+        if type_registry.type_of(from).is_none() {
+            continue;
+        }
         for &to in &members {
             if from == to {
                 continue;
             }
-            let Some(to_type) = type_registry.type_of(to) else { continue };
-            for pipe in ALL_PIPES {
-                if check_type_geometry(LinkageSource::Entity(from_type), *pipe, to_type).is_ok() {
+            if type_registry.type_of(to).is_none() {
+                continue;
+            }
+            for wire in crate::fold::control::EDGE_KIND_WIRE_VALUES {
+                let kind = crate::fold::control::edge_kind_from_wire(wire);
+                if matches!(evaluate_type_geometry(from, to, &kind, type_registry), GeometryEvaluation::Permitted) {
                     return true;
                 }
             }

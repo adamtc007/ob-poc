@@ -1204,6 +1204,16 @@ pub enum ProvisionalityReason {
     /// taken on unproven ground, exactly as `AdmissionOnAllegedType` is for
     /// a `Stop` (§2a's own reasoning, extended to piercing).
     PiercedOnAllegedDeclaration { underlying_holder: EntityId },
+    /// TS.5 R6: at assertion time, the type geometry could not be evaluated
+    /// for this edge — either endpoint carried no type assertion at all
+    /// (`TypeRegistryState::proof_of` returns `None`, a different,
+    /// "unresolved" state from `Alleged`), or the edge's `Pipe`
+    /// classification itself did not resolve (`pipe_of` returned
+    /// `provisional: true` — e.g. an `EconomicInterest` edge into a target
+    /// type outside TS.2 §3's three ratified buckets). The assertion was
+    /// admitted anyway (CTN-2e: record freely, conclude carefully) — this
+    /// reason makes that admission legible rather than silent.
+    GeometryUnevaluable { entity: EntityId, edge_kind_label: String },
 }
 
 /// The assurance surface for one determination: empty means fully proved
@@ -1278,6 +1288,30 @@ pub fn compute_assurance(
             reasons.insert(ProvisionalityReason::AdmissionOnAllegedType {
                 entity: s.stopped_at,
                 edge_kind_label: "statutory_authority".to_string(),
+            });
+        }
+    }
+
+    // TS.5 R6: an edge touching the determination whose geometry could not
+    // be evaluated at assertion time — either endpoint carries no type
+    // assertion at all (`proof_of` returns `None`, distinct from `Alleged`),
+    // or the edge's `Pipe` classification itself did not resolve. Mirrors
+    // `AllegedEdge`'s convention of keying the reason on `edge.to`.
+    for edge in control_state.edges.values() {
+        if !edge.is_active() {
+            continue;
+        }
+        if !(touched.contains(&edge.from) || touched.contains(&edge.to)) {
+            continue;
+        }
+        let from_typed = type_registry.proof_of(edge.from).is_some();
+        let to_typed = type_registry.proof_of(edge.to).is_some();
+        let to_type = type_registry.type_of(edge.to);
+        let pipe_resolved = crate::geometry::pipe_of(&edge.kind, to_type).pipe.is_some();
+        if !from_typed || !to_typed || !pipe_resolved {
+            reasons.insert(ProvisionalityReason::GeometryUnevaluable {
+                entity: edge.to,
+                edge_kind_label: format!("{:?}", edge.kind),
             });
         }
     }

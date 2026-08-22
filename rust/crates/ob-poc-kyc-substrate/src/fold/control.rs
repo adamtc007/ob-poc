@@ -304,28 +304,113 @@ pub const EDGE_KIND_WIRE_VALUES: &[&str] = &[
 
 fn edge_kind_from_payload(payload: &serde_json::Value) -> EdgeKind {
     match payload.get("kind").and_then(|v| v.as_str()) {
-        Some("economic_interest") => EdgeKind::EconomicInterest,
-        Some("voting_rights") => EdgeKind::VotingRights,
-        Some("board_appointment") => EdgeKind::BoardAppointment,
-        Some("gp_statutory") => EdgeKind::GpStatutory,
-        Some("designated_member") => EdgeKind::DesignatedMember,
-        Some("trust_settlor") => EdgeKind::TrustRole(TrustRoleKind::Settlor),
-        Some("trust_trustee") => EdgeKind::TrustRole(TrustRoleKind::Trustee),
-        Some("trust_protector") => EdgeKind::TrustRole(TrustRoleKind::Protector),
-        Some("trust_beneficiary") => EdgeKind::TrustRole(TrustRoleKind::Beneficiary),
-        Some("nominee") => EdgeKind::Nominee,
-        Some("officer_appointment") => EdgeKind::OfficerAppointment,
-        Some("management_mandate") => EdgeKind::ManagementMandate,
-        Some("membership_rights") => EdgeKind::MembershipRights,
-        Some("statutory_authority") => EdgeKind::StatutoryAuthority,
-        Some("employment") => EdgeKind::Employment,
-        Some("containment") => EdgeKind::Containment,
+        Some(wire) => edge_kind_from_wire(wire),
         // Total-dispatch backstop for HISTORICAL events only (the fold must
         // stay infallible — D2). The live append path can no longer reach
-        // this with an unknown/absent kind: the op-normalizer rejects
-        // anything outside `EDGE_KIND_WIRE_VALUES` before the event exists
-        // (TS.1 §1b).
-        Some("dominant_influence") | Some(_) | None => EdgeKind::DominantInfluence,
+        // this with an absent kind: the op-normalizer rejects anything
+        // outside `EDGE_KIND_WIRE_VALUES` before the event exists (TS.1 §1b).
+        None => EdgeKind::DominantInfluence,
+    }
+}
+
+/// Wire-string → `EdgeKind`, total over `EDGE_KIND_WIRE_VALUES` plus the
+/// same historical-event backstop as `edge_kind_from_payload` (which now
+/// delegates here). `pub(crate)` so `placement.rs`'s R2 existence check
+/// (TS.5) can iterate every assertable kind without constructing throwaway
+/// JSON payloads.
+pub(crate) fn edge_kind_from_wire(wire: &str) -> EdgeKind {
+    match wire {
+        "economic_interest" => EdgeKind::EconomicInterest,
+        "voting_rights" => EdgeKind::VotingRights,
+        "board_appointment" => EdgeKind::BoardAppointment,
+        "gp_statutory" => EdgeKind::GpStatutory,
+        "designated_member" => EdgeKind::DesignatedMember,
+        "trust_settlor" => EdgeKind::TrustRole(TrustRoleKind::Settlor),
+        "trust_trustee" => EdgeKind::TrustRole(TrustRoleKind::Trustee),
+        "trust_protector" => EdgeKind::TrustRole(TrustRoleKind::Protector),
+        "trust_beneficiary" => EdgeKind::TrustRole(TrustRoleKind::Beneficiary),
+        "nominee" => EdgeKind::Nominee,
+        "officer_appointment" => EdgeKind::OfficerAppointment,
+        "management_mandate" => EdgeKind::ManagementMandate,
+        "membership_rights" => EdgeKind::MembershipRights,
+        "statutory_authority" => EdgeKind::StatutoryAuthority,
+        "employment" => EdgeKind::Employment,
+        "containment" => EdgeKind::Containment,
+        // Covers "dominant_influence" and any other string. See
+        // `edge_kind_from_payload`'s doc: unreachable from the live append
+        // path (op-normalizer fail-closed gate); kept total for
+        // historical-event replay.
+        _ => EdgeKind::DominantInfluence,
+    }
+}
+
+// ── Type geometry at the write path (EOP-DD-KYCUBO-TS.5 R1/R2) ────────────────
+
+/// Extract the (from, kind, to) triple a geometry-gated event asserts, per
+/// verb payload shape (TS.5 §6 Q1/Q2). Shared by `check_preconditions`'s
+/// `TypeGeometryPermits` arm (the append/preview chokepoint) and
+/// `placement.rs`'s R2 existence check — ONE extraction, not two.
+fn geometry_triple_for_event(
+    event: &IntentEvent,
+    control: &ControlState,
+) -> Option<(EntityId, EntityId, EdgeKind)> {
+    match event.verb_fqn.as_str() {
+        "ubo.edge.assert-economic-interest" => entity_id(&event.payload, "from_entity_id")
+            .zip(entity_id(&event.payload, "to_entity_id"))
+            .map(|(from, to)| (from, to, EdgeKind::EconomicInterest)),
+        "ubo.edge.pierce-nominee" => {
+            // Source is the disclosed nominator (payload); target is the
+            // PIERCED edge's own `to` (the new edge keeps the same target as
+            // the nominee arrangement it replaces — it is not in the payload
+            // at all).
+            let from = entity_id(&event.payload, "nominator_entity_id");
+            let to = edge_id_from_target(event).and_then(|eid| control.edges.get(&eid)).map(|e| e.to);
+            from.zip(to).map(|(from, to)| (from, to, edge_kind_from_payload(&event.payload)))
+        }
+        _ => entity_id(&event.payload, "from_entity_id")
+            .zip(entity_id(&event.payload, "to_entity_id"))
+            .map(|(from, to)| (from, to, edge_kind_from_payload(&event.payload))),
+    }
+}
+
+/// Outcome of evaluating type geometry for one (from, kind, to) triple.
+/// `Unevaluable` and `Permitted` both ADMIT (R5/R6) — only `Refused`
+/// blocks. Kept as three distinct outcomes (not a `bool`) so a caller can
+/// tell "affirmatively legal" from "could not be evaluated, admitted by
+/// CTN-2e default" — the same distinction `ProvisionalityReason` preserves
+/// downstream at determination time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GeometryEvaluation {
+    Permitted,
+    /// Either endpoint's type is unasserted, or the edge's `Pipe`
+    /// classification did not resolve (`pipe_of` returned `provisional`).
+    Unevaluable,
+    Refused(crate::geometry::GeometryError),
+}
+
+/// TS.5 R1/R2 — the single geometry evaluation both the write-path
+/// precondition and the board preview call. Pure: no store, no clock.
+pub(crate) fn evaluate_type_geometry(
+    from: EntityId,
+    to: EntityId,
+    kind: &EdgeKind,
+    type_registry: &TypeRegistryState,
+) -> GeometryEvaluation {
+    let (Some(from_type), Some(to_type)) = (type_registry.type_of(from), type_registry.type_of(to))
+    else {
+        return GeometryEvaluation::Unevaluable;
+    };
+    let classification = crate::geometry::pipe_of(kind, Some(to_type));
+    let Some(pipe) = classification.pipe else {
+        return GeometryEvaluation::Unevaluable;
+    };
+    match crate::geometry::check_type_geometry(
+        crate::geometry::LinkageSource::Entity(from_type),
+        pipe,
+        to_type,
+    ) {
+        Ok(()) => GeometryEvaluation::Permitted,
+        Err(e) => GeometryEvaluation::Refused(e),
     }
 }
 
@@ -872,6 +957,36 @@ pub fn check_preconditions(
                         });
                     }
                 }
+            }
+            Precondition::TypeGeometryPermits => {
+                // TS.5 R1 — TS.1 §1's FIRST constraint layer, applied to the
+                // exact (from, kind, to) triple this event asserts. Extracted
+                // as `geometry_triple_for_event`/`evaluate_type_geometry`
+                // (below) so `placement.rs`'s R2 preview check can call the
+                // IDENTICAL logic instead of a hand-rolled duplicate — one
+                // chokepoint, reused, not two implementations to keep in sync.
+                let Some((from, to, kind)) = geometry_triple_for_event(event, control) else {
+                    // Vacuous when the probe carries no resolvable endpoints
+                    // — same convention as `NoDuplicateActiveEdge`/
+                    // `EntityRegistered` above.
+                    continue;
+                };
+                if let GeometryEvaluation::Refused(geo_err) =
+                    evaluate_type_geometry(from, to, &kind, type_registry)
+                {
+                    return Err(KycError::GeometryRefused {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!("{from:?} --{kind:?}--> {to:?} is not a move (TS.1 §2/§2a): {geo_err:?}"),
+                    });
+                }
+                // R5/R6 (`Unevaluable`/`Permitted`): an alleged OR untyped
+                // endpoint, or an unresolved pipe classification, ADMITS
+                // provisionally — this precondition must never fail closed
+                // on missing proof (CTN-2e). Provisionality is recorded
+                // downstream, at determination time, by
+                // `determination::compute_assurance`
+                // (`ProvisionalityReason::AllegedType`/`GeometryUnevaluable`),
+                // not here — this checker has no side channel to record into.
             }
         }
     }

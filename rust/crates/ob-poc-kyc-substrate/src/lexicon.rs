@@ -119,6 +119,20 @@ pub enum Precondition {
     /// already asserted"; nothing to correct otherwise, that's
     /// `assert-type`'s job).
     PriorTypeAsserted,
+
+    // ── EOP-DD-KYCUBO-TS.5 R1 — geometry becomes a precondition ─────────────
+    /// TS.1 §2/§2a's type→linkage matrix, checked against the event's
+    /// endpoints and (classified) pipe (`crate::geometry::check_type_geometry`).
+    /// Attached to `ubo.edge.assert-control`, `ubo.edge.assert-economic-
+    /// interest`, and `ubo.edge.pierce-nominee` — the three verbs that
+    /// introduce or restate an edge's (from, kind, to) triple (TS.5 §6 Q1/Q2).
+    /// R5/R6: an alleged or untyped endpoint, or an unresolved pipe
+    /// classification, ADMITS provisionally — this is the one precondition
+    /// that must never fail closed on missing proof (CTN-2e); it fails
+    /// closed only on a triple the matrix affirmatively refuses. Produces
+    /// `KycError::GeometryRefused`, distinct from `PreconditionFailed`
+    /// (TS.5 §5 `geometry_refusal_is_distinguishable_from_stud_refusal`).
+    TypeGeometryPermits,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -322,10 +336,13 @@ pub fn phase1_lexicon() -> LexiconManifest {
             smallvec![FoldId::ControlGraph],
             // T6.2 row 1: subject must be registered; no active edge with the
             // same (from, to, kind) may already exist — contradicting claims
-            // go through supersede, never a second assert (K-13).
+            // go through supersede, never a second assert (K-13). TS.5 R1:
+            // the type-geometry layer — TS.1 §1's FIRST constraint, ahead of
+            // these positional studs.
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::NoDuplicateActiveEdge,
+                Precondition::TypeGeometryPermits,
             ],
             AuthoritySpec::analyst(),
             vec![],
@@ -335,10 +352,13 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Claim an economic-interest edge (shareholding percentage)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            // T6.2 row 2: same two studs as row 1, reused.
+            // T6.2 row 2: same two studs as row 1, reused. TS.5 R1/§6 Q1:
+            // geometry checked against the CLASSIFIED pipe (pipe_of), not a
+            // raw kind — economic-interest edges carry no `kind` field.
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::NoDuplicateActiveEdge,
+                Precondition::TypeGeometryPermits,
             ],
             AuthoritySpec::analyst(),
             vec![],
@@ -388,10 +408,14 @@ pub fn phase1_lexicon() -> LexiconManifest {
              disclosed nominator's underlying edge (K-8, K-13)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
+            // TS.5 §6 Q2: a pierce asserts a NEW (nominator, kind, pierced-
+            // edge's-`to`) triple — structurally an assertion, gated the
+            // same as assert-control/assert-economic-interest.
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::EdgeExists,
                 Precondition::EdgeActive,
+                Precondition::TypeGeometryPermits,
             ],
             AuthoritySpec::senior_analyst(),
             vec![],

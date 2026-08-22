@@ -9,6 +9,15 @@ pub enum KycError {
     #[error("precondition failed for {verb}: {reason}")]
     PreconditionFailed { verb: VerbFqn, reason: String },
 
+    /// TS.5 R1/§5 `geometry_refusal_is_distinguishable_from_stud_refusal`:
+    /// the type-geometry layer (TS.1 §1's FIRST constraint layer — "is this
+    /// triple a move at all") is structurally distinct from a stud
+    /// (positional) violation, and must produce a distinguishable error, not
+    /// share `PreconditionFailed`'s shape. "Not a move" versus "not legal
+    /// here."
+    #[error("geometry refused for {verb}: {reason}")]
+    GeometryRefused { verb: VerbFqn, reason: String },
+
     #[error("edge {0:?} not found in control graph")]
     EdgeNotFound(EdgeId),
 
