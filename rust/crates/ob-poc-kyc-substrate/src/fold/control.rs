@@ -1082,6 +1082,60 @@ pub fn edges_of_kind_into(
         .collect()
 }
 
+/// TS.4 §2 Ruling A: active edges, pointed at `target`, whose kind is a
+/// governing-mandate BASIS — `ManagementMandate` (ManCo/AIFM/adviser) or
+/// `GpStatutory` (GP-of-LP; TS.2 Ruling 2 "basis, not the label 'ManCo'" —
+/// a limited partnership's governing mandate is its general partner's
+/// statutory control, not a separate management-contract edge). Both kinds
+/// are already `ControlAdmission::Traverse` (TS.3), so this is a
+/// kind-filtered view of the same edges `reconciled_control_edges` admits —
+/// not a new admission class — used by `fund_pivot_resolve` to find WHERE
+/// a subject re-anchors before delegating to the shared control walk.
+pub fn governing_mandate_edges_into(
+    state: &ControlState,
+    target: EntityId,
+) -> Vec<ReconciledControlEdge> {
+    state
+        .edges
+        .values()
+        .filter(|e| {
+            matches!(e.kind, EdgeKind::ManagementMandate | EdgeKind::GpStatutory)
+                && e.to == target
+                && e.is_active()
+        })
+        .map(|e| ReconciledControlEdge {
+            id: e.id,
+            from: e.from,
+            to: e.to,
+            kind: e.kind.clone(),
+            verified_by: if e.is_verified() {
+                e.evidence_event_id
+            } else {
+                None
+            },
+            originating_event_id: e.originating_event_id,
+        })
+        .collect()
+}
+
+/// TS.4 §3 Ruling B: every active, unpierced `EdgeKind::Nominee` edge in
+/// the ENTIRE control state — not scoped to any one strategy's traversal.
+/// Ruling B widens the freeze-time K-8 guard from "only when
+/// `nominee_pierce_strategy` was selected" to unconditional: a nominee
+/// sitting mid-chain inside a fund, trust, or corporate structure must be
+/// pierced before freeze succeeds under ANY strategy, not only when the
+/// subject itself classified as `Nominee`. Extracted here (rather than left
+/// inline at the op-layer call site) so the same check is directly testable
+/// without a DB (`determination_never_terminates_at_a_nominee`).
+pub fn unpierced_nominee_edges(state: &ControlState) -> Vec<EdgeId> {
+    state
+        .edges
+        .values()
+        .filter(|e| e.is_active() && matches!(e.kind, EdgeKind::Nominee))
+        .map(|e| e.id)
+        .collect()
+}
+
 // ── Trust edge summary (for TrustRoleStrategy, TS.1) ─────────────────────────
 
 /// An active trust-role edge ready for the role-based prong computation.

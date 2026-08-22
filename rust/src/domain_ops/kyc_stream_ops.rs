@@ -753,29 +753,29 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .selected_strategy
             .as_deref()
             .ok_or_else(|| anyhow!("freeze: no strategy selected (K-4 precondition)"))?;
-        // TS.4 (§2.6) fail-closed guard, BEFORE dispatch (so the dispatch arm
-        // below stays a plain `"..." => &Strategy` expression the closure
-        // tooth's arm scanner recognises): `resolve()` returns
-        // `Vec<ProngCandidate>` and cannot signal error, so the
-        // unpierced-nominee scan lives here. Freezing while an unpierced
-        // nominee edge is active would either attribute control to the
-        // nominee (the exact wrong answer K-8 exists to prevent) or silently
-        // drop the arrangement — hard-error instead.
-        if strategy_name == "nominee_pierce_strategy" {
-            let unpierced: Vec<String> = control
-                .edges
-                .values()
-                .filter(|e| e.is_active() && matches!(e.kind, EdgeKind::Nominee))
-                .map(|e| e.id.0.to_string())
-                .collect();
-            if !unpierced.is_empty() {
-                return Err(anyhow!(
-                    "freeze: nominee_pierce_strategy selected but unpierced nominee edge(s) \
-                     remain active: [{}] — pierce each via ubo.edge.pierce-nominee before \
-                     freezing (K-8, fail-closed)",
-                    unpierced.join(", ")
-                ));
-            }
+        // TS.4 §3 Ruling B (widened from §2.6's original nominee_pierce_
+        // strategy-only scope): `resolve()` returns `Vec<ProngCandidate>`
+        // and cannot signal error, so the unpierced-nominee scan lives
+        // here, BEFORE dispatch (so the dispatch arm below stays a plain
+        // `"..." => &Strategy` expression the closure tooth's arm scanner
+        // recognises). UNCONDITIONAL as of Ruling B: a nominee sitting
+        // mid-chain inside a fund, trust, or corporate structure is
+        // reachable under ANY strategy, not only when the subject itself
+        // classified as `Nominee` — freezing while ANY active unpierced
+        // nominee edge exists anywhere in the graph would either attribute
+        // control to the nominee (the exact wrong answer K-8 exists to
+        // prevent) or silently drop the arrangement — hard-error instead,
+        // regardless of which strategy actually ran.
+        let unpierced: Vec<String> = ob_poc_kyc_substrate::unpierced_nominee_edges(&control)
+            .into_iter()
+            .map(|id| id.0.to_string())
+            .collect();
+        if !unpierced.is_empty() {
+            return Err(anyhow!(
+                "freeze: unpierced nominee edge(s) remain active: [{}] — pierce each via \
+                 ubo.edge.pierce-nominee before freezing (TS.4 §3 Ruling B, K-8, fail-closed)",
+                unpierced.join(", ")
+            ));
         }
         let strategy: &dyn DeterminationStrategy = match strategy_name {
             "ownership_prong_strategy" => &OwnershipProngStrategy,
@@ -870,6 +870,41 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             None => None,
         };
 
+        // TS.4 §3 Ruling B: tag every candidate with the pierces (if any)
+        // followed along ITS OWN chain — universal, regardless of which
+        // strategy resolved it (`nominee_pierce_strategy` needs no special
+        // case; the substitution already happened at edge-admission time,
+        // this just makes it a visible, recorded part of the answer). Runs
+        // AFTER the SMO pull above so pulled candidates are tagged too.
+        for c in &mut candidates {
+            c.pierces = ob_poc_kyc_substrate::detect_pierces_in_chain(&control, &c.ownership_chain);
+        }
+
+        // TS.4 §2 Ruling 2f / CTN-2e: a governing-mandate pivot lacking
+        // contract evidence COMPUTES (candidates above already reflect it)
+        // but may not FREEZE — "record freely, conclude carefully". Unlike
+        // the unpierced-nominee guard above (a hard structural block before
+        // dispatch), this is a post-resolve stud: it inspects whatever
+        // pivots the strategy actually recorded, so it applies uniformly to
+        // any strategy that produces a `pivot` (today: fund_control_strategy
+        // only), not just the one dispatched this call.
+        let unevidenced_pivots: Vec<String> = candidates
+            .iter()
+            .filter_map(|c| c.pivot.as_ref())
+            .filter(|p| !p.mandate_evidenced)
+            .map(|p| p.mandate_edge_id.0.to_string())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        if !unevidenced_pivots.is_empty() {
+            return Err(anyhow!(
+                "freeze: determination pivoted through governing-mandate edge(s) [{}] with no \
+                 contract evidence attached — attach-evidence before freezing (TS.4 §2 Ruling 2f, \
+                 CTN-2e: record freely, conclude carefully)",
+                unevidenced_pivots.join(", ")
+            ));
+        }
+
         let smo_result = match (control.smo_person_id, control.smo_event_id) {
             (Some(pid), Some(orig)) => Some(SmoResult::Person(ProngCandidate {
                 person_id: pid,
@@ -877,6 +912,8 @@ impl SemOsVerbOp for UboDeterminationFreeze {
                 effective_ownership_pct: None,
                 ownership_chain: vec![],
                 originating_event_id: orig,
+                pivot: None,
+                pierces: Vec::new(),
             })),
             (None, _) => None,
             (Some(_), None) => {

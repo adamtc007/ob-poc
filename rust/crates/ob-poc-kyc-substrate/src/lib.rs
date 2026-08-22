@@ -25,22 +25,24 @@ pub(crate) mod types;
 // ── Convenience re-exports ────────────────────────────────────────────────────
 
 pub use determination::{
-    compute_assurance, detect_statutory_stops, find_subject_entity, freeze_determination,
-    pull_smo_on_exhaustion, recover_determination_at, recover_determination_bitemporal,
-    ControlProngStrategy, CooperativeMemberStrategy, DelegationStatus, DeterminationAssurance,
-    DeterminationInProgress, DeterminationPin, DeterminationStrategy, FoundationCouncilStrategy,
-    FrozenDetermination, FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy,
-    Prong, ProngCandidate, ProvisionalityReason, RecoveryPin, SmoPullRecord, SmoResult,
-    StateOwnedStrategy, TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
+    compute_assurance, detect_pierces_in_chain, detect_statutory_stops, find_subject_entity,
+    freeze_determination, fund_pivot_resolve, pull_smo_on_exhaustion, recover_determination_at,
+    recover_determination_bitemporal, ControlProngStrategy, CooperativeMemberStrategy,
+    DelegationStatus, DeterminationAssurance, DeterminationInProgress, DeterminationPin,
+    DeterminationStrategy, FoundationCouncilStrategy, FrozenDetermination, FundControlStrategy,
+    FundPivotResult, NomineePierceStrategy, OwnershipProngStrategy, PierceRecord, PivotCycleRecord,
+    Prong, ProngCandidate, ProvisionalityReason, RecordedPivot, RecoveryPin, SmoPullRecord,
+    SmoResult, StateOwnedStrategy, TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
     check_control_preconditions, check_preconditions, control_admission, edges_of_kind_into,
-    fold_control, natural_persons_from_events, reconciled_control_edges,
-    reconciled_economic_edges, reconciled_trust_edges, ControlAdmission, ControlState, EdgeKind,
-    EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge,
-    StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES, IMPLEMENTED_STRATEGY_CLASSES,
+    fold_control, governing_mandate_edges_into, natural_persons_from_events,
+    reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges,
+    unpierced_nominee_edges, ControlAdmission, ControlState, EdgeKind, EdgeState, EdgeStatus,
+    ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge, StructureClass,
+    TrustRoleKind, EDGE_KIND_WIRE_VALUES, IMPLEMENTED_STRATEGY_CLASSES,
     STRUCTURE_CLASS_WIRE_VALUES,
 };
 pub use fold::obligation::{

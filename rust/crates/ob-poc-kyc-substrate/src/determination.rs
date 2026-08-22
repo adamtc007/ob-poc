@@ -26,9 +26,9 @@ use crate::error::KycError;
 use crate::event::IntentEvent;
 use crate::fold::control::{
     reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
-    ReconciledEconomicEdge, TrustRoleKind,
+    EdgeKind, ReconciledEconomicEdge, TrustRoleKind,
 };
-use crate::types::{EntityId, EventId, Hash, PersonId, Principal};
+use crate::types::{EdgeId, EntityId, EventId, Hash, PersonId, Principal};
 
 // ── Prong ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,92 @@ pub struct ProngCandidate {
     pub ownership_chain: Vec<EntityId>,
     /// The event that introduced the edge that makes this person a candidate.
     pub originating_event_id: EventId,
+    /// TS.4 §2 Ruling A: if this candidate was found by re-anchoring at a
+    /// governing-mandate holder (ManCo/AIFM/GP/adviser), the pivot that
+    /// produced it. `None` for ordinary (non-pivoted) candidates.
+    #[serde(default)]
+    pub pivot: Option<RecordedPivot>,
+    /// TS.4 §3 Ruling B: every pierce (nominee → underlying holder)
+    /// followed along this candidate's chain, recorded — never a silent
+    /// substitution.
+    #[serde(default)]
+    pub pierces: Vec<PierceRecord>,
+}
+
+// ── Fund pivot (EOP-DD-KYCUBO-TS.4 §2 Ruling A) ─────────────────────────────
+
+/// TS.4 §2 Ruling A: the re-anchor a fund/LP subject's determination
+/// pivoted through — a governing-mandate holder reached via
+/// `EdgeKind::ManagementMandate` (ManCo/AIFM/adviser) or
+/// `EdgeKind::GpStatutory` (GP-of-LP; TS.2 Ruling 2 "basis, not the label
+/// 'ManCo'"). Recorded so the determination can explain itself — "resolved
+/// via governing mandate at X" — rather than merely producing a chain that
+/// happens to pass through the pivot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordedPivot {
+    /// The entity the walk re-anchored at (the mandate holder / GP), NOT
+    /// the fund/LP subject itself.
+    pub pivot_entity: EntityId,
+    /// The edge kind that established this as a governing-mandate pivot —
+    /// always `ManagementMandate` or `GpStatutory`, never any other kind.
+    pub basis_edge_kind: EdgeKind,
+    /// The edge asserting the mandate/GP relationship into the pivot.
+    pub mandate_edge_id: EdgeId,
+    /// TS.2 Ruling 2f / CTN-2e: whether contract evidence has been attached
+    /// to the mandate edge (`EdgeStatus::Evidenced` or beyond, i.e. NOT
+    /// bare `Asserted`). `false` means this candidate computes but the
+    /// determination may not freeze while it is the only path to a person
+    /// — "record freely, conclude carefully".
+    pub mandate_evidenced: bool,
+}
+
+/// TS.4 §2 Ruling A (2b): a governing-mandate re-anchor that would revisit
+/// an entity already on the pivot path taken to reach it — the branch
+/// halts there instead of looping, and the halt is recorded, never
+/// silently dropped (K-8-style discipline extended to pivot cycles).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PivotCycleRecord {
+    /// The pivot entity that would have been revisited.
+    pub revisited_entity: EntityId,
+    /// The chain of pivot entities walked before the revisit was detected.
+    pub pivot_path: Vec<EntityId>,
+}
+
+/// TS.4 §2 Ruling A: `fund_pivot_resolve`'s full result. Carries the audit
+/// trail (which pivots were taken, which cycles halted) that
+/// `FundControlStrategy::resolve()` alone cannot express through the plain
+/// `DeterminationStrategy::resolve() -> Vec<ProngCandidate>` signature —
+/// the same "richer data via a standalone function, trait unchanged" shape
+/// TS.3 established for `pull_smo_on_exhaustion`/`detect_statutory_stops`
+/// (see TS.3 §6: only the admission function is trait-surface work).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FundPivotResult {
+    /// Union across every governing-mandate pivot found (TS.2 Ruling 2e:
+    /// co-management is a union, not a suppression) — each candidate
+    /// carries its own `pivot` (`ProngCandidate::pivot`) naming which
+    /// pivot path produced it.
+    pub candidates: Vec<ProngCandidate>,
+    /// Pivot cycles halted (empty if none).
+    pub cycles: Vec<PivotCycleRecord>,
+}
+
+// ── Cross-strategy piercing (EOP-DD-KYCUBO-TS.4 §3 Ruling B) ────────────────
+
+/// TS.4 §3 Ruling B: one nominee → underlying-holder substitution followed
+/// during traversal, recorded — never a silent substitution (K-8, TS.0
+/// §5: a nominee is a capacity held in a particular edge, not what an
+/// entity IS, and piercing must be available during any strategy).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PierceRecord {
+    /// The entity that held the nominee capacity on the pierced edge.
+    pub nominee_entity: EntityId,
+    /// The disclosed nominator substituted in its place.
+    pub underlying_holder: EntityId,
+    /// The original (now-superseded) `EdgeKind::Nominee` edge.
+    pub nominee_edge_id: EdgeId,
+    /// The replacement edge asserted by `ubo.edge.pierce-nominee`, carrying
+    /// the real underlying kind.
+    pub replacement_edge_id: EdgeId,
 }
 
 // ── Strategy interface (K-4) ─────────────────────────────────────────────────
@@ -111,15 +197,14 @@ pub const STRATEGY_DELEGATION_REGISTRY: &[(&str, DelegationStatus)] = &[
     ("ownership_prong_strategy", DelegationStatus::GenuineImplementation),
     ("control_prong_strategy", DelegationStatus::GenuineImplementation),
     ("trust_role_strategy", DelegationStatus::GenuineImplementation),
-    // TS.4 §4 finding, Phase 1 (RED-honest pin, BEFORE Ruling A's fix):
-    // `fund_control_strategy` forwards VERBATIM to `control_prong_strategy`
-    // — claimed-but-delegated. Phase 2 makes this `GenuineImplementation`
-    // (the fund pivot: provenance, per-pivot exhaustion, evidence stud) —
-    // a conscious edit here, red/green-proofed in the same tranche.
-    (
-        "fund_control_strategy",
-        DelegationStatus::DeclaredDelegate { delegates_to: "control_prong_strategy" },
-    ),
+    // TS.4 §4 finding, Phase 2 (conscious edit — was `DeclaredDelegate` in
+    // Phase 1's RED-honest pin): `fund_control_strategy` now delegates to
+    // `fund_pivot_resolve`, which records the pivot, targets exhaustion at
+    // the pivot entity, unions co-management, and stamps an evidence flag —
+    // a real domain difference from a raw `control_prong_strategy` walk,
+    // proven behaviorally by `strategy_delegation_is_exactly_known`'s
+    // divergence check.
+    ("fund_control_strategy", DelegationStatus::GenuineImplementation),
     ("foundation_council_strategy", DelegationStatus::GenuineImplementation),
     ("state_owned_strategy", DelegationStatus::GenuineImplementation),
     ("cooperative_member_strategy", DelegationStatus::GenuineImplementation),
@@ -218,6 +303,8 @@ impl DeterminationStrategy for OwnershipProngStrategy {
                 // INVARIANT: orig is always Some here because the adjacency map
                 // always carries the edge's originating_event_id (never random).
                 originating_event_id: orig.expect("originating_event_id must be deterministic"),
+                pivot: None,
+                pierces: Vec::new(),
             })
             .collect()
     }
@@ -286,6 +373,8 @@ fn resolve_chain_candidates(
             effective_ownership_pct: None,
             ownership_chain: chain,
             originating_event_id: orig,
+            pivot: None,
+            pierces: Vec::new(),
         })
         .collect()
 }
@@ -415,22 +504,190 @@ impl DeterminationStrategy for TrustRoleStrategy {
     }
 }
 
+// ── fund_pivot_resolve (EOP-DD-KYCUBO-TS.4 §2 Ruling A) ─────────────────────
+
+/// TS.4 §2 Ruling A: resolve a fund/LP subject via its governing-mandate
+/// holder(s) — keyed on BASIS (`EdgeKind::ManagementMandate` for a
+/// ManCo/AIFM/adviser, `EdgeKind::GpStatutory` for a GP-of-LP; TS.2 Ruling
+/// 2 "basis, not the label 'ManCo'" — an LP resolves through its GP
+/// exactly the way a corporate-form fund resolves through its ManCo/AIFM),
+/// not a raw, unexplained control walk. Called directly by
+/// `FundControlStrategy::resolve()`; exposed standalone (mirroring TS.3's
+/// `pull_smo_on_exhaustion`/`detect_statutory_stops` shape, TS.3 §6) so a
+/// caller can inspect the pivot/cycle audit trail the plain
+/// `DeterminationStrategy::resolve() -> Vec<ProngCandidate>` signature
+/// cannot carry.
+///
+/// - **No pivot found** (no active governing-mandate edge into the
+///   subject): falls back to the plain control walk directly from the
+///   subject — unchanged pre-TS.4 capability. A fund whose control is
+///   asserted directly (e.g. a literal `dominant_influence`, no formal
+///   ManCo/GP layer) still resolves; there is simply no pivot to record.
+/// - **2a — exhaustion targets the pivot, not the subject:** when a
+///   pivot's own control-chain resolution is empty, the SMO/officer pull
+///   (`pull_smo_on_exhaustion`) is anchored at `pivot_entity`, not
+///   `subject_entity_id` — a fund with no natural-person controller above
+///   its ManCo pulls the MANCO's officers, not the fund's own (nonexistent)
+///   officers. Firing this HERE, inside the strategy, is load-bearing: it
+///   pre-empts the orchestrator-level `pull_smo_on_exhaustion(subject_
+///   entity_id, ...)` call in `kyc_stream_ops.rs`/`recover_determination_at`
+///   (wrongly anchored at the fund for this structure class) by returning
+///   non-empty candidates, which makes that call's `prior_candidates.
+///   is_empty()` guard correctly no-op.
+/// - **2b/2d — pivot cycles terminate and record:** v1 admits only DIRECT
+///   governing-mandate edges into the subject (one hop — mirrors
+///   `ProngCandidate::pivot` being a single `Option<RecordedPivot>`, not a
+///   chain), so the only structurally possible revisit at this depth is a
+///   self-referential mandate (`pivot_entity == subject_entity_id`) — a
+///   degenerate but real "circular management arrangement". That branch
+///   halts and is recorded (`PivotCycleRecord`) rather than silently
+///   admitted as its own controller. Cycles WITHIN a pivot's own
+///   control-chain walk (beyond this one hop) are still caught by
+///   `resolve_chain_candidates`'s existing path-based guard, unchanged.
+/// - **2e — co-management is a union:** every governing-mandate edge INTO
+///   the subject is its own independent pivot; results union by person
+///   (first pivot to reach a person wins, in the edges' deterministic
+///   `BTreeMap` order — Q6/K-16/18/33), each candidate keeps its own
+///   `RecordedPivot`. Neither pivot's contribution is suppressed.
+/// - **2f — evidence stud is recorded, not enforced, here:** every
+///   candidate's `pivot.mandate_evidenced` reflects whether the mandate
+///   edge is `Evidenced`/`Verified` (not bare `Asserted`) — CTN-2e:
+///   "record freely, conclude carefully" — the freeze-time refusal lives
+///   at the freeze call site, not here (this function always computes).
+/// - **No IM-specific branch (2c/2d):** this function admits exactly the
+///   two already-`Traverse`-classified control kinds (TS.3) that constitute
+///   a governing mandate — there is no third "delegated IM" `EdgeKind`
+///   anywhere in the taxonomy. An affiliated-IM case that is not itself a
+///   governing mandate finds no pivot here and falls through to ordinary
+///   control/ownership traversal (`no_im_specific_path_exists`, TS.4 §5).
+pub fn fund_pivot_resolve(
+    state: &ControlState,
+    subject_entity_id: EntityId,
+    natural_persons: &BTreeSet<PersonId>,
+) -> FundPivotResult {
+    let pivots = crate::fold::control::governing_mandate_edges_into(state, subject_entity_id);
+
+    if pivots.is_empty() {
+        let edges = reconciled_control_edges(state);
+        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        for e in &edges {
+            adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+        }
+        return FundPivotResult {
+            candidates: resolve_chain_candidates(adj, subject_entity_id, natural_persons),
+            cycles: Vec::new(),
+        };
+    }
+
+    let mut candidates: BTreeMap<PersonId, ProngCandidate> = BTreeMap::new();
+    let mut cycles: Vec<PivotCycleRecord> = Vec::new();
+
+    for pivot_edge in &pivots {
+        let pivot_entity = pivot_edge.from;
+
+        // 2b/2d: the only revisit possible at v1's single-hop pivot depth —
+        // a governing mandate naming the subject itself as its own manager.
+        if pivot_entity == subject_entity_id {
+            cycles.push(PivotCycleRecord {
+                revisited_entity: pivot_entity,
+                pivot_path: vec![subject_entity_id],
+            });
+            continue;
+        }
+
+        let mandate_evidenced = state
+            .edges
+            .get(&pivot_edge.id)
+            .map(|e| e.status != crate::fold::control::EdgeStatus::Asserted)
+            .unwrap_or(false);
+        let recorded_pivot = RecordedPivot {
+            pivot_entity,
+            basis_edge_kind: pivot_edge.kind.clone(),
+            mandate_edge_id: pivot_edge.id,
+            mandate_evidenced,
+        };
+
+        // If the pivot entity is ITSELF a natural person — a management
+        // mandate held personally, not through a further ManCo/GP entity —
+        // it is the answer directly (mirrors how `resolve_chain_candidates`
+        // treats any `from` that is a natural person: an immediate
+        // candidate, not a node to traverse further through). Re-anchoring
+        // one hop further (below) is only correct when the pivot is itself
+        // a legal entity still to be resolved.
+        let mut pivot_candidates: Vec<ProngCandidate> =
+            if natural_persons.contains(&PersonId(pivot_entity.0)) {
+                vec![ProngCandidate {
+                    person_id: PersonId(pivot_entity.0),
+                    prong: Prong::ControlByOtherMeans,
+                    effective_ownership_pct: None,
+                    ownership_chain: Vec::new(),
+                    originating_event_id: pivot_edge.originating_event_id,
+                    pivot: None,
+                    pierces: Vec::new(),
+                }]
+            } else {
+                // Re-anchor: walk the shared control-chain traversal FROM the
+                // pivot entity — the chain itself is unchanged from TS.3;
+                // what TS.4 adds is the pivot record and the
+                // correctly-anchored exhaustion below.
+                let edges = reconciled_control_edges(state);
+                let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+                for e in &edges {
+                    adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+                }
+                resolve_chain_candidates(adj, pivot_entity, natural_persons)
+            };
+
+        // 2a: exhaustion targets the PIVOT, not the subject/fund.
+        if pivot_candidates.is_empty() {
+            if let Some((pulled, _record)) =
+                pull_smo_on_exhaustion(state, pivot_entity, natural_persons, &pivot_candidates)
+            {
+                pivot_candidates.extend(pulled);
+            }
+        }
+
+        for c in &mut pivot_candidates {
+            // K-1/K-35 auditability: the chain reads fund → pivot → person,
+            // not just pivot → person.
+            let mut full_chain = vec![subject_entity_id];
+            full_chain.extend(c.ownership_chain.iter().copied());
+            c.ownership_chain = full_chain;
+            c.pivot = Some(recorded_pivot.clone());
+        }
+
+        // 2e: union across pivots — first pivot to reach a person wins
+        // (deterministic order); neither pivot's contribution as a whole
+        // is suppressed.
+        for c in pivot_candidates {
+            candidates.entry(c.person_id).or_insert(c);
+        }
+    }
+
+    FundPivotResult { candidates: candidates.into_values().collect(), cycles }
+}
+
 // ── FundControlStrategy (TS.2 — fund control sits with the manager) ──────────
 
-/// Resolves natural persons controlling an InvestmentFund-classified subject
-/// — the corporate-form fund (SICAV/OEIC/unit trust) whose control edge is
-/// the MANAGEMENT relationship (ManCo/AIFM/GP-analog), not its investors
-/// (EOP-DD-KYCUBO-KIT-TS0 §2.2, ratified 2026-08-12).
+/// Resolves natural persons controlling an InvestmentFund/LimitedPartnership
+/// Fund-classified subject — the fund (SICAV/OEIC/unit trust/LP) whose
+/// control edge is the MANAGEMENT relationship (ManCo/AIFM/GP), not its
+/// investors (EOP-DD-KYCUBO-KIT-TS0 §2.2, ratified 2026-08-12; realised
+/// against the working chain by EOP-DD-KYCUBO-TS.4 §2 Ruling A, ratified
+/// 2026-08-21 — see `fund_pivot_resolve`).
 ///
-/// **No new `EdgeKind`:** the management relationship asserts as
-/// `dominant_influence` (or `board_appointment` where literal). The strategy
-/// is a thin delegate to `ControlProngStrategy`'s traversal with fund
-/// framing: same `reconciled_control_edges` walk, same natural-person chain
-/// resolution. Investor `economic_interest` edges are NOT traversed — they
-/// stay on the economic axis and feed the existing ownership prong only when
-/// someone genuinely crosses the threshold. Every candidate is
-/// `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always `None`;
-/// `threshold_pct` is accepted for signature parity but unused.
+/// **GenuineImplementation (TS.4; was a thin delegate to
+/// `ControlProngStrategy` through TS.3):** delegates to `fund_pivot_resolve`,
+/// which records the governing-mandate pivot, targets SMO exhaustion at the
+/// pivot rather than the fund, unions co-management, and stamps an evidence
+/// flag for freeze-time gating — none of which a raw `ControlProngStrategy`
+/// walk can express (see `STRATEGY_DELEGATION_REGISTRY`,
+/// `strategy_delegation_is_exactly_known`). Investor `economic_interest`
+/// edges are NOT traversed — they stay on the economic axis and feed the
+/// existing ownership prong only when someone genuinely crosses the
+/// threshold. Every candidate is `Prong::ControlByOtherMeans`;
+/// `effective_ownership_pct` is always `None`; `threshold_pct` is accepted
+/// for signature parity but unused.
 ///
 /// **Why a NAMED strategy rather than mapping InvestmentFund →
 /// `control_prong_strategy` directly** (the §2.2 alternative, rejected at
@@ -439,9 +696,9 @@ impl DeterminationStrategy for TrustRoleStrategy {
 /// was resolved under the fund-control basis (manager, not investors)", not
 /// merely "some control walk happened".
 ///
-/// **Scope (TS.2 v1):** inherits `ControlProngStrategy`'s v1 boundary — does
-/// not cross into the economic axis for an intermediate controlling entity's
-/// own UBOs (v2).
+/// **Scope (TS.4 v1):** inherits `fund_pivot_resolve`'s v1 boundary —
+/// single-hop pivot, no crossing into the economic axis for an intermediate
+/// controlling entity's own UBOs (v2).
 pub struct FundControlStrategy;
 
 impl DeterminationStrategy for FundControlStrategy {
@@ -454,10 +711,9 @@ impl DeterminationStrategy for FundControlStrategy {
         state: &ControlState,
         subject_entity_id: EntityId,
         natural_persons: &BTreeSet<PersonId>,
-        threshold_pct: f64,
+        _threshold_pct: f64,
     ) -> Vec<ProngCandidate> {
-        // Thin delegate (§2.2): same traversal machinery, fund framing.
-        ControlProngStrategy.resolve(state, subject_entity_id, natural_persons, threshold_pct)
+        fund_pivot_resolve(state, subject_entity_id, natural_persons).candidates
     }
 }
 
@@ -745,6 +1001,48 @@ pub fn detect_statutory_stops(
     .collect()
 }
 
+// ── Pierce detection in a chain (EOP-DD-KYCUBO-TS.4 §3 Ruling B) ────────────
+
+/// TS.4 §3 Ruling B: detect every pierce (nominee → underlying holder)
+/// that was followed to reach a determination — a `Superseded`
+/// `EdgeKind::Nominee` edge whose `to` lies on the given chain,
+/// cross-referenced to its replacement (the active edge whose
+/// `pierced_from` names it).
+///
+/// **Detection only — not a new substitution mechanism.** The substitution
+/// itself already happens at the edge-admission level: a pierced nominee's
+/// replacement edge carries an ordinary `Traverse`-kind (e.g.
+/// `VotingRights`) with the SAME `to`, so `reconciled_control_edges` walks
+/// straight through it — confirmed working since TS.0's `pierce-nominee`
+/// verb landed. What TS.4 §3 found absent was any RECORD that a pierce was
+/// followed (K-8: never silent); this function is that record, called
+/// against every candidate's `ownership_chain` by the caller (`kyc_stream_
+/// ops.rs`, `recover_determination_at`) after `resolve()` returns.
+pub fn detect_pierces_in_chain(state: &ControlState, chain: &[EntityId]) -> Vec<PierceRecord> {
+    let chain_set: BTreeSet<EntityId> = chain.iter().copied().collect();
+    let mut records: Vec<PierceRecord> = state
+        .edges
+        .values()
+        .filter(|e| {
+            matches!(e.kind, EdgeKind::Nominee)
+                && e.status == crate::fold::control::EdgeStatus::Superseded
+                && chain_set.contains(&e.to)
+        })
+        .filter_map(|nominee_edge| {
+            state.edges.values().find(|r| r.pierced_from == Some(nominee_edge.id)).map(
+                |replacement| PierceRecord {
+                    nominee_entity: nominee_edge.from,
+                    underlying_holder: replacement.from,
+                    nominee_edge_id: nominee_edge.id,
+                    replacement_edge_id: replacement.id,
+                },
+            )
+        })
+        .collect();
+    records.sort_by_key(|p| (p.nominee_edge_id.0, p.replacement_edge_id.0));
+    records
+}
+
 // ── SMO pull on exhaustion (TS.3 §4a) ────────────────────────────────────────
 
 /// TS.3 §4a: the audit record that the SMO/officer population was PULLED by
@@ -854,6 +1152,8 @@ pub fn pull_smo_on_exhaustion(
                     effective_ownership_pct: None,
                     ownership_chain: vec![subject_entity_id, entity],
                     originating_event_id: e.originating_event_id,
+                    pivot: None,
+                    pierces: Vec::new(),
                 });
             }
         }
@@ -898,6 +1198,12 @@ pub enum ProvisionalityReason {
     /// narrow case §2a calls out by name: a `Stop` at a believed-but-
     /// unproven state body.
     AdmissionOnAllegedType { entity: EntityId, edge_kind_label: String },
+    /// TS.4 §3 Q2: a pierce substituted `underlying_holder` on the basis of
+    /// a nominee declaration (the replacement edge) that is not yet
+    /// `EdgeStatus::Verified` — the substitution is a traversal decision
+    /// taken on unproven ground, exactly as `AdmissionOnAllegedType` is for
+    /// a `Stop` (§2a's own reasoning, extended to piercing).
+    PiercedOnAllegedDeclaration { underlying_holder: EntityId },
 }
 
 /// The assurance surface for one determination: empty means fully proved
@@ -973,6 +1279,23 @@ pub fn compute_assurance(
                 entity: s.stopped_at,
                 edge_kind_label: "statutory_authority".to_string(),
             });
+        }
+    }
+
+    // TS.4 §3 Q2: a pierce followed on the basis of a not-yet-Verified
+    // replacement edge (the disclosed nominator's declaration) is itself a
+    // traversal decision taken on unproven ground.
+    for c in candidates {
+        for p in &c.pierces {
+            let replacement_verified = control_state
+                .edges
+                .get(&p.replacement_edge_id)
+                .is_some_and(|e| matches!(e.status, crate::fold::control::EdgeStatus::Verified));
+            if !replacement_verified {
+                reasons.insert(ProvisionalityReason::PiercedOnAllegedDeclaration {
+                    underlying_holder: p.underlying_holder,
+                });
+            }
         }
     }
 
@@ -1214,6 +1537,13 @@ pub fn recover_determination_at(
         None => None,
     };
 
+    // TS.4 §3 Ruling B: tag every candidate with the pierces (if any)
+    // followed along ITS OWN chain — same universal tagging as the live
+    // freeze op (`kyc_stream_ops.rs`); replay must record the same facts.
+    for c in &mut candidates {
+        c.pierces = detect_pierces_in_chain(&control, &c.ownership_chain);
+    }
+
     // Find SMO from control state.
     // smo_event_id is ALWAYS Some when smo_person_id is Some (set together in fold_control).
     // Using expect() rather than a fallback here: a None would mean the fold is
@@ -1225,6 +1555,8 @@ pub fn recover_determination_at(
             effective_ownership_pct: None,
             ownership_chain: vec![],
             originating_event_id: orig_event_id,
+            pivot: None,
+            pierces: Vec::new(),
         })),
         (None, _) => None,
         (Some(_), None) => {

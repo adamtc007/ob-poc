@@ -760,6 +760,8 @@ fn ec4_smo_fallback_when_no_ubos_found() {
             effective_ownership_pct: None,
             ownership_chain: vec![],
             originating_event_id: smo_orig_event_id,
+            pivot: None,
+            pierces: Vec::new(),
         })
     });
 
