@@ -58,4 +58,11 @@ pub enum KycError {
 
     #[error("other error: {0}")]
     Other(#[from] anyhow::Error),
+
+    /// D2.0 §6 `run_pins_are_complete`: a run missing any of its required
+    /// pins (subject root, board hash, pack version hash, both times,
+    /// trigger, in-scope set) is refused at construction — falsifiable, not
+    /// a NOT NULL column nothing can violate.
+    #[error("evaluation run refused — incomplete pins: {reason}")]
+    IncompleteRun { reason: String },
 }

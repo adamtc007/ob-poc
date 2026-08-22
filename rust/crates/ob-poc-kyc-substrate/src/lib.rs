@@ -13,6 +13,7 @@
 
 pub(crate) mod determination;
 pub(crate) mod error;
+pub(crate) mod evaluation;
 pub(crate) mod event;
 pub(crate) mod fold;
 pub(crate) mod geometry;
@@ -35,6 +36,11 @@ pub use determination::{
     SmoResult, StateOwnedStrategy, TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
 };
 pub use error::KycError;
+pub use evaluation::{
+    applicability_holds, board_state_hash, in_scope_check_ids, work_list_from_history,
+    ApplicabilityCondition, BoardSnapshot, Check, EvaluationRun, Finding, RiskLevel, RunPins,
+    UnevaluableReason, Verdict,
+};
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
     check_control_preconditions, check_preconditions, control_admission, edges_of_kind_into,
