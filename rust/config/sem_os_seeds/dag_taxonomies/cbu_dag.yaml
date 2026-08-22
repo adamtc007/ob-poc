@@ -114,17 +114,11 @@ dsl_verb_reconciliation:
     - document.create-request
     - document.extract
     - document.for-entity
-    - document.get
     - document.list-requests-by-workstream
-    - document.list-versions
     - document.mark-received
     - document.mark-requested
     - document.missing-for-entity
-    - document.reject
     - document.reject-request
-    - document.start-qa
-    - document.upload-version
-    - document.verify
     - document.verify-request
     - document.waive-request
     - document.list
@@ -183,12 +177,7 @@ dsl_verb_reconciliation:
     - observation.supersede
     - observation.verify-allegations
   ownership_surface:
-    - ownership.bridge.bods-ownership
-    - ownership.bridge.gleif-fund-managers
-    - ownership.bridge.manco-roles
-    - ownership.control-links.compute
     - ownership.control-links.list
-    - ownership.refresh
   request_surface:
     - request.cancel
     - request.create
@@ -281,12 +270,12 @@ dsl_verb_reconciliation:
     - kyc.list-missing-items
     - kyc.obligation.create
     - kyc.obligation.satisfy
-    - kyc.obligation.update-identity
-    - kyc.obligation.update-risk
-    - kyc.obligation.update-screening
+    - assert.identity
+    - assert.risk
+    - assert.screening
     - kyc.obligation.waive
-    - kyc.person.approve
-    - kyc.person.reject
+    - decide.approve
+    - decide.reject
     - kyc.subject.classify-structure
     - kyc.subject.register
   onboarding_surface:
@@ -308,9 +297,7 @@ dsl_verb_reconciliation:
     - trading-profile.read
   ubo_surface:
     - ubo.determination.apply-smo-fallback
-    - ubo.determination.compute-fold
     - ubo.determination.freeze
-    - ubo.determination.select-strategy
     - ubo.edge.assert-control
     - ubo.edge.assert-economic-interest
     - ubo.edge.attach-evidence

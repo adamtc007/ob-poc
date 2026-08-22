@@ -117,7 +117,7 @@ fn declared_verb_universe() -> BTreeSet<String> {
 /// The dsl.kyc verb family (`declared_verb_universe()`) widened by whichever
 /// `screening.yaml` verbs are ALSO registered as `SemOsVerbOp`s inside
 /// `kyc_stream_ops.rs` (today: `screening.complete`, `screening.review-hit`
-/// — the W5 screening hook, which fans out `kyc.obligation.update-screening`
+/// — the W5 screening hook, which fans out `assert.screening`
 /// events from inside the same file). Deliberately NOT a blind union of all
 /// of `screening.yaml`: most of its verbs (`pep`, `sanctions`,
 /// `adverse-media`, `bulk-refresh`, `await-aggregate-outcome`) are also
@@ -259,9 +259,9 @@ fn assembly_pack_is_exactly_known() {
         "ubo.determination.apply-smo-fallback",
         "ubo.determination.freeze",
         "kyc.obligation.create",
-        "kyc.obligation.update-identity",
-        "kyc.obligation.update-screening",
-        "kyc.obligation.update-risk",
+        "assert.identity",
+        "assert.screening",
+        "assert.risk",
         "kyc.obligation.satisfy",
         "kyc.obligation.waive",
     ]
@@ -298,9 +298,9 @@ fn relocated_facts_are_in_assembly() {
     let assembly = assembly_lexicon();
     let evaluation = evaluation_lexicon();
     for fqn in [
-        "kyc.obligation.update-screening",
-        "kyc.obligation.update-identity",
-        "kyc.obligation.update-risk",
+        "assert.screening",
+        "assert.identity",
+        "assert.risk",
     ] {
         assert!(
             assembly.get(fqn).is_some(),
@@ -424,10 +424,15 @@ fn retired_verbs_are_gone() {
 #[test]
 fn stream_governed_family_covers_every_declared_verb() {
     let globs = stream_governed_globs();
+    // 6 → 7 (TS.6 §3 relocation, 2026-08-22): `assert.*` added for
+    // assert.screening/.identity/.risk, renamed out of `kyc.obligation.*`.
+    // They remain stream-governed — only the namespace moved, not the
+    // behaviour — so the family list must cover the new prefix or they would
+    // read as ungoverned (K-G3).
     assert_eq!(
         globs.len(),
-        6,
-        "stream_governed.verb_families count drifted from the audited 6: {globs:#?}"
+        7,
+        "stream_governed.verb_families count drifted from the audited 7: {globs:#?}"
     );
     // The kyc.role.* glob is vacuous after the K-G7 retirement (no live verb
     // matches it) — left in kyc_dag.yaml deliberately: governance-block
@@ -800,9 +805,9 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // `kyc_decision_records` directly). The 5 obligation verbs below keep
     // only `ObligationExists`.
     for fqn in [
-        "kyc.obligation.update-identity",
-        "kyc.obligation.update-screening",
-        "kyc.obligation.update-risk",
+        "assert.identity",
+        "assert.screening",
+        "assert.risk",
         "kyc.obligation.satisfy",
         "kyc.obligation.waive",
     ] {
@@ -1962,5 +1967,90 @@ fn no_stud_is_duplicated() {
         "placement.rs::type_registry_candidates (correct-type block): found a \
          hand-rolled type_of check — the board-preview side of the stud \
          duplication has come back; it must consult check_control_preconditions only"
+    );
+}
+
+/// TS.6 / K-G7 — **the search index**, not just source files.
+///
+/// `retired_verbs_are_gone` above scans YAML declarations, op structs and
+/// `LexiconEntry`s — source only. That is exactly why four retired FQNs
+/// (`kyc.role.assign`, `kyc.role.withdraw`,
+/// `ubo.determination.select-strategy`, `ubo.determination.compute-fold`)
+/// survived every sweep as live rows in `verb_pattern_embeddings` with zero
+/// `dsl_verbs` backing: an operator utterance still resolved to a dead verb
+/// while "grep-proven gone" reported clean (found 2026-08-22).
+///
+/// An orphan is an embedding whose FQN is neither a live verb NOR a live
+/// macro. Macros are deliberately absent from `dsl_verbs` — they live in
+/// `config/verb_schemas/macros/` and are expanded before execution — so the
+/// naive "no dsl_verbs row" test would wrongly flag every macro
+/// (`ubo.edge.pierce-nominee` is the live example).
+///
+/// Live-DB. Ignored by default so the pure pack stays runnable without a
+/// database; run it in the DB lane.
+#[tokio::test]
+#[ignore = "needs DATABASE_URL"]
+async fn retired_verbs_are_gone_from_the_search_index() {
+    use std::collections::BTreeSet;
+
+    let url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .connect(&url)
+        .await
+        .expect("connect");
+
+    let orphans: Vec<(String, i64)> = sqlx::query_as(
+        r#"SELECT e.verb_name, count(*)::bigint
+           FROM "ob-poc".verb_pattern_embeddings e
+           LEFT JOIN "ob-poc".dsl_verbs d ON d.full_name = e.verb_name
+           WHERE d.full_name IS NULL
+           GROUP BY e.verb_name ORDER BY e.verb_name"#,
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("query orphans");
+
+    // Every FQN declared as a macro anywhere under config/verb_schemas/macros/.
+    let mut macro_fqns: BTreeSet<String> = BTreeSet::new();
+    let dir = std::path::Path::new("config/verb_schemas/macros");
+    for entry in std::fs::read_dir(dir).expect("read macros dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
+            continue;
+        }
+        let src = std::fs::read_to_string(&path).expect("read macro yaml");
+        for line in src.lines() {
+            // Top-level (column-0) `some.macro.fqn:` keys are macro names.
+            if let Some(name) = line.strip_suffix(':') {
+                if !name.is_empty()
+                    && !name.starts_with(char::is_whitespace)
+                    && !name.starts_with('#')
+                    && name.contains('.')
+                {
+                    macro_fqns.insert(name.to_string());
+                }
+            }
+        }
+    }
+    assert!(
+        macro_fqns.contains("ubo.edge.pierce-nominee"),
+        "macro scan is broken — it must find the known live macro"
+    );
+
+    // KYC/UBO scope: this pack's own retirements. `bpmn.*` orphans are a
+    // separate, pre-existing finding outside this tranche's fence.
+    let kyc_orphans: Vec<String> = orphans
+        .iter()
+        .filter(|(fqn, _)| fqn.starts_with("kyc.") || fqn.starts_with("ubo.") || fqn.starts_with("assert.") || fqn.starts_with("decide."))
+        .filter(|(fqn, _)| !macro_fqns.contains(fqn))
+        .map(|(fqn, n)| format!("{fqn} ({n} rows)"))
+        .collect();
+
+    assert!(
+        kyc_orphans.is_empty(),
+        "retired KYC/UBO verbs still discoverable in the search index — \
+         prune verb_pattern_embeddings + verb_centroids for: {kyc_orphans:#?}"
     );
 }

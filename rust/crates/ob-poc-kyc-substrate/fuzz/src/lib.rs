@@ -6,7 +6,7 @@
 //! interesting-branch coverage).
 //!
 //! `gen_events` builds a plausible-but-adversarial `IntentEvent` sequence:
-//! verb FQNs drawn from the 21 known dsl.kyc verbs (plus deliberately
+//! verb FQNs drawn from the 16 known dsl.kyc verbs (plus deliberately
 //! unknown ones, to keep `apply_one_control_event`'s total-dispatch
 //! fallthrough hot), payloads carrying every field any control-fold verb
 //! reads, and a small reused id pool so edges/entities/persons actually
@@ -18,12 +18,23 @@ use ob_poc_kyc_substrate::{
 };
 use uuid::Uuid;
 
-/// All 21 live dsl.kyc verb FQNs (control-fold verbs, obligation-fold verbs,
+/// All 14 live dsl.kyc verb FQNs (control-fold verbs, obligation-fold verbs,
 /// and determination-layer verbs the pure folds ignore) plus a couple of
 /// deliberately-unknown FQNs, so every fold's total-dispatch fallthrough
 /// (D2) stays hot alongside its real match arms. `fold_control` and
 /// `fold_obligations` each only react to their own subset — every other
 /// verb here exercises their harmless `_ => {}` arm instead.
+/// `select-strategy`/`compute-fold` (TS.6 P2, K-G7) and `pierce-nominee`
+/// (TS.6 P2, folded into a macro composing `assert-control`+`supersede`)
+/// dropped from this list — none of the three has a dedicated fold arm any
+/// more, so their strings would just be more `not.a.real.verb`-style
+/// fallthrough noise, indistinguishable from the two deliberate unknowns
+/// already below. `kyc.person.approve`/`.reject` also dropped (TS.6 P1/P2)
+/// — renamed `decide.approve`/`.reject` and moved to `ob-poc-kyc-decide`,
+/// which never appends to the fact stream at all, so neither fold has ever
+/// had a dispatch arm for them (this fuzz target only exercises
+/// `apply_one_control_event`/`apply_one_obligation_event`, never
+/// `ob-poc-kyc-decide`'s DB-backed ops).
 const ALL_VERBS: &[&str] = &[
     "kyc.subject.register",
     "kyc.subject.classify-structure",
@@ -32,20 +43,15 @@ const ALL_VERBS: &[&str] = &[
     "ubo.edge.attach-evidence",
     "ubo.edge.verify",
     "ubo.edge.supersede",
-    "ubo.edge.pierce-nominee",
     "ubo.edge.reconcile-conflict",
-    "ubo.determination.select-strategy",
-    "ubo.determination.compute-fold",
     "ubo.determination.apply-smo-fallback",
     "ubo.determination.freeze",
     "kyc.obligation.create",
-    "kyc.obligation.update-identity",
-    "kyc.obligation.update-screening",
-    "kyc.obligation.update-risk",
+    "assert.identity",
+    "assert.screening",
+    "assert.risk",
     "kyc.obligation.satisfy",
     "kyc.obligation.waive",
-    "kyc.person.approve",
-    "kyc.person.reject",
     // Genuinely unknown FQNs — historical/garbage-event fallthrough (D2).
     "not.a.real.verb",
     "",
@@ -169,6 +175,12 @@ fn build_payload(
     );
     put(
         "edge_id",
+        pick_uuid_like(tape, edge_pool).map(serde_json::Value::from),
+    );
+    // TS.6 P2: `ubo.edge.assert-control`'s new provenance field — the
+    // `pierce-nominee` macro's `pierced-from` arg, normalized to this key.
+    put(
+        "pierced_from",
         pick_uuid_like(tape, edge_pool).map(serde_json::Value::from),
     );
     if tape.bool() {

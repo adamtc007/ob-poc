@@ -72,21 +72,15 @@ dsl_verb_reconciliation:
     - document.create-request
     - document.extract
     - document.for-entity
-    - document.get
     - document.list
     - document.list-missing
     - document.list-requests-by-workstream
-    - document.list-versions
     - document.mark-received
     - document.mark-requested
     - document.missing-for-entity
-    - document.reject
     - document.reject-request
     - document.solicit
     - document.solicit-batch
-    - document.start-qa
-    - document.upload-version
-    - document.verify
     - document.verify-request
     - document.waive-request
   economic_exposure_surface:
@@ -115,12 +109,12 @@ dsl_verb_reconciliation:
     - kyc.list-missing-items
     - kyc.obligation.create
     - kyc.obligation.satisfy
-    - kyc.obligation.update-identity
-    - kyc.obligation.update-risk
-    - kyc.obligation.update-screening
+    - assert.identity
+    - assert.risk
+    - assert.screening
     - kyc.obligation.waive
-    - kyc.person.approve
-    - kyc.person.reject
+    - decide.approve
+    - decide.reject
     - kyc.subject.classify-structure
     - kyc.subject.register
   observation_surface:
@@ -135,12 +129,7 @@ dsl_verb_reconciliation:
   onboarding_surface:
     - onboarding.status
   ownership_surface:
-    - ownership.bridge.bods-ownership
-    - ownership.bridge.gleif-fund-managers
-    - ownership.bridge.manco-roles
-    - ownership.control-links.compute
     - ownership.control-links.list
-    - ownership.refresh
   red_flag_surface:
     - red-flag.escalate
     - red-flag.raise
@@ -177,9 +166,7 @@ dsl_verb_reconciliation:
     - tollgate.override
   ubo_surface:
     - ubo.determination.apply-smo-fallback
-    - ubo.determination.compute-fold
     - ubo.determination.freeze
-    - ubo.determination.select-strategy
     - ubo.edge.assert-control
     - ubo.edge.assert-economic-interest
     - ubo.edge.attach-evidence
@@ -209,6 +196,16 @@ stream_governed:
     UBO/KYC determination verbs are governed by the stream lexicon and fold
     preconditions, not by DAG from-state/to-state slots. The DAG intentionally
     has no lifecycle slot for these stream-backed verb families.
+  # kyc.role.* and kyc.person.* are both vacuous (match zero live verbs) —
+  # kyc.role.assign/withdraw retired 2026-08-12 (K-G7), kyc.person.approve/
+  # .reject renamed decide.approve/.reject and moved to ob-poc-kyc-decide
+  # TS.6 P2 (no longer stream-governed at all — the whole point of the
+  # Evaluation-pack split). Both left here rather than deleted; see
+  # tests/kyc_pack_closure.rs for the full rationale. NOTE for future
+  # editors: this naive line-scanning parser (stream_governed_globs() in
+  # kyc_pack_closure.rs) breaks the list early on any comment line placed
+  # INSIDE the verb_families block below — keep per-item commentary here,
+  # above the list, not interleaved with it.
   verb_families:
     - ubo.edge.*
     - ubo.determination.*
@@ -216,6 +213,7 @@ stream_governed:
     - kyc.role.*
     - kyc.obligation.*
     - kyc.person.*
+    - assert.*
   stream_tables:
     - kyc_intent_events
     - kyc_subject_streams

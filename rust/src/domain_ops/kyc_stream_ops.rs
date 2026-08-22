@@ -18,16 +18,16 @@ use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_postgres::ops::SemOsVerbOp;
 
-use ob_poc_kyc_seam::{append_in_scope, map_principal, IntentEventDraft};
+use ob_poc_kyc_seam::{append_in_scope, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, check_preconditions, edges_invalidated_by_correction,
+    check_preconditions, edges_invalidated_by_correction,
     entity_type_from_wire, find_subject_entity, fold_control_versioned, fold_obligations_versioned,
-    fold_type_registry, natural_persons_from_events, phase1_lexicon, pipe_of,
+    fold_type_registry, natural_persons_from_events, assembly_lexicon, pipe_of,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
     CooperativeMemberStrategy, EdgeId, EdgeKind, EntityId, FoldRegistry, FoundationCouncilStrategy,
     FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId, Prong,
-    ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, SubjectOverallState, TargetBinding,
+    ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, TargetBinding,
     TrustRoleStrategy, V1FoldImpl,
     EDGE_KIND_WIRE_VALUES, ENTITY_TYPE_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
 };
@@ -52,7 +52,7 @@ async fn stream_append(
     ctx: &mut VerbExecutionContext,
     scope: &mut dyn TransactionScope,
 ) -> Result<ob_poc_kyc_store::AppendOutcome> {
-    let lexicon = phase1_lexicon();
+    let lexicon = assembly_lexicon();
     let entry = validate_entry_fqn
         .map(|fqn| {
             lexicon
@@ -88,6 +88,42 @@ async fn stream_append(
     .map_err(|e| anyhow!("{verb_fqn} stream append failed: {e}"))
 }
 
+/// K-23 "decision is final" — refuse if `subject` already has a
+/// `decide.approve`/`decide.reject` record.
+///
+/// `Precondition::SubjectNotDecided` was live-enforced (T6.4) for
+/// `kyc.obligation.{update-identity,update-screening,update-risk,satisfy,
+/// waive}` — a subject could not have its obligations touched once decided.
+/// Retired from the substrate TS.6 P2 (`decide.approve`/`decide.reject` no
+/// longer append to the fact stream, so the fold can never see a decision to
+/// check against) — re-homed here, onto `kyc_decision_records` directly,
+/// preserving the same guarantee for these 5 fact-stream verbs exactly as
+/// `ob-poc-kyc-decide`'s own finality check does for `decide.approve`/
+/// `decide.reject` themselves.
+async fn refuse_if_subject_already_decided(
+    scope: &mut dyn TransactionScope,
+    subject: SubjectId,
+    verb_fqn: &str,
+) -> Result<()> {
+    let existing = sqlx::query_scalar::<_, String>(
+        r#"SELECT verb_fqn FROM "ob-poc".kyc_decision_records
+           WHERE subject_root = $1 AND verb_fqn IN ('decide.approve', 'decide.reject')
+           LIMIT 1"#,
+    )
+    .bind(subject.0)
+    .fetch_optional(scope.executor())
+    .await
+    .map_err(|e| anyhow!("{verb_fqn}: finality check failed: {e}"))?;
+
+    if let Some(prior_fqn) = existing {
+        return Err(anyhow!(
+            "{verb_fqn} rejected: subject has already been decided ({prior_fqn}); \
+             the decision is final (K-23)"
+        ));
+    }
+    Ok(())
+}
+
 use super::helpers::{
     json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
 };
@@ -97,7 +133,7 @@ use super::helpers::{
 /// version-dispatch (D2) needs more than one registered version.
 static KYC_REGISTRY: LazyLock<FoldRegistry> = LazyLock::new(|| {
     let mut registry = FoldRegistry::new();
-    registry.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    registry.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     registry
 });
 
@@ -125,7 +161,50 @@ impl SemOsVerbOp for UboEdgeAssertControl {
         // Stable edge id (caller-supplied or fresh); the edge's identity in the fold.
         let edge = EdgeId(json_extract_uuid_opt(args, ctx, "edge-id").unwrap_or_else(Uuid::new_v4));
 
-        let lexicon = phase1_lexicon();
+        // TS.6 P2 (K-G7): `pierced-from` present means this call is the
+        // first half of the `ubo.edge.pierce-nominee` macro composition
+        // (config/verb_schemas/macros/ubo.yaml), which replaced the retired
+        // standalone verb. Op-layer fail-closed check (no precondition
+        // primitive expresses "edge is of kind X" — the same discipline the
+        // retired bespoke op used): the referenced edge must exist, be
+        // `EdgeKind::Nominee`, and be active. Cheap no-op on the common
+        // non-piercing path (no fold read at all unless the arg is present).
+        if let Some(pierced_from) = json_extract_uuid_opt(args, ctx, "pierced-from").map(EdgeId) {
+            let events = PgKycEventStore::load_events(scope.executor(), subject)
+                .await
+                .map_err(|e| anyhow!("ubo.edge.assert-control: load events failed: {e}"))?;
+            let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+            let control = fold_control_versioned(&refs, &KYC_REGISTRY)
+                .map_err(|e| anyhow!("ubo.edge.assert-control: control fold failed: {e}"))?;
+            match control.edges.get(&pierced_from) {
+                None => {
+                    return Err(anyhow!(
+                        "ubo.edge.assert-control: pierced-from edge {} not found in the \
+                         control graph (EdgeExists)",
+                        pierced_from.0
+                    ));
+                }
+                Some(e) if !matches!(e.kind, EdgeKind::Nominee) => {
+                    return Err(anyhow!(
+                        "ubo.edge.assert-control: pierced-from edge {} is not a nominee edge \
+                         (kind {:?}) — only EdgeKind::Nominee arrangements can be pierced \
+                         (K-8, fail-closed)",
+                        pierced_from.0,
+                        e.kind
+                    ));
+                }
+                Some(e) if !e.is_active() => {
+                    return Err(anyhow!(
+                        "ubo.edge.assert-control: pierced-from edge {} is not active \
+                         (EdgeActive)",
+                        pierced_from.0
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
+
+        let lexicon = assembly_lexicon();
         let entry = lexicon
             .get("ubo.edge.assert-control")
             .ok_or_else(|| anyhow!("ubo.edge.assert-control missing from lexicon"))?;
@@ -291,160 +370,21 @@ impl SemOsVerbOp for UboEdgeSupersede {
     }
 }
 
-/// `ubo.edge.pierce-nominee` — TS.4 = K-8 (EOP-DD-KYCUBO-KIT-TS0 §2.6,
-/// ratified 2026-08-12): pierce a nominee arrangement. ONE governed event,
-/// TWO fold effects: (a) the target nominee edge is superseded (K-13,
-/// `superseded_by` = the pierce event); (b) a new control edge from the
-/// disclosed nominator is asserted with the UNDERLYING kind and
-/// `pierced_from` provenance. The "target is actually a nominee edge" check
-/// has no precondition primitive — enforced here, fail-closed, via a
-/// pre-append fold (same pre-fold pattern as freeze/person.approve; the
-/// EdgeExists/EdgeActive/SubjectRegistered studs re-check under the lock).
-pub struct UboEdgePierceNominee;
-
-#[async_trait]
-impl SemOsVerbOp for UboEdgePierceNominee {
-    fn fqn(&self) -> &str {
-        "ubo.edge.pierce-nominee"
-    }
-
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let edge = EdgeId(json_extract_uuid(args, ctx, "edge-id")?);
-        let nominator = json_extract_uuid(args, ctx, "nominator-id")?;
-        let payload = normalize_pierce_nominee_payload(args, edge, nominator)?;
-
-        // Op-layer fail-closed kind check (§2.6 checklist note): no
-        // precondition primitive expresses "edge is of kind X", so the
-        // nominee-kind verification lives here. Pre-append fold — same
-        // accepted small race window as freeze's pre-fold; existence/
-        // activeness are ALSO re-checked under the lock by the declared
-        // EdgeExists/EdgeActive studs.
-        let events = PgKycEventStore::load_events(scope.executor(), subject)
-            .await
-            .map_err(|e| anyhow!("pierce-nominee: load events failed: {e}"))?;
-        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-        let control = fold_control_versioned(&refs, &KYC_REGISTRY)
-            .map_err(|e| anyhow!("pierce-nominee: control fold failed: {e}"))?;
-        match control.edges.get(&edge) {
-            None => {
-                return Err(anyhow!(
-                    "ubo.edge.pierce-nominee: target edge {} not found in the control graph \
-                     (EdgeExists)",
-                    edge.0
-                ));
-            }
-            Some(e) if !matches!(e.kind, EdgeKind::Nominee) => {
-                return Err(anyhow!(
-                    "ubo.edge.pierce-nominee: target edge {} is not a nominee edge \
-                     (kind {:?}) — only EdgeKind::Nominee arrangements can be pierced \
-                     (K-8, fail-closed)",
-                    edge.0,
-                    e.kind
-                ));
-            }
-            Some(_) => {}
-        }
-
-        let outcome = stream_append(
-            "ubo.edge.pierce-nominee",
-            subject,
-            TargetBinding::for_edge(subject, edge),
-            payload,
-            "senior-analyst.pierce-nominee",
-            Some("ubo.edge.pierce-nominee"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(json!({
-            "pierced_edge_id": edge.0,
-            "seq": outcome.seq,
-        })))
-    }
-}
-
-/// Normalize `ubo.edge.pierce-nominee`'s payload (TS.4, §2.6) — fail-closed
-/// duties, mirroring `normalize_assert_control_payload`'s §1b discipline:
-///
-/// 1. **`kind` must be a member of the canonical wire set AND not
-///    `nominee`:** the arg is the UNDERLYING kind the nominator actually
-///    holds; a pierce can never produce another nominee edge (fail-closed —
-///    that would just relocate the K-8 problem). Unknown/absent kinds are
-///    rejected before append, exactly as assert-control's normalizer does.
-/// 2. **Kebab→snake:** `edge-id`→`edge_id` (the TARGET nominee edge — the
-///    fold reads `target.edge_id`, but the payload copy keeps the event
-///    self-describing), `nominator-id`→`nominator_entity_id` (read by the
-///    fold arm), `trust-revocable`→`trust_revocable` (meaningful if the
-///    underlying kind is `trust_settlor`).
-/// 3. **Provenance stamp:** `pierced_from` = the target nominee edge id
-///    (§2.6 — carried on the event payload; the fold also records it on the
-///    new `EdgeState`).
-fn normalize_pierce_nominee_payload(
-    args: &serde_json::Value,
-    edge: EdgeId,
-    nominator: Uuid,
-) -> Result<serde_json::Value> {
-    let underlying_values = || {
-        EDGE_KIND_WIRE_VALUES
-            .iter()
-            .filter(|k| **k != "nominee")
-            .copied()
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    match args.get("kind").and_then(|v| v.as_str()) {
-        Some("nominee") => {
-            return Err(anyhow!(
-                "ubo.edge.pierce-nominee: kind 'nominee' rejected — a pierce cannot produce \
-                 another nominee edge (K-8, fail-closed); pass the UNDERLYING kind the \
-                 nominator actually holds. Valid wire values: {}",
-                underlying_values()
-            ));
-        }
-        Some(kind) if EDGE_KIND_WIRE_VALUES.contains(&kind) => {}
-        Some(unknown) => {
-            return Err(anyhow!(
-                "ubo.edge.pierce-nominee: unrecognized kind '{unknown}' — rejected fail-closed \
-                 (TS.1 §1b wire-normalizer discipline). Valid wire values: {}",
-                underlying_values()
-            ));
-        }
-        None => {
-            return Err(anyhow!(
-                "ubo.edge.pierce-nominee: kind is required (the UNDERLYING kind the nominator \
-                 actually holds) — rejected fail-closed. Valid wire values: {}",
-                underlying_values()
-            ));
-        }
-    }
-    let mut p = args.clone();
-    if let Some(obj) = p.as_object_mut() {
-        obj.remove("edge-id");
-        obj.insert(
-            "edge_id".to_string(),
-            serde_json::Value::String(edge.0.to_string()),
-        );
-        obj.remove("nominator-id");
-        obj.insert(
-            "nominator_entity_id".to_string(),
-            serde_json::Value::String(nominator.to_string()),
-        );
-        if let Some(v) = obj.remove("trust-revocable") {
-            obj.insert("trust_revocable".to_string(), v);
-        }
-        obj.insert(
-            "pierced_from".to_string(),
-            serde_json::Value::String(edge.0.to_string()),
-        );
-    }
-    Ok(p)
-}
+// `UboEdgePierceNominee` / `ubo.edge.pierce-nominee` RETIRED (TS.6 P2, K-G7,
+// 2026-08-22): the bespoke op's two governed effects — supersede the target
+// nominee edge (K-13) + assert the disclosed nominator's real edge with
+// `pierced_from` provenance (K-8) — are now two ordinary verb calls composed
+// by the `ubo.edge.pierce-nominee` MACRO (config/verb_schemas/macros/
+// ubo.yaml): `ubo.edge.assert-control` (extended with an optional
+// `pierced-from` arg — see its op-layer fail-closed check above and
+// `normalize_assert_control_payload` below) followed by `ubo.edge.supersede`
+// (unchanged). Piercing records a real handed-over fact, so it wasn't
+// deleted outright (unlike select-strategy/compute-fold) — it was
+// redesigned because the old shape was a single-purpose verb doing two
+// governed effects in one hand-rolled fold arm, with no reusable
+// composition mechanism; the macro is executed atomically under the
+// Sequencer's one-scope-per-runbook model, same as any other multi-step
+// macro, so the two effects still commit or roll back together.
 
 pub struct UboEdgeReconcileConflict;
 
@@ -481,107 +421,21 @@ impl SemOsVerbOp for UboEdgeReconcileConflict {
 
 // ── Determination verbs ───────────────────────────────────────────────────────
 
-pub struct UboDeterminationSelectStrategy;
+// `UboDeterminationSelectStrategy` / `ubo.determination.select-strategy`
+// RETIRED (TS.6 P2, K-G7): the strategy is now DERIVED from
+// `structure_class` (`strategy_for_structure_class`), never separately
+// asserted. Reintroduction path: only if a structure class is ever ratified
+// with more than one legitimate strategy to choose between — at that point
+// the verb would need to record which one was picked, which today's
+// total 1:1 class→strategy mapping makes unnecessary.
 
-#[async_trait]
-impl SemOsVerbOp for UboDeterminationSelectStrategy {
-    fn fqn(&self) -> &str {
-        "ubo.determination.select-strategy"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        //    `Some(fqn)` — T6.1(c): select-strategy now carries a real
-        //    precondition (`StructureClassSupported`, the 6a exemplar). Before
-        //    this it had none, so `None` here was harmless; leaving it `None`
-        //    now would silently never enforce the fail-closed guard at the
-        //    real write path (same defect class as freeze's dead-precondition
-        //    bug fixed in EOP-DD-KYCUBO-003 — a declared-but-unwired check).
-        let outcome = stream_append(
-            "ubo.determination.select-strategy",
-            subject,
-            TargetBinding::for_subject(subject),
-            args.clone(),
-            "analyst.select-strategy",
-            Some("ubo.determination.select-strategy"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
-
-pub struct UboDeterminationComputeFold;
-
-#[async_trait]
-impl SemOsVerbOp for UboDeterminationComputeFold {
-    fn fqn(&self) -> &str {
-        "ubo.determination.compute-fold"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        // compute-fold is a projection read — fold the stream and return the state.
-        let events = ob_poc_kyc_store::PgKycEventStore::load_events(scope.executor(), subject)
-            .await
-            .map_err(|e| anyhow!("compute-fold load failed: {e}"))?;
-        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-        let state = ob_poc_kyc_substrate::fold_control_versioned(&refs, &KYC_REGISTRY)
-            .map_err(|e| anyhow!("compute-fold failed: {e}"))?;
-        let type_registry = ob_poc_kyc_substrate::fold_type_registry(&refs);
-
-        // T6-tooth fix (2026-08-12, EOP-PLAN-KYCUBO-KIT-001 Part A): compute-fold's
-        // lexicon entry declares [ReconciledProjection, StrategySelected] (K-14),
-        // but this op is a pure read/projection with NO append call — it never
-        // routed through `stream_append`'s `validate_entry_fqn`, so the declared
-        // precondition was dead: the placement/preview board (which calls
-        // `check_preconditions` directly over every lexicon entry) already
-        // enforced it, but the real invocation path did not. Same defect family
-        // as freeze's pre-DD-003 dead precondition and the pre-T6.1(c)
-        // select-strategy gap — found by the new `every_precondition_carrying_
-        // verb_is_reached_by_the_checker` closure tooth (A2). Both declared
-        // preconditions read only `ControlState`, so `check_control_preconditions`
-        // (no obligation fold needed) is sufficient; the probe event mirrors the
-        // pattern `placement.rs`/`preview.rs` already use for precondition-only
-        // (no-append) evaluation.
-        let lexicon = phase1_lexicon();
-        let entry = lexicon
-            .get("ubo.determination.compute-fold")
-            .ok_or_else(|| anyhow!("ubo.determination.compute-fold missing from lexicon"))?;
-        let probe = ob_poc_kyc_substrate::IntentEvent::new(
-            subject,
-            "ubo.determination.compute-fold",
-            map_principal(&ctx.principal),
-            AuthorityRef("compute-fold.precondition-probe".into()),
-            TargetBinding::for_subject(subject),
-            serde_json::Value::Null,
-            ctx.as_of,
-        );
-        check_control_preconditions(entry, &state, &type_registry, &probe)
-            .map_err(|e| anyhow!("ubo.determination.compute-fold precondition failed: {e}"))?;
-
-        Ok(VerbExecutionOutcome::Record(serde_json::json!({
-            "registered": state.registered,
-            "edge_count": state.edges.len(),
-            "active_edges": state.edges.values().filter(|e| e.is_active()).count(),
-            "verified_edges": state.edges.values().filter(|e| e.is_verified()).count(),
-            "is_reconciled": state.is_reconciled(),
-            "has_strategy": state.has_strategy(),
-            "structure_class": state.structure_class,
-        })))
-    }
-}
+// `UboDeterminationComputeFold` / `ubo.determination.compute-fold` RETIRED
+// (TS.6 P2, K-G7): a pure read (fold the stream, return a summary, append
+// nothing) that carried freeze's own precondition pair
+// (`ReconciledProjection`, `StructureClassSupported`) only to demonstrate
+// it pre-freeze. `freeze` already declares the identical pair
+// independently, so nothing needed building to "preserve the gate
+// elsewhere" — see the lexicon.rs comment at this verb's former entry.
 
 pub struct UboDeterminationApplySmoFallback;
 
@@ -669,7 +523,15 @@ fn normalize_assert_control_payload(
     args: &serde_json::Value,
     edge: EdgeId,
 ) -> Result<serde_json::Value> {
+    let pierced = args.get("pierced-from").and_then(|v| v.as_str()).is_some();
     match args.get("kind").and_then(|v| v.as_str()) {
+        Some("nominee") if pierced => {
+            return Err(anyhow!(
+                "ubo.edge.assert-control: a pierce cannot produce another nominee edge \
+                 (K-8, fail-closed) — `kind` must be the UNDERLYING kind the nominator \
+                 actually holds"
+            ));
+        }
         Some(kind) if EDGE_KIND_WIRE_VALUES.contains(&kind) => {}
         Some(unknown) => {
             return Err(anyhow!(
@@ -692,6 +554,12 @@ fn normalize_assert_control_payload(
     if let Some(obj) = p.as_object_mut() {
         if let Some(v) = obj.remove("trust-revocable") {
             obj.insert("trust_revocable".to_string(), v);
+        }
+        // TS.6 P2 (K-G7): stamps the fold-read key (`pierced_from`) from the
+        // caller-facing kebab arg — the `ubo.edge.pierce-nominee` macro's
+        // provenance pointer at the nominee edge this assertion pierces.
+        if let Some(v) = obj.remove("pierced-from") {
+            obj.insert("pierced_from".to_string(), v);
         }
     }
     Ok(p)
@@ -746,13 +614,15 @@ impl SemOsVerbOp for UboDeterminationFreeze {
         let type_registry = fold_type_registry(&refs);
 
         // 2. Run the actual determination strategy (EOP-DD-KYCUBO-003 R1/M1.2).
-        //    `select-strategy` must have fired (ReconciledProjection/StrategySelected
-        //    preconditions gate compute-fold/freeze already); dispatch on the
-        //    recorded strategy name rather than assuming ownership_prong_strategy.
-        let strategy_name = control
-            .selected_strategy
-            .as_deref()
-            .ok_or_else(|| anyhow!("freeze: no strategy selected (K-4 precondition)"))?;
+        //    TS.6 P2: `select-strategy` is retired — the strategy is DERIVED
+        //    from `structure_class` (`strategy_for_structure_class`), never
+        //    separately asserted. `StructureClassSupported` (gating
+        //    compute-fold/freeze already) guarantees the class is a member
+        //    of the pinned implemented-strategy set before we get here.
+        let structure_class = control.structure_class.as_ref().ok_or_else(|| {
+            anyhow!("freeze: no structure class set (StructureClassSupported precondition)")
+        })?;
+        let strategy_name = ob_poc_kyc_substrate::strategy_for_structure_class(structure_class);
         // TS.4 §3 Ruling B (widened from §2.6's original nominee_pierce_
         // strategy-only scope): `resolve()` returns `Vec<ProngCandidate>`
         // and cannot signal error, so the unpierced-nominee scan lives
@@ -1466,7 +1336,7 @@ pub struct KycObligationUpdateIdentity;
 #[async_trait]
 impl SemOsVerbOp for KycObligationUpdateIdentity {
     fn fqn(&self) -> &str {
-        "kyc.obligation.update-identity"
+        "assert.identity"
     }
     async fn execute(
         &self,
@@ -1476,15 +1346,18 @@ impl SemOsVerbOp for KycObligationUpdateIdentity {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 12 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists / SubjectNotDecided were dead at the real write
-        // path.
+        // ObligationExists was dead at the real write path.
+        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
+        // (retired from the substrate — decide.approve/decide.reject no
+        // longer append to the fact stream, so the fold can't see it).
+        refuse_if_subject_already_decided(scope, subject, "assert.identity").await?;
         let outcome = stream_append(
-            "kyc.obligation.update-identity",
+            "assert.identity",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-update",
-            Some("kyc.obligation.update-identity"),
+            Some("assert.identity"),
             ctx,
             scope,
         )
@@ -1500,7 +1373,7 @@ pub struct KycObligationUpdateScreening;
 #[async_trait]
 impl SemOsVerbOp for KycObligationUpdateScreening {
     fn fqn(&self) -> &str {
-        "kyc.obligation.update-screening"
+        "assert.screening"
     }
     async fn execute(
         &self,
@@ -1510,15 +1383,18 @@ impl SemOsVerbOp for KycObligationUpdateScreening {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 13 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists / SubjectNotDecided were dead at the real write
-        // path.
+        // ObligationExists was dead at the real write path.
+        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
+        // (retired from the substrate — decide.approve/decide.reject no
+        // longer append to the fact stream, so the fold can't see it).
+        refuse_if_subject_already_decided(scope, subject, "assert.screening").await?;
         let outcome = stream_append(
-            "kyc.obligation.update-screening",
+            "assert.screening",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-update",
-            Some("kyc.obligation.update-screening"),
+            Some("assert.screening"),
             ctx,
             scope,
         )
@@ -1534,7 +1410,7 @@ pub struct KycObligationUpdateRisk;
 #[async_trait]
 impl SemOsVerbOp for KycObligationUpdateRisk {
     fn fqn(&self) -> &str {
-        "kyc.obligation.update-risk"
+        "assert.risk"
     }
     async fn execute(
         &self,
@@ -1544,15 +1420,18 @@ impl SemOsVerbOp for KycObligationUpdateRisk {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 14 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists / SubjectNotDecided were dead at the real write
-        // path.
+        // ObligationExists was dead at the real write path.
+        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
+        // (retired from the substrate — decide.approve/decide.reject no
+        // longer append to the fact stream, so the fold can't see it).
+        refuse_if_subject_already_decided(scope, subject, "assert.risk").await?;
         let outcome = stream_append(
-            "kyc.obligation.update-risk",
+            "assert.risk",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-update",
-            Some("kyc.obligation.update-risk"),
+            Some("assert.risk"),
             ctx,
             scope,
         )
@@ -1578,8 +1457,11 @@ impl SemOsVerbOp for KycObligationSatisfy {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 15 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists / SubjectNotDecided were dead at the real write
-        // path.
+        // ObligationExists was dead at the real write path.
+        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
+        // (retired from the substrate — decide.approve/decide.reject no
+        // longer append to the fact stream, so the fold can't see it).
+        refuse_if_subject_already_decided(scope, subject, "kyc.obligation.satisfy").await?;
         let outcome = stream_append(
             "kyc.obligation.satisfy",
             subject,
@@ -1613,8 +1495,11 @@ impl SemOsVerbOp for KycObligationWaive {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let _reason = json_extract_string(args, "reason")?;
         // T6.4 row 16 finding: `validate_entry_fqn` was `None` —
-        // ObligationExists / SubjectNotDecided were dead at the real write
-        // path.
+        // ObligationExists was dead at the real write path.
+        // `SubjectNotDecided` re-homed onto kyc_decision_records TS.6 P2
+        // (retired from the substrate — decide.approve/decide.reject no
+        // longer append to the fact stream, so the fold can't see it).
+        refuse_if_subject_already_decided(scope, subject, "kyc.obligation.waive").await?;
         let outcome = stream_append(
             "kyc.obligation.waive",
             subject,
@@ -1632,102 +1517,18 @@ impl SemOsVerbOp for KycObligationWaive {
     }
 }
 
-pub struct KycPersonApprove;
-
-#[async_trait]
-impl SemOsVerbOp for KycPersonApprove {
-    fn fqn(&self) -> &str {
-        "kyc.person.approve"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-
-        // K-23 gate (EOP-DD-KYCUBO-003 R2/M1.3): a subject may be approved only
-        // once all required obligations have reached an allowed terminal state.
-        // Folded pre-append (same accepted small race window as freeze's
-        // pre-fold, above) rather than inside the ControlState-only
-        // `append_in_scope` validate closure, which has no obligation view.
-        let events = PgKycEventStore::load_events(scope.executor(), subject)
-            .await
-            .map_err(|e| anyhow!("person.approve: load events failed: {e}"))?;
-        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-        let obligations = fold_obligations_versioned(&refs, &KYC_REGISTRY)
-            .map_err(|e| anyhow!("person.approve: obligation fold failed: {e}"))?;
-        let overall = obligations.derive_subject_state(subject);
-        if overall != SubjectOverallState::AllTerminal {
-            return Err(anyhow!(
-                "kyc.person.approve rejected: subject {} obligations are not all terminal \
-                 (state={overall:?}) — K-23 gate (determination and approval are separate; \
-                 approval requires every required obligation to reach a terminal state)",
-                subject.0,
-            ));
-        }
-
-        // T6.4 row 17 finding: `validate_entry_fqn` was `None` — the K-23
-        // gate (SubjectAllTerminal / SubjectNotDecided) was declared in the
-        // lexicon but never reached by the checker at the real op call
-        // site; the hand-rolled fold above already enforces the same gate
-        // (kept as-is), this wires the declared precondition too so the
-        // checker is the single enforced source of truth, not just this
-        // op's bespoke pre-check.
-        let outcome = stream_append(
-            "kyc.person.approve",
-            subject,
-            TargetBinding::for_subject(subject),
-            args.clone(),
-            "senior-analyst.approve",
-            Some("kyc.person.approve"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
-
-pub struct KycPersonReject;
-
-#[async_trait]
-impl SemOsVerbOp for KycPersonReject {
-    fn fqn(&self) -> &str {
-        "kyc.person.reject"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        // T6.4 row 18 finding: `validate_entry_fqn` was `None` —
-        // SubjectNotDecided was dead at the real write path.
-        let outcome = stream_append(
-            "kyc.person.reject",
-            subject,
-            TargetBinding::for_subject(subject),
-            args.clone(),
-            "senior-analyst.reject",
-            Some("kyc.person.reject"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
+// `KycPersonApprove`/`KycPersonReject` retired from this file TS.6 P2
+// (K-G7) — renamed `decide.approve`/`decide.reject` and moved to
+// `ob-poc-kyc-decide` (`crates/ob-poc-kyc-decide/src/lib.rs`), which has no
+// dependency on `ob-poc-kyc-seam` and so writes only to
+// `"ob-poc".kyc_decision_records`, never this file's `stream_append`/the
+// fact stream. The K-23 gate and the finality check both moved with them
+// (re-homed onto `kyc_decision_records` directly — see that crate's doc
+// comment).
 
 // ── W5 screening hook (EOP-DD-KYCUBO-004 Part 1) ───────────────────────────────
 
-/// Map a `screenings.status` value to the `kyc.obligation.update-screening`
+/// Map a `screenings.status` value to the `assert.screening`
 /// track `state` it represents. Fail-closed on any value outside the verb
 /// YAML's declared `valid_values` — `valid_values` is descriptive metadata,
 /// not a DSL-parse-time hard reject (see CLAUDE.md), so this op is the actual
@@ -1759,7 +1560,7 @@ fn review_hit_status_to_track_state(status: &str) -> Result<&'static str> {
 }
 
 /// Resolve `workstream_id` to the entity being screened, and fan out an
-/// `kyc.obligation.update-screening` event to every obligation currently
+/// `assert.screening` event to every obligation currently
 /// registered for that entity's subject stream (`kyc.obligation.*` verbs key
 /// `subject-id` to the natural person/entity's own UUID — see
 /// `tests/kyc_w3_w5_w6.rs`).
@@ -1802,12 +1603,12 @@ async fn apply_screening_outcome_to_obligations(
             "state": state,
         });
         stream_append(
-            "kyc.obligation.update-screening",
+            "assert.screening",
             subject,
             TargetBinding::for_subject(subject),
             payload,
             "system.screening-hook",
-            Some("kyc.obligation.update-screening"),
+            Some("assert.screening"),
             ctx,
             scope,
         )
@@ -1869,7 +1670,7 @@ async fn signal_if_workstream_screenings_settled(
 
 /// `screening.complete` — was `behavior: crud`; now `plugin` so completion
 /// also fans out to the dsl.kyc obligation stream (EOP-DD-KYCUBO-004 Part 1,
-/// closing the previously-unwired W5 hook: `kyc.obligation.update-screening`
+/// closing the previously-unwired W5 hook: `assert.screening`
 /// existed and folded correctly but nothing called it from a real screening
 /// outcome). Preserves the original CRUD semantics exactly: only
 /// `result-summary`/`match-count` when present, `completed_at = now()`

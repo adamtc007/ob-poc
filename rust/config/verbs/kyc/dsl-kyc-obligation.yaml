@@ -76,173 +76,6 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
-      obligation.update-identity:
-        flavour: attribute_mutating
-        description: Advance the identity verification track of an obligation
-        effect_class: append_fact
-        invocation_phrases:
-        - update identity track
-        - advance identity verification
-        - record identity outcome
-        - mark identity verified
-        - update identity verification
-        - record identity verification result
-        - advance identity track
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: kyc_obligation
-          tags:
-          - kyc
-          - obligation
-          - identity
-          - w5
-          - dsl-kyc
-          phase_tags:
-          - kyc
-          side_effects: state_write
-        args:
-        - name: subject-id
-          type: uuid
-          required: true
-          description: Subject stream to append this obligation event to
-        - name: obligation-id
-          type: uuid
-          required: true
-          description: The obligation whose identity track to advance
-        - name: state
-          type: string
-          required: true
-          description: 'One of: in_progress, satisfied, waived, deferred, expired,
-            rejected'
-          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
-        - name: reason
-          type: string
-          required: false
-          description: Reason (required if state=waived)
-        returns:
-          type: record
-          fields:
-          - name: seq
-            type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-      obligation.update-screening:
-        flavour: attribute_mutating
-        description: Advance the screening track of an obligation (K-26 — screening
-          gates approval, not determination)
-        effect_class: append_fact
-        invocation_phrases:
-        - update screening track
-        - record screening outcome
-        - advance screening track
-        - mark screening complete
-        - update obligation screening
-        - record screening result for obligation
-        - advance the screening track
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: kyc_obligation
-          tags:
-          - kyc
-          - obligation
-          - screening
-          - w5
-          - dsl-kyc
-          phase_tags:
-          - kyc
-          side_effects: state_write
-        args:
-        - name: subject-id
-          type: uuid
-          required: true
-          description: Subject stream to append this obligation event to
-        - name: obligation-id
-          type: uuid
-          required: true
-          description: The obligation whose screening track to advance
-        - name: state
-          type: string
-          required: true
-          description: 'One of: in_progress, satisfied, waived, deferred, expired,
-            rejected'
-          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
-        - name: reason
-          type: string
-          required: false
-        returns:
-          type: record
-          fields:
-          - name: seq
-            type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-      obligation.update-risk:
-        flavour: attribute_mutating
-        description: Advance the risk-assessment track of an obligation
-        effect_class: append_fact
-        invocation_phrases:
-        - update risk track
-        - record risk outcome
-        - advance risk assessment
-        - mark risk assessment complete
-        - update obligation risk
-        - record risk assessment result
-        - advance the risk track
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: kyc_obligation
-          tags:
-          - kyc
-          - obligation
-          - risk
-          - w5
-          - dsl-kyc
-          phase_tags:
-          - kyc
-          side_effects: state_write
-        args:
-        - name: subject-id
-          type: uuid
-          required: true
-          description: Subject stream to append this obligation event to
-        - name: obligation-id
-          type: uuid
-          required: true
-          description: The obligation whose risk track to advance
-        - name: state
-          type: string
-          required: true
-          description: 'One of: in_progress, satisfied, waived, deferred, expired,
-            rejected'
-          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
-        - name: reason
-          type: string
-          required: false
-        returns:
-          type: record
-          fields:
-          - name: seq
-            type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
       obligation.satisfy:
         flavour: attribute_mutating
         description: Mark all tracks on an obligation as satisfied (full KYC clearance)
@@ -340,9 +173,205 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
-      person.approve:
+      # person.approve/person.reject RETIRED from this domain TS.6 P2
+      # (K-G7) — renamed decide.approve/decide.reject and moved to the new
+      # `decide:` domain below (structural Evaluation-pack split,
+      # EOP-DD-KYCUBO-TS.6 §1: writes only to kyc_decision_records via
+      # ob-poc-kyc-decide, which has no dependency on ob-poc-kyc-seam, so it
+      # never reaches the fact stream).
+
+  # ── TS.6 §3 relocation (2026-08-22) ────────────────────────────────────
+  # `assert.screening` / `assert.identity` / `assert.risk` were
+  # `kyc.obligation.update-{screening,identity,risk}` until TS.6 §3's
+  # ratified relocation: they are Assembly FACTS ("someone handed us a
+  # screening result / an identity verification / a risk rating"), not
+  # work-item updates on an obligation. Filing them in the obligation
+  # namespace is what made their purpose read as unclear. They keep their
+  # fold behaviour and their place in assembly_lexicon() exactly; only the
+  # namespace moves. Sibling of the `decide:` evaluation namespace below —
+  # the assert/assess/decide scheme named in TS.6's v0.1-0.2 change log.
+  assert:
+    description: "Assembly facts — observations someone handed us about the world (TS.6 §3)"
+
+    verbs:
+      screening:
         flavour: attribute_mutating
-        description: Approve a subject once all obligations are terminal (K-23 gate)
+        description: Advance the screening track of an obligation (K-26 — screening
+          gates approval, not determination)
+        effect_class: append_fact
+        invocation_phrases:
+        - update screening track
+        - record screening outcome
+        - advance screening track
+        - mark screening complete
+        - update obligation screening
+        - record screening result for obligation
+        - advance the screening track
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags:
+          - kyc
+          - obligation
+          - screening
+          - w5
+          - dsl-kyc
+          phase_tags:
+          - kyc
+          side_effects: state_write
+        args:
+        - name: subject-id
+          type: uuid
+          required: true
+          description: Subject stream to append this obligation event to
+        - name: obligation-id
+          type: uuid
+          required: true
+          description: The obligation whose screening track to advance
+        - name: state
+          type: string
+          required: true
+          description: 'One of: in_progress, satisfied, waived, deferred, expired,
+            rejected'
+          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
+        - name: reason
+          type: string
+          required: false
+        returns:
+          type: record
+          fields:
+          - name: seq
+            type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+      identity:
+        flavour: attribute_mutating
+        description: Advance the identity verification track of an obligation
+        effect_class: append_fact
+        invocation_phrases:
+        - update identity track
+        - advance identity verification
+        - record identity outcome
+        - mark identity verified
+        - update identity verification
+        - record identity verification result
+        - advance identity track
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags:
+          - kyc
+          - obligation
+          - identity
+          - w5
+          - dsl-kyc
+          phase_tags:
+          - kyc
+          side_effects: state_write
+        args:
+        - name: subject-id
+          type: uuid
+          required: true
+          description: Subject stream to append this obligation event to
+        - name: obligation-id
+          type: uuid
+          required: true
+          description: The obligation whose identity track to advance
+        - name: state
+          type: string
+          required: true
+          description: 'One of: in_progress, satisfied, waived, deferred, expired,
+            rejected'
+          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
+        - name: reason
+          type: string
+          required: false
+          description: Reason (required if state=waived)
+        returns:
+          type: record
+          fields:
+          - name: seq
+            type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+      risk:
+        flavour: attribute_mutating
+        description: Advance the risk-assessment track of an obligation
+        effect_class: append_fact
+        invocation_phrases:
+        - update risk track
+        - record risk outcome
+        - advance risk assessment
+        - mark risk assessment complete
+        - update obligation risk
+        - record risk assessment result
+        - advance the risk track
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags:
+          - kyc
+          - obligation
+          - risk
+          - w5
+          - dsl-kyc
+          phase_tags:
+          - kyc
+          side_effects: state_write
+        args:
+        - name: subject-id
+          type: uuid
+          required: true
+          description: Subject stream to append this obligation event to
+        - name: obligation-id
+          type: uuid
+          required: true
+          description: The obligation whose risk track to advance
+        - name: state
+          type: string
+          required: true
+          description: 'One of: in_progress, satisfied, waived, deferred, expired,
+            rejected'
+          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
+        - name: reason
+          type: string
+          required: false
+        returns:
+          type: record
+          fields:
+          - name: seq
+            type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+  decide:
+    description: KYC Evaluation-pack verdicts (EOP-DD-KYCUBO-TS.6 §1/§4) — deciding
+      is what this pack is for. Writes only to kyc_decision_records, never the
+      dsl.kyc fact stream (ob-poc-kyc-decide has no dependency on ob-poc-kyc-seam,
+      the sole fact-stream append chokepoint).
+    verbs:
+      approve:
+        flavour: attribute_mutating
+        description: Approve a subject once all obligations are terminal (K-23 gate).
+          Writes only to kyc_decision_records — never the fact stream.
         effect_class: append_fact
         invocation_phrases:
         - approve person
@@ -363,7 +392,7 @@ domains:
           noun: kyc_subject
           tags:
           - kyc
-          - person
+          - decide
           - approval
           - decision
           - w5
@@ -379,17 +408,17 @@ domains:
         returns:
           type: record
           fields:
-          - name: seq
-            type: integer
+          - name: decision_id
+            type: uuid
         three_axis:
           state_effect: preserving
           external_effects: []
           consequence:
             baseline: reviewable
-      person.reject:
+      reject:
         flavour: attribute_mutating
-        description: Reject a subject (K-23 — decision recorded on the stream, never
-          erased)
+        description: Reject a subject (K-23 — decision recorded in kyc_decision_records,
+          never the fact stream, never erased)
         effect_class: append_fact
         invocation_phrases:
         - reject person
@@ -410,7 +439,7 @@ domains:
           noun: kyc_subject
           tags:
           - kyc
-          - person
+          - decide
           - rejection
           - decision
           - w5
@@ -430,8 +459,8 @@ domains:
         returns:
           type: record
           fields:
-          - name: seq
-            type: integer
+          - name: decision_id
+            type: uuid
         three_axis:
           state_effect: preserving
           external_effects: []

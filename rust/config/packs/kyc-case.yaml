@@ -73,17 +73,11 @@ allowed_verbs:
   - document.create-request
   - document.extract
   - document.for-entity
-  - document.get
   - document.list-requests-by-workstream
-  - document.list-versions
   - document.mark-received
   - document.mark-requested
   - document.missing-for-entity
-  - document.reject
   - document.reject-request
-  - document.start-qa
-  - document.upload-version
-  - document.verify
   - document.verify-request
   - document.waive-request
   - economic-exposure.compute
@@ -107,12 +101,7 @@ allowed_verbs:
   - observation.record-from-document
   - observation.supersede
   - observation.verify-allegations
-  - ownership.bridge.bods-ownership
-  - ownership.bridge.gleif-fund-managers
-  - ownership.bridge.manco-roles
-  - ownership.control-links.compute
   - ownership.control-links.list
-  - ownership.refresh
   - request.cancel
   - request.create
   - request.escalate
@@ -207,20 +196,18 @@ allowed_verbs:
   # unpierced Nominee edge remains active, so this session-level path is the
   # only way to actually clear that state from a live KYC workspace.
   - ubo.edge.pierce-nominee
-  - ubo.determination.select-strategy
-  - ubo.determination.compute-fold
   - ubo.determination.apply-smo-fallback
   - ubo.determination.freeze
   - kyc.subject.register
   - kyc.subject.classify-structure
   - kyc.obligation.create
-  - kyc.obligation.update-identity
-  - kyc.obligation.update-screening
-  - kyc.obligation.update-risk
+  - assert.identity
+  - assert.screening
+  - assert.risk
   - kyc.obligation.satisfy
   - kyc.obligation.waive
-  - kyc.person.approve
-  - kyc.person.reject
+  - decide.approve
+  - decide.reject
   - structure.setup
   - tollgate.evaluate
   - tollgate.override

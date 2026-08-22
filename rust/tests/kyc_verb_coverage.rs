@@ -22,13 +22,16 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycObligationCreate, KycObligationUpdateIdentity, KycObligationUpdateRisk,
-    KycObligationUpdateScreening, KycObligationWaive, KycPersonReject,
+    KycObligationCreate, KycObligationSatisfy, KycObligationUpdateIdentity, KycObligationUpdateRisk,
+    KycObligationUpdateScreening, KycObligationWaive,
     KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationApplySmoFallback,
-    UboDeterminationComputeFold, UboDeterminationFreeze, UboDeterminationSelectStrategy,
-    UboEdgeAssertControl, UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence,
-    UboEdgeReconcileConflict, UboEdgeSupersede, UboEdgeVerify,
+    UboDeterminationFreeze, UboEdgeAssertControl,
+    UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence, UboEdgeReconcileConflict,
+    UboEdgeSupersede, UboEdgeVerify,
 };
+// kyc.person.approve/.reject renamed decide.approve/.reject TS.6 P2 — moved
+// to ob-poc-kyc-decide.
+use ob_poc_kyc_decide::{DecideApprove, DecideReject};
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -104,6 +107,25 @@ async fn assert_event(pool: &PgPool, subject: SubjectId, verb_fqn: &str) {
     );
 }
 
+/// decide.approve/decide.reject write to `kyc_decision_records`, not the
+/// fact stream (TS.6 P2) — this is `assert_event`'s counterpart for them.
+async fn assert_decision_record(pool: &PgPool, subject: SubjectId, verb_fqn: &str) {
+    let count: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM "ob-poc".kyc_decision_records
+           WHERE subject_root = $1 AND verb_fqn = $2"#,
+    )
+    .bind(subject.0)
+    .bind(verb_fqn)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    assert!(
+        count > 0,
+        "expected decision record {verb_fqn} for subject {}",
+        subject.0
+    );
+}
+
 async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
     for s in subjects {
         for t in [
@@ -112,6 +134,9 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
             "kyc_control_edge_projection",
             "kyc_obligation_projection",
             "kyc_subject_rollup_projection",
+            // decide.approve/decide.reject write here now, not the fact
+            // stream (TS.6 P2) — cleaned up alongside the other tables.
+            "kyc_decision_records",
         ] {
             let _ = sqlx::query(&format!(
                 r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
@@ -269,92 +294,19 @@ async fn coverage_ubo_edge_reconcile_conflict() {
 }
 
 // ── Determination verbs (ubo.determination.*) ─────────────────────────────────
-
-#[tokio::test]
-async fn coverage_ubo_determination_select_strategy() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
-        &pool,
-    )
-    .await;
-    // T6.1(c): select-strategy now carries `StructureClassSupported` (the 6a
-    // exemplar) — classify-structure into an implemented class must precede
-    // it, or the append is rejected fail-closed (as it should be).
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({
-            "subject-id": subject.0, "strategy": "ownership_prong",
-        }),
-        &pool,
-    )
-    .await;
-    assert_event(&pool, subject, "ubo.determination.select-strategy").await;
-    cleanup(&pool, &[subject]).await;
-}
-
-#[tokio::test]
-async fn coverage_ubo_determination_compute_fold() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
-        &pool,
-    )
-    .await;
-    // T6-tooth fix (2026-08-12, EOP-PLAN-KYCUBO-KIT-001 Part A): compute-fold
-    // now genuinely enforces its declared [ReconciledProjection,
-    // StrategySelected] preconditions (K-14) — classify + reconcile +
-    // select-strategy must fire first (select-strategy's own
-    // `StructureClassSupported` precondition, from T6.1, requires the
-    // classify step too; same fix as `kyc_m3_remediation.rs::m3_3_structure_
-    // class_round_trips_through_the_fold`).
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
-        &pool,
-    )
-    .await;
-    // compute-fold is a pure read — returns a summary, no new event appended
-    run(
-        &UboDeterminationComputeFold,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    // register + classify-structure + reconcile-conflict + select-strategy are in the stream
-    // (compute-fold is a read — appends nothing itself)
-    let count: i64 = sqlx::query_scalar(
-        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#,
-    )
-    .bind(subject.0)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(count, 4, "compute-fold is a pure read — no event appended by it specifically");
-    cleanup(&pool, &[subject]).await;
-}
+//
+// `coverage_ubo_determination_select_strategy` RETIRED (TS.6 P2, K-G7):
+// `ubo.determination.select-strategy` no longer exists — the strategy is
+// derived from `structure_class` (`strategy_for_structure_class`), never
+// separately asserted.
+//
+// `coverage_ubo_determination_compute_fold` RETIRED (TS.6 P2, K-G7):
+// `ubo.determination.compute-fold` no longer exists — it was a derivation
+// dressed as a verb, carrying the identical [ReconciledProjection,
+// StructureClassSupported] precondition pair `freeze` already independently
+// declares. Nothing needed building to preserve the gate elsewhere; see
+// `coverage_ubo_determination_freeze` below and `coverage_ubo_determination_
+// apply_smo_fallback`'s own precondition coverage for the surviving proof.
 
 #[tokio::test]
 async fn coverage_ubo_determination_apply_smo_fallback() {
@@ -367,11 +319,12 @@ async fn coverage_ubo_determination_apply_smo_fallback() {
         &pool,
     )
     .await;
-    // T6.3 row 7 finding: apply-smo-fallback now carries ReconciledProjection
-    // + StrategySelected (reused from compute-fold/freeze's own gates) —
-    // this fixture predates that stud and called apply-smo-fallback
-    // straight after register. Real predecessor moves added, same fix
-    // pattern as `coverage_ubo_determination_freeze` below already uses.
+    // T6.3 row 7 finding: apply-smo-fallback carries ReconciledProjection +
+    // StructureClassSupported (reused from compute-fold/freeze's own gates,
+    // TS.6 P2 retired the separate select-strategy step) — this fixture
+    // predates that stud and called apply-smo-fallback straight after
+    // register. Real predecessor moves added, same fix pattern as
+    // `coverage_ubo_determination_freeze` below already uses.
     run(
         &KycSubjectClassifyStructure,
         serde_json::json!({
@@ -383,14 +336,6 @@ async fn coverage_ubo_determination_apply_smo_fallback() {
     run(
         &UboEdgeReconcileConflict,
         serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({
-            "subject-id": subject.0, "strategy": "ownership_prong_strategy",
-        }),
         &pool,
     )
     .await;
@@ -427,14 +372,6 @@ async fn coverage_ubo_determination_freeze() {
     run(
         &UboEdgeReconcileConflict,
         serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboDeterminationSelectStrategy,
-        serde_json::json!({
-            "subject-id": subject.0, "strategy": "ownership_prong_strategy",
-        }),
         &pool,
     )
     .await;
@@ -519,7 +456,7 @@ async fn coverage_kyc_obligation_update_identity() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc.obligation.update-identity").await;
+    assert_event(&pool, subject, "assert.identity").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -550,7 +487,7 @@ async fn coverage_kyc_obligation_update_screening() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc.obligation.update-screening").await;
+    assert_event(&pool, subject, "assert.screening").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -581,7 +518,7 @@ async fn coverage_kyc_obligation_update_risk() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc.obligation.update-risk").await;
+    assert_event(&pool, subject, "assert.risk").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -625,7 +562,7 @@ async fn coverage_kyc_person_reject() {
     )
     .await;
     run(
-        &KycPersonReject,
+        &DecideReject,
         serde_json::json!({
             "subject-id": subject.0,
             "reason": "sanctions match confirmed — PEP designation upheld",
@@ -633,6 +570,113 @@ async fn coverage_kyc_person_reject() {
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc.person.reject").await;
+    assert_decision_record(&pool, subject, "decide.reject").await;
     cleanup(&pool, &[subject]).await;
+}
+
+/// TS.6 §8 `decide_verbs_cite_their_basis`: every verdict records what it
+/// relied on — a non-empty obligation-fold snapshot, never a bare stamp.
+/// Exercises both landed verdicts: `decide.approve` (basis reflects an
+/// AllTerminal obligation) and `decide.reject` (basis reflects a subject
+/// with no obligations yet — rejection is allowed at any stage, but the
+/// basis must still be recorded, not omitted because there was "nothing to
+/// cite").
+#[tokio::test]
+async fn decide_verbs_cite_their_basis() {
+    let pool = pool().await;
+
+    // decide.approve — basis must reflect the AllTerminal obligation.
+    let approve_subject = SubjectId(Uuid::new_v4());
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({ "subject-id": approve_subject.0, "is_natural_person": true }),
+        &pool,
+    )
+    .await;
+    let obligation_id = Uuid::new_v4();
+    run(
+        &KycObligationCreate,
+        serde_json::json!({
+            "subject-id": approve_subject.0,
+            "obligation-id": obligation_id,
+            "role": "beneficial_owner",
+            "jurisdiction": "LU",
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycObligationSatisfy,
+        serde_json::json!({ "subject-id": approve_subject.0, "obligation-id": obligation_id }),
+        &pool,
+    )
+    .await;
+    run(
+        &DecideApprove,
+        serde_json::json!({ "subject-id": approve_subject.0 }),
+        &pool,
+    )
+    .await;
+
+    let approve_basis: serde_json::Value = sqlx::query_scalar(
+        r#"SELECT basis FROM "ob-poc".kyc_decision_records
+           WHERE subject_root = $1 AND verb_fqn = 'decide.approve'"#,
+    )
+    .bind(approve_subject.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        approve_basis.get("overall_state").and_then(|v| v.as_str()),
+        Some("AllTerminal"),
+        "decide.approve's basis must cite the AllTerminal obligation state it relied on: {approve_basis:?}"
+    );
+    let approve_obligation_ids = approve_basis
+        .get("obligation_ids")
+        .and_then(|v| v.as_array())
+        .expect("basis.obligation_ids must be an array");
+    assert_eq!(
+        approve_obligation_ids.len(),
+        1,
+        "decide.approve's basis must name the obligation it relied on: {approve_basis:?}"
+    );
+
+    // decide.reject — no obligations exist yet, but the basis must still be
+    // a real (non-empty) snapshot, not an omitted/null citation.
+    let reject_subject = SubjectId(Uuid::new_v4());
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({ "subject-id": reject_subject.0, "is_natural_person": true }),
+        &pool,
+    )
+    .await;
+    run(
+        &DecideReject,
+        serde_json::json!({
+            "subject-id": reject_subject.0,
+            "reason": "sanctions match confirmed",
+        }),
+        &pool,
+    )
+    .await;
+
+    let reject_basis: serde_json::Value = sqlx::query_scalar(
+        r#"SELECT basis FROM "ob-poc".kyc_decision_records
+           WHERE subject_root = $1 AND verb_fqn = 'decide.reject'"#,
+    )
+    .bind(reject_subject.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        reject_basis.get("overall_state").and_then(|v| v.as_str()),
+        Some("InProgress"),
+        "decide.reject's basis must still cite the (empty) obligation state, not omit citation: {reject_basis:?}"
+    );
+    assert!(
+        reject_basis.get("obligation_ids").is_some(),
+        "decide.reject's basis must name the obligation_ids key even when empty: {reject_basis:?}"
+    );
+
+    cleanup(&pool, &[approve_subject, reject_subject]).await;
 }

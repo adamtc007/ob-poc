@@ -102,10 +102,15 @@ pub enum SubjectOverallState {
     InProgress,
     /// All obligations are terminal — eligible for the approval gate.
     AllTerminal,
-    /// Explicitly approved by a decision verb.
-    Approved { by_event: EventId },
-    /// Explicitly rejected.
-    Rejected { by_event: EventId },
+    // `Approved`/`Rejected` retired TS.6 P2 (K-G7): `decide.approve`/
+    // `decide.reject` no longer append to the fact stream (structural
+    // Evaluation-pack split — `ob-poc-kyc-decide`, no dependency on
+    // `ob-poc-kyc-seam`), so this fold can never observe a decision event
+    // again. The K-23 "decision is final" finality check moved with them —
+    // `decide.approve`/`decide.reject` query `kyc_decision_records`
+    // directly rather than relying on this fold to have seen their own
+    // prior event. Obligation state describes the world Assembly builds;
+    // decisions are Evaluation's own record, never smeared back in here.
 }
 
 /// One subject's consolidated KYC view (K-22: identity record distinct from
@@ -118,8 +123,6 @@ pub struct SubjectRollup {
     pub obligations: Vec<ObligationId>,
     /// Folded overall state (Q4: fold over obligation tracks).
     pub overall_state: SubjectOverallState,
-    /// Decision event (if overall_state is Approved/Rejected).
-    pub decision_event_id: Option<EventId>,
 }
 
 // ── Obligation state ──────────────────────────────────────────────────────────
@@ -143,13 +146,6 @@ impl ObligationState {
             Some(r) => r,
             None => return SubjectOverallState::InProgress,
         };
-        // Already decided.
-        match &rollup.overall_state {
-            SubjectOverallState::Approved { .. } | SubjectOverallState::Rejected { .. } => {
-                return rollup.overall_state.clone();
-            }
-            _ => {}
-        }
         // Fold over obligations.
         if rollup.obligations.is_empty() {
             return SubjectOverallState::InProgress;
@@ -236,7 +232,6 @@ pub(crate) fn apply_one_obligation_event(
                     subject_id: sid,
                     obligations: vec![],
                     overall_state: SubjectOverallState::InProgress,
-                    decision_event_id: None,
                 });
             }
         }
@@ -275,7 +270,6 @@ pub(crate) fn apply_one_obligation_event(
                     subject_id: sid,
                     obligations: vec![],
                     overall_state: SubjectOverallState::InProgress,
-                    decision_event_id: None,
                 })
                 .obligations
                 .push(oid);
@@ -283,21 +277,21 @@ pub(crate) fn apply_one_obligation_event(
 
         "ubo.determination.freeze" => {}
 
-        "kyc.obligation.update-identity" => {
+        "assert.identity" => {
             if let Some(oid) = obligation_id_from_payload(p) {
                 if let Some(tracks) = state.obligations.get_mut(&oid) {
                     tracks.identity = track_state_from_event(event.id, p);
                 }
             }
         }
-        "kyc.obligation.update-screening" => {
+        "assert.screening" => {
             if let Some(oid) = obligation_id_from_payload(p) {
                 if let Some(tracks) = state.obligations.get_mut(&oid) {
                     tracks.screening = track_state_from_event(event.id, p);
                 }
             }
         }
-        "kyc.obligation.update-risk" => {
+        "assert.risk" => {
             if let Some(oid) = obligation_id_from_payload(p) {
                 if let Some(tracks) = state.obligations.get_mut(&oid) {
                     tracks.risk = track_state_from_event(event.id, p);
@@ -329,23 +323,11 @@ pub(crate) fn apply_one_obligation_event(
             }
         }
 
-        "kyc.person.approve" => {
-            if let Some(sid) = subject_id_from_event(event) {
-                if let Some(rollup) = state.subjects.get_mut(&sid) {
-                    rollup.overall_state = SubjectOverallState::Approved { by_event: event.id };
-                    rollup.decision_event_id = Some(event.id);
-                }
-            }
-        }
-        "kyc.person.reject" => {
-            if let Some(sid) = subject_id_from_event(event) {
-                if let Some(rollup) = state.subjects.get_mut(&sid) {
-                    rollup.overall_state = SubjectOverallState::Rejected { by_event: event.id };
-                    rollup.decision_event_id = Some(event.id);
-                }
-            }
-        }
-
+        // `kyc.person.approve`/`kyc.person.reject` retired from this fold
+        // TS.6 P2 (K-G7) — renamed `decide.approve`/`decide.reject` and
+        // moved to `ob-poc-kyc-decide`, which never appends to the fact
+        // stream, so these FQNs can no longer appear here. Falls to the
+        // catch-all below, same as any other unrecognized/foreign FQN.
         _ => {}
     }
     state
