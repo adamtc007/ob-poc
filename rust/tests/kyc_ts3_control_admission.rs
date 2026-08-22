@@ -230,6 +230,22 @@ fn smo_fallback_is_recorded_never_silent() {
     // OfficerAppointment edge (no natural-person control edge) — ownership
     // and control both exhaust at ManCo (TS.2 Ruling 2a: the mandate
     // holder, not the fund).
+    //
+    // **Superseded by EOP-DD-KYCUBO-TS.4 §2 Ruling A (2026-08-22), an
+    // INTENDED difference, not drift:** at TS.3 landing time,
+    // `FundControlStrategy` was still a thin delegate to
+    // `ControlProngStrategy`, so its own walk exhausted with ZERO
+    // candidates and an EXTERNAL, subject-anchored `pull_smo_on_exhaustion`
+    // call was needed to surface the officer. TS.4's `fund_pivot_resolve`
+    // makes the per-pivot exhaustion pull INTERNAL to `FundControlStrategy`
+    // itself (correctly anchored at the pivot — Ruling 2a's whole point:
+    // the naive subject-anchored pull is wrong for co-management, TS.4 §5
+    // `co_management_unions_with_per_pivot_paths`), so `resolve()` alone
+    // now returns the officer directly. The external, generic
+    // `pull_smo_on_exhaustion` — still exercised below — correctly declines
+    // to pull a SECOND time once `resolve()` already returned a candidate
+    // (§4a: "fires ONLY on exhaustion... never pushed" — `prior_candidates`
+    // is no longer empty).
     let fund = eid(11);
     let manco = eid(12);
     let officer = PersonId(eid(13).0);
@@ -244,17 +260,29 @@ fn smo_fallback_is_recorded_never_silent() {
     let natural_persons: BTreeSet<PersonId> = [officer].into_iter().collect();
 
     let candidates = FundControlStrategy.resolve(&state, fund, &natural_persons, 25.0);
-    assert!(candidates.is_empty(), "the walk itself must still exhaust at ManCo: {candidates:#?}");
+    assert_eq!(
+        candidates.len(),
+        1,
+        "TS.4 Ruling A: FundControlStrategy now performs its own per-pivot exhaustion \
+         pull internally: {candidates:#?}"
+    );
+    assert_eq!(candidates[0].person_id, officer);
+    assert_eq!(candidates[0].prong, Prong::SmoFallback);
+    assert_eq!(
+        candidates[0].pivot.as_ref().expect("carries its pivot").pivot_entity,
+        manco,
+        "the internal pull is anchored at the pivot (ManCo), never the fund"
+    );
 
+    // The generic, subject-anchored pull must NOT double-pull now that
+    // resolve() already produced a candidate (§4a: never pushed, and never
+    // pulled twice).
     let pulled = pull_smo_on_exhaustion(&state, fund, &natural_persons, &candidates);
-    let (pulled_candidates, record) =
-        pulled.expect("exhaustion at ManCo with an officer edge must pull, never stay silent");
-    assert_eq!(pulled_candidates.len(), 1);
-    assert_eq!(pulled_candidates[0].person_id, officer);
-    assert_eq!(pulled_candidates[0].prong, Prong::SmoFallback);
-    assert_eq!(record.exhausted_at, vec![manco], "must record the mandate holder, not the fund");
-    assert!(!record.reason.is_empty(), "the pull's reason must be recorded, never silent");
-    assert_eq!(record.pulled_officer_count, 1);
+    assert!(
+        pulled.is_none(),
+        "the external pull must decline once FundControlStrategy's own resolve() already \
+         surfaced a candidate: {pulled:#?}"
+    );
 }
 
 // ── §7 gate: employment_and_containment_never_traversed ──────────────────────
