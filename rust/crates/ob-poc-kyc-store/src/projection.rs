@@ -90,7 +90,11 @@ impl PgKycProjector {
 // deleted the queue and drainers but left the obligation projection
 // standing... it goes with obligations." `kyc_ubo.assert.obligation.creation`
 // — the only writer of a new `ObligationTracks` entry — is dissolved, so
-// `kyc_obligation_projection`/`kyc_subject_rollup_projection` can never
-// again receive a row; the projector had nothing left to project.
+// the tables the projector wrote could never again receive a row.
+// `kyc_obligation_projection`/`kyc_subject_rollup_projection` themselves
+// were DROPPED (EOP-DD-KYCUBO-D2.1 Tranche A, 2026-08-23, migration
+// `20260823_drop_kyc_obligation_projection_tables.sql`) — the projector's
+// removal left them standing, frozen and readable as if current, for a
+// full tranche before the tables followed it.
 // Reintroduction path: none named — the run book (D2.0 §4) replaces this
 // capability, not a future projector.

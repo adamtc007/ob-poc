@@ -96,8 +96,6 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
             "kyc_intent_events",
             "kyc_subject_streams",
             "kyc_control_edge_projection",
-            "kyc_obligation_projection",
-            "kyc_subject_rollup_projection",
         ] {
             let _ = sqlx::query(&format!(
                 r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#

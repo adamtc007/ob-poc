@@ -6,12 +6,14 @@
 //! the document link and returns to REQUIRED-like; any state →
 //! WAIVED. Shared runner functions + thin alias ops.
 //!
-//! Superseded-by-obligation-projection (state-graph remediation Phase 6b):
-//! the dsl.kyc stream (`kyc_ubo.assert.edge.evidence`, `kyc_obligation_projection`
-//! identity/screening/risk tracks) is the determination-path evidence
-//! model going forward. This module is retained only for case-level
-//! outreach (evidence requests/uploads scoped to a case, not yet folded
-//! into the stream) until W5 wires that path onto the stream too.
+//! Superseded-by-the-dsl.kyc-stream (state-graph remediation Phase 6b):
+//! `kyc_ubo.assert.edge.evidence` is the determination-path evidence model
+//! going forward (the identity/screening/risk obligation-fold tracks it
+//! once fed were dissolved D2.0 §5, 2026-08-22, and their now-writerless
+//! projection table dropped D2.1 Tranche A, 2026-08-23). This module is
+//! retained only for case-level outreach (evidence requests/uploads
+//! scoped to a case, not yet folded into the stream) until W5 wires that
+//! path onto the stream too.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
