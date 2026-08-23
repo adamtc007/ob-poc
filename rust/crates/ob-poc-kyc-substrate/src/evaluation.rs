@@ -1,22 +1,36 @@
-//! D2.0 — the evaluation pack's foundation: check-applicability and the run
-//! book. Pure, deterministic, no DB (same discipline as `determination.rs`).
+//! D2.0/D2.1 — the evaluation pack's foundation and engine: check
+//! applicability, verdict computation, and the run book. Pure, deterministic,
+//! no DB (same discipline as `determination.rs`).
 //!
 //! **The boundary that must not break (D2.0 §2):** this module reads the
 //! board (`ControlState`, `TypeRegistryState`, `Option<&FrozenDetermination>`)
 //! and produces run/finding records. It has no append in its dependency
 //! graph and must never gain one.
+//!
+//! **D2.1 (2026-08-23) closes the gap D2.0 left open:** D2.0 shipped the run
+//! book's envelope (pins, hashes, append-only shape) but no way to fill it —
+//! `Check` had no `evaluate()`, the catalogue passed by every decide op was a
+//! literal `&[]`, and `findings` was hardcoded `json!([])` at the persist
+//! site. `Check::evaluate` (below), `EvaluationCatalogue`, and the one real
+//! proof check (`ProvenTypeCheck`, D2.1 §2/§7 Q2) close that gap. The check
+//! CATALOGUE'S CONTENTS — what a sanctions, threshold, or jurisdiction check
+//! actually tests — remain out of scope (D2.0 §7 Q2, reaffirmed D2.1 §2);
+//! `ProvenTypeCheck` exists as the machinery's own end-to-end proof, not as
+//! catalogue content.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::determination::{FrozenDetermination, ProvisionalityReason};
 use crate::error::KycError;
 use crate::fold::control::{ControlState, StructureClass};
-use crate::fold::type_registry::TypeRegistryState;
+use crate::fold::type_registry::{TypeProofStatus, TypeRegistryState};
 use crate::geometry::EntityType;
-use crate::types::{EntityId, EventId, Hash, SubjectId};
+use crate::types::{EventId, Hash, SubjectId};
 
 // ── §3 Applicability — a closed, typed condition vocabulary (RULED) ────────
 
@@ -93,34 +107,171 @@ pub fn applicability_holds(conditions: &[ApplicabilityCondition], board: &BoardS
     conditions.iter().any(|c| c.holds(board))
 }
 
-/// A check's declared shape: an id and its applicability. The check
-/// catalogue's actual contents (what a sanctions/threshold/evidence check
-/// tests) are explicitly out of scope here (D2.0 §7 Q2) — this trait is the
-/// machinery a real check will implement against.
+/// A check's full shape (D2.1 §2): an id, its applicability, and — new this
+/// tranche — how to actually run it. `evaluate` is machinery, not catalogue
+/// content: it turns a board into a `Verdict`, the thing D2.0 shipped no way
+/// to produce. The check catalogue's actual CONTENTS (what a sanctions,
+/// threshold, or evidence-sufficiency check tests) remain explicitly out of
+/// scope (D2.0 §7 Q2 / D2.1 §2) — this trait is what any real check,
+/// whenever one is authored, implements against.
 pub trait Check {
     fn check_id(&self) -> &str;
     fn applicability(&self) -> &[ApplicabilityCondition];
+    /// Run this check against the board and produce a verdict. D2.1 §2/C1:
+    /// "a check that cannot be run is not a check." `Verdict` carries its own
+    /// reason/detail data (see below) so this single call fully determines
+    /// the outcome — no second pass, no risk of a reason disagreeing with
+    /// the verdict it explains.
+    fn evaluate(&self, board: &BoardSnapshot<'_>) -> Verdict;
+}
+
+/// D2.1 §2 C3: "a real catalogue type the run consults, replacing the
+/// literal `&[]`." Holds check instances behind `dyn Check` so a catalogue
+/// can mix different concrete check types (today it holds exactly one — see
+/// `default_catalogue`). The catalogue's CONTENTS are D2.0 §7 Q2 / D2.1 §2's
+/// explicit OUT-of-scope line; this type is the machinery that would run
+/// whatever contents a future, separately-governed tranche adds.
+pub struct EvaluationCatalogue(Vec<Arc<dyn Check + Send + Sync>>);
+
+impl EvaluationCatalogue {
+    pub fn new(checks: Vec<Arc<dyn Check + Send + Sync>>) -> Self {
+        Self(checks)
+    }
+
+    pub fn checks(&self) -> &[Arc<dyn Check + Send + Sync>] {
+        &self.0
+    }
+
+    /// The one real check that exists today (D2.1 §2's "one real check, end
+    /// to end — as the proof the machinery works, not as catalogue
+    /// content"; §7 Q2 RULED it is `ProvenTypeCheck`, below). Every decide
+    /// op consults this catalogue instead of the D2.0-era literal `&[]`.
+    pub fn default_catalogue() -> Self {
+        Self(vec![Arc::new(ProvenTypeCheck)])
+    }
 }
 
 /// The in-scope set for a board: every check whose applicability holds,
 /// computed fresh — never stored (D2.0 §3's one invariant regardless).
-pub fn in_scope_check_ids<C: Check>(checks: &[C], board: &BoardSnapshot<'_>) -> Vec<String> {
-    checks
+pub fn in_scope_check_ids(catalogue: &EvaluationCatalogue, board: &BoardSnapshot<'_>) -> Vec<String> {
+    catalogue
+        .checks()
         .iter()
         .filter(|c| applicability_holds(c.applicability(), board))
         .map(|c| c.check_id().to_string())
         .collect()
 }
 
+/// Evaluate every in-scope check against the board and produce the run's
+/// findings (D2.1 §2 C3 — replaces the D2.0-era hardcoded `json!([])`).
+/// Uses the SAME applicability filter as `in_scope_check_ids`, so a check
+/// that is in scope always has a matching finding and vice versa — the two
+/// cannot drift apart because both read the same predicate over the same
+/// catalogue and board.
+pub fn evaluate_checks(
+    catalogue: &EvaluationCatalogue,
+    board: &BoardSnapshot<'_>,
+    subject: SubjectId,
+) -> Vec<Finding> {
+    catalogue
+        .checks()
+        .iter()
+        .filter(|c| applicability_holds(c.applicability(), board))
+        .map(|c| Finding { check_id: c.check_id().to_string(), subject, verdict: c.evaluate(board), cites: vec![] })
+        .collect()
+}
+
+// ── D2.1 §2/§7 Q2 — the one real proof check ────────────────────────────────
+
+/// "Every entity on the board has a proven type" (D2.1 §7 Q2, RULED).
+/// Board-only, no compliance input — exercises all three verdicts from pure
+/// board state:
+///
+/// - **Pass**: every registered, non-withdrawn entity's type is
+///   `TypeProofStatus::Proved` (vacuously true on an empty board — the
+///   founding property, D2.0 §1, applies here too: nothing to fail on is a
+///   legitimate Pass, not a special case).
+/// - **Unevaluable**: some entity's type is `Alleged` (asserted but not yet
+///   proved — TS.3 §2a's own provisionality distinction) or entirely absent
+///   (no type asserted at all — D2.0 §4's `FactAbsent`, a different,
+///   "unresolved" state from `Alleged`).
+/// - **Fail**: a WITHDRAWN member (`TypeRegistryState::withdrawn_members`)
+///   whose type was never proved. Withdrawal (TS.1 move 6) is a real,
+///   board-only fact meaning no further evidence will ever arrive for that
+///   entity within this determination — its type proof is now permanently
+///   stuck, a genuine "cannot be proven going forward" derived purely from
+///   board state, distinct from "not yet proven" for an active member.
+///
+/// Aggregates worst-first across `registered_entity_ids` (a `BTreeSet`, so
+/// iteration order — and therefore which offending entity a Fail/Unevaluable
+/// verdict names — is deterministic): any qualifying Fail wins over any
+/// qualifying Unevaluable wins over Pass.
+pub struct ProvenTypeCheck;
+
+impl Check for ProvenTypeCheck {
+    fn check_id(&self) -> &str {
+        "board.every-entity-has-a-proven-type"
+    }
+
+    fn applicability(&self) -> &[ApplicabilityCondition] {
+        // Always in scope — this check is the machinery's own end-to-end
+        // proof, not conditional catalogue content (D2.1 §2).
+        &[ApplicabilityCondition::Unconditional]
+    }
+
+    fn evaluate(&self, board: &BoardSnapshot<'_>) -> Verdict {
+        for &entity in &board.control.registered_entity_ids {
+            let withdrawn = board.type_registry.is_withdrawn(entity);
+            if withdrawn && !matches!(board.type_registry.proof_of(entity), Some(TypeProofStatus::Proved)) {
+                return Verdict::Fail {
+                    detail: format!(
+                        "entity {} was withdrawn from the group with no proven type on record — \
+                         its type can no longer be proven (no further evidence will arrive for a \
+                         withdrawn member)",
+                        entity.0
+                    ),
+                };
+            }
+        }
+        for &entity in &board.control.registered_entity_ids {
+            if board.type_registry.is_withdrawn(entity) {
+                continue;
+            }
+            match board.type_registry.proof_of(entity) {
+                Some(TypeProofStatus::Proved) => continue,
+                Some(TypeProofStatus::Alleged) => {
+                    return Verdict::Unevaluable {
+                        reason: UnevaluableReason::Provisional(ProvisionalityReason::AllegedType { entity }),
+                    };
+                }
+                None => {
+                    return Verdict::Unevaluable {
+                        reason: UnevaluableReason::FactAbsent {
+                            what: format!("entity {} has no type asserted at all", entity.0),
+                        },
+                    };
+                }
+            }
+        }
+        Verdict::Pass
+    }
+}
+
 // ── §4 The run book ─────────────────────────────────────────────────────────
 
 /// Three verdicts, not two (D2.0 §4). `Unevaluable` is first-class: a check
 /// whose facts are absent has not failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// **D2.1 §2/C1/C6:** `Fail` and `Unevaluable` now carry their own data —
+/// `evaluate()`'s single call fully determines the outcome, so a persisted
+/// `Unevaluable` verdict always carries the SAME reason that drove it (C6
+/// `unevaluable_carries_its_reason`), never a reason recomputed separately
+/// and at risk of disagreeing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Verdict {
     Pass,
-    Fail,
-    Unevaluable,
+    Fail { detail: String },
+    Unevaluable { reason: UnevaluableReason },
 }
 
 /// Why a check could not be evaluated. Reuses the assurance profile's own
@@ -128,7 +279,7 @@ pub enum Verdict {
 /// vocabulary, plus the one genuinely new case D2.0 §4 implies: the fact
 /// this check needs simply isn't on the board at all (distinct from
 /// "on the board but unproven").
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UnevaluableReason {
     /// The fact this check needs has not been recorded on the board at all.
     FactAbsent { what: String },
@@ -136,59 +287,47 @@ pub enum UnevaluableReason {
     Provisional(ProvisionalityReason),
 }
 
-/// What a check's evaluation concluded about one subject, citing the facts
-/// it relied on (K-35-style traceability — never an unsourced verdict).
-#[derive(Debug, Clone)]
+/// What a check's evaluation concluded, citing the facts it relied on
+/// (K-35-style traceability — never an unsourced verdict). `subject` is the
+/// run's own `SubjectId` — the UBO-group determination root (D2.0 §7 Q3: "a
+/// run is UBO-group level... findings tagged per subject") — not an
+/// individual board `EntityId`; a check that names a SPECIFIC offending
+/// entity does so inside its `Verdict`'s own data (see `ProvenTypeCheck`),
+/// which is always available regardless of whether the board has any
+/// entities on it at all.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Finding {
     pub check_id: String,
-    pub subject: EntityId,
+    pub subject: SubjectId,
     pub verdict: Verdict,
-    /// `Some` iff `verdict == Unevaluable`.
-    pub unevaluable_reason: Option<UnevaluableReason>,
-    /// Free-text detail for `Pass`/`Fail` (what was checked, what it found).
-    pub detail: Option<String>,
     /// Events relied on for this verdict.
     pub cites: Vec<EventId>,
 }
 
 impl Finding {
-    pub fn pass(check_id: impl Into<String>, subject: EntityId, cites: Vec<EventId>) -> Self {
-        Self {
-            check_id: check_id.into(),
-            subject,
-            verdict: Verdict::Pass,
-            unevaluable_reason: None,
-            detail: None,
-            cites,
-        }
+    pub fn pass(check_id: impl Into<String>, subject: SubjectId, cites: Vec<EventId>) -> Self {
+        Self { check_id: check_id.into(), subject, verdict: Verdict::Pass, cites }
     }
 
-    pub fn fail(
-        check_id: impl Into<String>,
-        subject: EntityId,
-        detail: impl Into<String>,
-        cites: Vec<EventId>,
-    ) -> Self {
-        Self {
-            check_id: check_id.into(),
-            subject,
-            verdict: Verdict::Fail,
-            unevaluable_reason: None,
-            detail: Some(detail.into()),
-            cites,
-        }
+    pub fn fail(check_id: impl Into<String>, subject: SubjectId, detail: impl Into<String>, cites: Vec<EventId>) -> Self {
+        Self { check_id: check_id.into(), subject, verdict: Verdict::Fail { detail: detail.into() }, cites }
     }
 
-    pub fn unevaluable(check_id: impl Into<String>, subject: EntityId, reason: UnevaluableReason) -> Self {
-        Self {
-            check_id: check_id.into(),
-            subject,
-            verdict: Verdict::Unevaluable,
-            unevaluable_reason: Some(reason),
-            detail: None,
-            cites: vec![],
-        }
+    pub fn unevaluable(check_id: impl Into<String>, subject: SubjectId, reason: UnevaluableReason) -> Self {
+        Self { check_id: check_id.into(), subject, verdict: Verdict::Unevaluable { reason }, cites: vec![] }
     }
+}
+
+/// D2.1 §7 Q3 (RULED): "a run is an act in a session, not a background job
+/// ... Sage triggers the permission and the REPL runs it against the
+/// database. No side doors, except in test mode." A run's trigger must name
+/// BOTH which verb ran it (`verb_fqn`, D2.0 §4's "who or what triggered it")
+/// AND the session that acted (`session_id`) — "who or what" is incomplete
+/// without knowing WHO.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunTrigger {
+    pub verb_fqn: String,
+    pub session_id: Uuid,
 }
 
 /// A UBO-group-level evaluation run (D2.0 §7 Q3, RULED): one board hash, one
@@ -202,7 +341,7 @@ pub struct EvaluationRun {
     pub evaluation_pack_version_hash: Hash,
     pub valid_time: DateTime<Utc>,
     pub knowledge_time: DateTime<Utc>,
-    pub trigger: String,
+    pub trigger: RunTrigger,
     pub in_scope_check_ids: Vec<String>,
     pub findings: Vec<Finding>,
 }
@@ -217,7 +356,7 @@ pub struct RunPins {
     pub evaluation_pack_version_hash: Hash,
     pub valid_time: DateTime<Utc>,
     pub knowledge_time: DateTime<Utc>,
-    pub trigger: String,
+    pub trigger: RunTrigger,
     pub in_scope_check_ids: Vec<String>,
 }
 
@@ -230,9 +369,18 @@ impl EvaluationRun {
     /// computed value (zero applicable checks against today's catalogue,
     /// or a board nothing is applicable to yet), distinct from a pin that
     /// was never recorded at all.
+    ///
+    /// D2.1 §7 Q3: a run with no session origin is refused — the trigger's
+    /// `session_id` must not be the nil UUID, same discipline as
+    /// `subject_root`.
     pub fn new(run_id: Uuid, pins: RunPins, findings: Vec<Finding>) -> Result<Self, KycError> {
-        if pins.trigger.trim().is_empty() {
-            return Err(KycError::IncompleteRun { reason: "trigger is empty".into() });
+        if pins.trigger.verb_fqn.trim().is_empty() {
+            return Err(KycError::IncompleteRun { reason: "trigger.verb_fqn is empty".into() });
+        }
+        if pins.trigger.session_id.is_nil() {
+            return Err(KycError::IncompleteRun {
+                reason: "trigger.session_id is the nil UUID — a run must be an act in a session (D2.1 §7 Q3)".into(),
+            });
         }
         if pins.subject_root.0.is_nil() {
             return Err(KycError::IncompleteRun { reason: "subject_root is the nil UUID".into() });

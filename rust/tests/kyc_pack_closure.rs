@@ -320,26 +320,36 @@ fn relocated_facts_are_in_assembly() {
 }
 
 #[test]
-fn evaluation_pack_cannot_write_facts() {
-    // TS.6 §8's structural gate, made a discoverable `cargo test` rather than
-    // only a hand-run shell script (`scripts/check_kyc_decide_deps.sh`,
-    // which this duplicates in Rust so CI's normal test run catches drift):
-    // `ob-poc-kyc-decide` must have zero dependency, direct or transitive, on
-    // ANY crate exposing a dsl.kyc fact-stream append.
+fn evaluation_pack_dependency_graph_excludes_the_append_chokepoint() {
+    // RENAMED from `evaluation_pack_cannot_write_facts` (EOP-DD-KYCUBO-D2.1
+    // §6/§7 Q1, 2026-08-23). The old name asserted the evaluation pack
+    // "cannot write facts" — a claim the 2026-08-23 reconciliation disproved
+    // BY EXECUTION for the second time: `ob-poc-kyc-decide` holds an `sqlx`
+    // dependency and a live `&mut PgConnection` via `scope.executor()`, so a
+    // probe using raw SQL against `"ob-poc".kyc_intent_events` compiled,
+    // ran, and inserted a real fact-stream row while this dep-tree check
+    // still reported PASS. A crate-dependency check cannot express "must
+    // never write to table X" when the crate holds a SQL driver and a
+    // connection — no widening of the forbidden-crate list closes that gap,
+    // because the reachable path was never a crate dependency at all.
     //
-    // WIDENED 2026-08-22. The original list named only `ob-poc-kyc-seam` —
-    // the sole GOVERNED chokepoint, but NOT the only crate-level write path.
-    // `ob-poc-kyc-store::PgKycEventStore::append` is `pub` and is the real
-    // append (stream lock, seq allocation, INSERT into kyc_intent_events).
-    // The reconciliation proved the gap by execution: a probe inside the
-    // evaluation pack appended a real event with `ob-poc-kyc-seam` nowhere in
-    // its tree, while this test still passed. The gate forbade the wrong edge.
+    // D2.1 §7 Q1 (RULED): the two-pack SPLIT is the design and is correct —
+    // the evaluation pack is read-only on the UBO board and writes only its
+    // own run sheet, and no Sage session can execute evaluation verbs
+    // against the assembly pack. What a crate can technically reach with a
+    // raw SQL driver is an implementation property of the crate, not a
+    // defect in that design. So the gate is corrected to assert what is
+    // actually TRUE and load-bearing — the dependency graph excludes the
+    // GOVERNED append chokepoint (`ob-poc-kyc-seam::append_in_scope`, the
+    // sole path every real dsl.kyc verb dispatches through) and its
+    // underlying store (`ob-poc-kyc-store::PgKycEventStore::append`) —
+    // rather than the stronger, now twice-disproven claim that no fact can
+    // reach the table by any means. A gate asserting something false is
+    // worse than a gate that cannot fail.
     //
-    // The evaluation pack now depends on `ob-poc-kyc-read`, which contains no
-    // append at all — so the property holds by construction, and this test is
-    // FALSIFIABLE: re-add `ob-poc-kyc-store` to
-    // `crates/ob-poc-kyc-decide/Cargo.toml` and it goes red (RED-proven
-    // 2026-08-22).
+    // Still falsifiable the same way as before: re-add `ob-poc-kyc-store`
+    // (or `ob-poc-kyc-seam`) to `crates/ob-poc-kyc-decide/Cargo.toml` and
+    // this goes red.
     let output = std::process::Command::new("cargo")
         .args(["tree", "-p", "ob-poc-kyc-decide"])
         .output()
@@ -358,8 +368,9 @@ fn evaluation_pack_cannot_write_facts() {
     ] {
         assert!(
             !tree.contains(forbidden),
-            "ob-poc-kyc-decide must never depend on {forbidden} — it exposes a \
-             fact-stream append (TS.6 §8 evaluation_pack_cannot_write_facts). \
+            "ob-poc-kyc-decide must never depend on {forbidden} — it is the governed \
+             dsl.kyc fact-stream append chokepoint (D2.1 §7 Q1 \
+             evaluation_pack_dependency_graph_excludes_the_append_chokepoint). \
              Depend on ob-poc-kyc-read instead. Dep tree:\n{tree}"
         );
     }

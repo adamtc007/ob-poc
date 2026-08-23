@@ -24,7 +24,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use dsl_runtime::{TransactionScope, VerbExecutionContext};
+use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationUpdateIdentity, KycObligationUpdateRisk, KycObligationUpdateScreening,
     KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
@@ -79,9 +79,12 @@ impl TransactionScope for Scope {
     }
 }
 
-/// Dispatch a verb op and commit. Returns the raw VerbExecutionOutcome as JSON.
+/// Dispatch a verb op and commit. Returns the raw VerbExecutionOutcome as
+/// JSON. Runs under a real session identity (D2.1 §7 Q3) via the
+/// `test-fixtures`-gated `test_verb_execution_context_with_session` — the
+/// `decide.*` ops in this file refuse a context with no session_id.
 async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> serde_json::Value {
-    let mut ctx = VerbExecutionContext::default();
+    let mut ctx = ob_poc_kyc_decide::test_verb_execution_context_with_session(Uuid::new_v4());
     let mut scope = Scope::begin(pool).await;
     let out = op
         .execute(&args, &mut ctx, &mut scope)
@@ -93,7 +96,7 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> se
 
 /// Dispatch a verb op expecting refusal; commits nothing (rolls back).
 async fn run_expect_err(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> String {
-    let mut ctx = VerbExecutionContext::default();
+    let mut ctx = ob_poc_kyc_decide::test_verb_execution_context_with_session(Uuid::new_v4());
     let mut scope = Scope::begin(pool).await;
     let err = op
         .execute(&args, &mut ctx, &mut scope)
@@ -146,8 +149,6 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
             "kyc_intent_events",
             "kyc_subject_streams",
             "kyc_control_edge_projection",
-            "kyc_obligation_projection",
-            "kyc_subject_rollup_projection",
             // kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject write here now, not the fact
             // stream (TS.6 P2) — cleaned up alongside the other tables.
             "kyc_decision_records",
@@ -519,7 +520,7 @@ async fn coverage_kyc_decide_obligation_waiver() {
         &DecideObligationWaive,
         serde_json::json!({
             "subject-id": subject.0,
-            "check-id": "sanctions.screen",
+            "check-id": "board.every-entity-has-a-proven-type",
             "reason": "entity is regulated financial institution — simplified due diligence applies",
         }),
         &pool,
@@ -561,33 +562,44 @@ async fn coverage_kyc_person_reject() {
 /// `kyc_evaluation_runs`, and the cited run's `board_state_hash` matches
 /// what `run_id` row actually recorded — not just present, but genuinely
 /// the run that ran. Exercises both landed verdicts: `kyc_ubo.decide.subject.approve`
-/// (gate trivially passes today — the check catalogue is empty, D2.0 §7 Q2
-/// out of scope) and `kyc_ubo.decide.subject.reject` (citation recorded even though
-/// rejection is allowed at any stage).
+/// (against a genuinely EMPTY board — no production Assembly verb can
+/// reach `TypeProofStatus::Proved` today, since `UboEdgeAttachEvidence`
+/// always edge-scopes its target and `fold_type_registry` only reads
+/// `kyc_ubo.assert.edge.evidence` as a type-proof event when UNSCoped;
+/// `ProvenTypeCheck` passes vacuously on an empty board, D2.1 §2, so K-23
+/// does not refuse this run) and `kyc_ubo.decide.subject.reject` (citation
+/// recorded even though rejection is allowed at any stage, board has one
+/// registered-but-untyped entity so `ProvenTypeCheck` returns
+/// `Unevaluable` — irrelevant to reject, which never gates on the work
+/// list).
 #[tokio::test]
 async fn decide_cites_a_run() {
     let pool = pool().await;
 
-    for (subject, op, fqn, extra_args) in [
+    for (subject, op, fqn, extra_args, register_first) in [
         (
             SubjectId(Uuid::new_v4()),
             &DecideApprove as &dyn SemOsVerbOp,
             "kyc_ubo.decide.subject.approve",
             serde_json::json!({}),
+            false,
         ),
         (
             SubjectId(Uuid::new_v4()),
             &DecideReject as &dyn SemOsVerbOp,
             "kyc_ubo.decide.subject.reject",
             serde_json::json!({ "reason": "sanctions match confirmed" }),
+            true,
         ),
     ] {
-        run(
-            &KycSubjectRegister,
-            serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
-            &pool,
-        )
-        .await;
+        if register_first {
+            run(
+                &KycSubjectRegister,
+                serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+                &pool,
+            )
+            .await;
+        }
         let mut args = serde_json::json!({ "subject-id": subject.0 });
         for (k, v) in extra_args.as_object().unwrap() {
             args[k] = v.clone();

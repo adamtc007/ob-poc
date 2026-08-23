@@ -2,67 +2,49 @@
 //! (no store, no clock), same discipline as `ts5_geometry_enforcement.rs`:
 //! folded state is plain data, so these gates build it directly rather than
 //! replaying events through the fold.
+//!
+//! **EOP-DD-KYCUBO-D2.1 Tranche B (2026-08-23) rehomed five of the original
+//! nine D2.0 §6 gates** onto the production `SemOsVerbOp::execute` path —
+//! `checks_run_at_any_board_state`, `in_scope_set_is_computed_not_stored`,
+//! `staleness_is_hash_comparison`, `runs_are_append_only`,
+//! `run_pins_are_complete` — see
+//! `rust/tests/kyc_d21_gate_rehoming.rs::*_through_production`. The
+//! reconciliation that triggered the rehoming proved these pure-fixture
+//! versions could not detect production writing a FABRICATED in-scope set
+//! (they build their own `TestCheck` fixtures and never read anything
+//! production persisted), so they no longer serve as this programme's proof
+//! that the property holds in the running system.
+//!
+//! Four are removed outright, not duplicated, to avoid two suites quietly
+//! drifting apart. `run_pins_are_complete` is the one exception: it names
+//! two genuinely distinct properties that were bundled under one test —
+//! "does the pure constructor (`EvaluationRun::new`) refuse an incomplete
+//! pin set" (constructor-level, retained here as
+//! `evaluation_run_new_refuses_incomplete_pins`, and does not overlap with
+//! anything the production gate checks) and "does production actually call
+//! that constructor with complete, real pins" (rehomed as
+//! `run_pins_are_complete_through_production`). Splitting rather than
+//! moving is the correct call only because the two halves test different
+//! things; it is not the default and is called out explicitly so it is not
+//! read as quiet drift.
+//!
+//! The remaining two — `unevaluable_is_not_fail` and
+//! `work_list_is_derived_from_latest_run` — carry a D2.1 §3 four-field
+//! deferral notice each: production cannot produce a real verdict at all
+//! today (`Check` has no `evaluate()`, the catalogue is a literal `&[]`),
+//! so there is nothing for a production-driven version of either gate to
+//! observe. They stay here as pure-function coverage until Tranche C.
 
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    applicability_holds, board_state_hash, in_scope_check_ids, work_list_from_history,
-    ApplicabilityCondition, BoardSnapshot, Check, ControlState, EntityId, EntityType,
-    EvaluationRun, Finding, KycError, RunPins, StructureClass, TypeRegistryState, Verdict,
+    applicability_holds, work_list_from_history, ApplicabilityCondition, BoardSnapshot,
+    ControlState, EntityId, EntityType, EvaluationRun, Finding, KycError, RunPins, RunTrigger,
+    SubjectId, TypeRegistryState, Verdict,
 };
-
-fn as_of() -> DateTime<Utc> {
-    DateTime::<Utc>::from_timestamp(0, 0).unwrap()
-}
-
-struct TestCheck {
-    id: &'static str,
-    applicability: Vec<ApplicabilityCondition>,
-}
-
-impl Check for TestCheck {
-    fn check_id(&self) -> &str {
-        self.id
-    }
-    fn applicability(&self) -> &[ApplicabilityCondition] {
-        &self.applicability
-    }
-}
 
 fn empty_board<'a>(control: &'a ControlState, types: &'a TypeRegistryState) -> BoardSnapshot<'a> {
     BoardSnapshot { control, type_registry: types, determination: None }
-}
-
-// ── §3 P1 gate: in_scope_set_is_computed_not_stored ─────────────────────────
-
-/// D2.0 §6: adding a trust to the board changes the in-scope set on the
-/// next run with no configuration change anywhere — the in-scope set is
-/// RECOMPUTED, never stored.
-#[test]
-fn in_scope_set_is_computed_not_stored() {
-    let checks = vec![
-        TestCheck { id: "always.on", applicability: vec![ApplicabilityCondition::Unconditional] },
-        TestCheck {
-            id: "trust.only",
-            applicability: vec![ApplicabilityCondition::StructureClassPresent(StructureClass::Trust)],
-        },
-    ];
-
-    let mut control = ControlState::default();
-    let types = TypeRegistryState::default();
-
-    let before = in_scope_check_ids(&checks, &empty_board(&control, &types));
-    assert_eq!(before, vec!["always.on".to_string()], "trust check must not be in scope yet");
-
-    // No configuration change anywhere — only the board changed.
-    control.structure_class = Some(StructureClass::Trust);
-    let after = in_scope_check_ids(&checks, &empty_board(&control, &types));
-    assert_eq!(
-        after,
-        vec!["always.on".to_string(), "trust.only".to_string()],
-        "adding a trust to the board must pull trust.only into scope with zero config change"
-    );
 }
 
 /// The two board-gap condition kinds (P0 0c): typed and total, but always
@@ -81,6 +63,11 @@ fn jurisdiction_and_risk_conditions_are_typed_but_currently_unsatisfiable() {
 #[test]
 fn entity_type_present_condition_reads_the_type_registry() {
     use ob_poc_kyc_substrate::{fold_type_registry, AuthorityRef, IntentEvent, Principal, SubjectId, TargetBinding};
+    use chrono::{DateTime, Utc};
+
+    fn as_of() -> DateTime<Utc> {
+        DateTime::<Utc>::from_timestamp(0, 0).unwrap()
+    }
 
     let subject = SubjectId(Uuid::new_v4());
     let entity = EntityId(Uuid::new_v4());
@@ -116,74 +103,189 @@ fn entity_type_present_condition_reads_the_type_registry() {
     ));
 }
 
-// ── §4/§6 run book gates ─────────────────────────────────────────────────────
+// ── D2.1 §2/§7 Q2 — `ProvenTypeCheck`, the one real proof check ────────────
+
+use ob_poc_kyc_substrate::{Check, ProvenTypeCheck};
+
+#[test]
+fn proven_type_check_passes_on_empty_board() {
+    let control = ControlState::default();
+    let types = TypeRegistryState::default();
+    let board = empty_board(&control, &types);
+    assert!(matches!(ProvenTypeCheck.evaluate(&board), Verdict::Pass), "vacuously true — nothing to fail on");
+}
+
+#[test]
+fn proven_type_check_passes_when_every_entity_is_proved() {
+    use ob_poc_kyc_substrate::{fold_type_registry, AuthorityRef, IntentEvent, Principal, SubjectId, TargetBinding};
+    use chrono::{DateTime, Utc};
+    fn as_of() -> DateTime<Utc> {
+        DateTime::<Utc>::from_timestamp(0, 0).unwrap()
+    }
+
+    let subject = SubjectId(Uuid::new_v4());
+    let entity = EntityId(Uuid::new_v4());
+    let assert_type = IntentEvent::new(
+        subject,
+        "kyc_ubo.assert.subject.type",
+        Principal::test_analyst(),
+        AuthorityRef("test".into()),
+        TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
+        serde_json::json!({ "entity_id": entity.0.to_string(), "entity_type": "natural_person" }),
+        as_of(),
+    );
+    let evidence = IntentEvent::new(
+        subject,
+        "kyc_ubo.assert.edge.evidence",
+        Principal::test_analyst(),
+        AuthorityRef("test".into()),
+        TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
+        serde_json::json!({ "entity_id": entity.0.to_string() }),
+        as_of(),
+    );
+    let types = fold_type_registry(&[&assert_type, &evidence]);
+    let mut control = ControlState::default();
+    control.registered_entity_ids.insert(entity);
+    let board = empty_board(&control, &types);
+    assert!(
+        matches!(ProvenTypeCheck.evaluate(&board), Verdict::Pass),
+        "a type-scoped evidence event must fold the entity's proof to Proved"
+    );
+}
+
+#[test]
+fn proven_type_check_is_unevaluable_when_a_type_is_alleged() {
+    use ob_poc_kyc_substrate::{fold_type_registry, AuthorityRef, IntentEvent, Principal, SubjectId, TargetBinding};
+    use chrono::{DateTime, Utc};
+    fn as_of() -> DateTime<Utc> {
+        DateTime::<Utc>::from_timestamp(0, 0).unwrap()
+    }
+
+    let subject = SubjectId(Uuid::new_v4());
+    let entity = EntityId(Uuid::new_v4());
+    let assert_type = IntentEvent::new(
+        subject,
+        "kyc_ubo.assert.subject.type",
+        Principal::test_analyst(),
+        AuthorityRef("test".into()),
+        TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
+        serde_json::json!({ "entity_id": entity.0.to_string(), "entity_type": "natural_person" }),
+        as_of(),
+    );
+    let types = fold_type_registry(&[&assert_type]);
+    let mut control = ControlState::default();
+    control.registered_entity_ids.insert(entity);
+    let board = empty_board(&control, &types);
+    match ProvenTypeCheck.evaluate(&board) {
+        Verdict::Unevaluable { reason: ob_poc_kyc_substrate::UnevaluableReason::Provisional(_) } => {}
+        other => panic!("expected Unevaluable(Provisional(AllegedType)), got {other:?}"),
+    }
+}
+
+#[test]
+fn proven_type_check_is_unevaluable_when_no_type_is_asserted_at_all() {
+    let mut control = ControlState::default();
+    let entity = EntityId(Uuid::new_v4());
+    control.registered_entity_ids.insert(entity);
+    let types = TypeRegistryState::default();
+    let board = empty_board(&control, &types);
+    match ProvenTypeCheck.evaluate(&board) {
+        Verdict::Unevaluable { reason: ob_poc_kyc_substrate::UnevaluableReason::FactAbsent { .. } } => {}
+        other => panic!("expected Unevaluable(FactAbsent), got {other:?}"),
+    }
+}
+
+#[test]
+fn proven_type_check_fails_on_a_withdrawn_unproven_entity() {
+    let mut control = ControlState::default();
+    let entity = EntityId(Uuid::new_v4());
+    control.registered_entity_ids.insert(entity);
+    let mut types = TypeRegistryState::default();
+    types.withdrawn_members.insert(entity);
+    let board = empty_board(&control, &types);
+    match ProvenTypeCheck.evaluate(&board) {
+        Verdict::Fail { detail } => assert!(detail.contains(&entity.0.to_string()), "detail must name the offending entity"),
+        other => panic!("expected Fail, got {other:?}"),
+    }
+}
+
+// ── §4/§6 run book gates — pure-function coverage retained under a D2.1 §3
+// deferral (see the module doc comment) ─────────────────────────────────────
 
 fn pins(check_ids: Vec<String>) -> RunPins {
+    use chrono::{DateTime, Utc};
     use ob_poc_kyc_substrate::Hash;
+    fn as_of() -> DateTime<Utc> {
+        DateTime::<Utc>::from_timestamp(0, 0).unwrap()
+    }
     RunPins {
         subject_root: ob_poc_kyc_substrate::SubjectId(Uuid::new_v4()),
         board_state_hash: Hash::of_json(&serde_json::json!({"n": 1})),
         evaluation_pack_version_hash: Hash::of_json(&serde_json::json!({"v": 1})),
         valid_time: as_of(),
         knowledge_time: as_of(),
-        trigger: "test".into(),
+        trigger: RunTrigger { verb_fqn: "test".into(), session_id: Uuid::new_v4() },
         in_scope_check_ids: check_ids,
     }
 }
 
-/// D2.0 §6 `checks_run_at_any_board_state` — the founding property: a board
-/// of three alleged edges over alleged types produces a run, with verdicts,
-/// and no error. Nothing gates on completeness.
-#[test]
-fn checks_run_at_any_board_state() {
-    let control = ControlState::default();
-    let types = TypeRegistryState::default();
-    let entity = EntityId(Uuid::new_v4());
-    let findings = vec![Finding::unevaluable(
-        "sanctions.screen",
-        entity,
-        ob_poc_kyc_substrate::UnevaluableReason::FactAbsent { what: "no screening fact recorded".into() },
-    )];
-    let _board = empty_board(&control, &types);
-    let run = EvaluationRun::new(Uuid::new_v4(), pins(vec!["sanctions.screen".into()]), findings)
-        .expect("a run over an incomplete board must not error");
-    assert_eq!(run.findings.len(), 1);
-    assert!(matches!(run.findings[0].verdict, Verdict::Unevaluable));
-}
-
 /// D2.0 §6 `unevaluable_is_not_fail` — property: adding the missing fact and
 /// re-running flips it to pass or fail, never the reverse.
+///
+/// D2.1 §3 DEFERRAL — not rehomed onto production (Tranche B):
+///   WHAT: proving through a real op call that a check whose fact is absent
+///         persists `Verdict::Unevaluable` (never `Fail`), and that
+///         supplying the fact and re-running flips it — never the reverse.
+///   WHY:  no production path can produce ANY verdict today — `Check` has
+///         no `evaluate()`, the catalogue passed to every decide op is a
+///         literal `&[]`, and `findings` is hardcoded `json!([])` at the
+///         persist site. There is nothing for a production-driven version
+///         of this gate to observe.
+///   WHO:  D2.1 Tranche C (`Check::evaluate`, the real catalogue, and real
+///         findings persistence) — same task this deferral was recorded in.
+///   WHEN: D2.1 Tranche C.
 #[test]
 fn unevaluable_is_not_fail() {
-    let entity = EntityId(Uuid::new_v4());
+    let subject = SubjectId(Uuid::new_v4());
     let unevaluable = Finding::unevaluable(
         "sanctions.screen",
-        entity,
+        subject,
         ob_poc_kyc_substrate::UnevaluableReason::FactAbsent { what: "no screening fact".into() },
     );
-    assert!(matches!(unevaluable.verdict, Verdict::Unevaluable));
-    assert!(!matches!(unevaluable.verdict, Verdict::Fail));
+    assert!(matches!(unevaluable.verdict, Verdict::Unevaluable { .. }));
+    assert!(!matches!(unevaluable.verdict, Verdict::Fail { .. }));
 
     // Re-running with the fact now present flips it — never the reverse.
-    let now_pass = Finding::pass("sanctions.screen", entity, vec![]);
+    let now_pass = Finding::pass("sanctions.screen", subject, vec![]);
     assert!(matches!(now_pass.verdict, Verdict::Pass));
 }
 
 /// D2.0 §6 `work_list_is_derived_from_latest_run` — structural: no stored
 /// work-list state exists; the list is a query over the newest run.
+///
+/// D2.1 §3 DEFERRAL — not rehomed onto production (Tranche B):
+///   WHAT: proving through real persisted run history that the current
+///         work list is the LATEST run's failing/unevaluable findings,
+///         ignoring a stale prior run's findings.
+///   WHY:  same root cause as `unevaluable_is_not_fail` above — findings
+///         are always `[]` in every production run today, so two real runs
+///         are indistinguishable by work list regardless of ordering; the
+///         property has nothing to exercise through production yet.
+///   WHO:  D2.1 Tranche C — same task this deferral was recorded in.
+///   WHEN: D2.1 Tranche C.
 #[test]
 fn work_list_is_derived_from_latest_run() {
-    let entity = EntityId(Uuid::new_v4());
+    let subject = SubjectId(Uuid::new_v4());
     let old_run = EvaluationRun::new(
         Uuid::new_v4(),
         pins(vec!["c1".into()]),
-        vec![Finding::fail("c1", entity, "was failing", vec![])],
+        vec![Finding::fail("c1", subject, "was failing", vec![])],
     )
     .unwrap();
     let new_run = EvaluationRun::new(
         Uuid::new_v4(),
         pins(vec!["c1".into()]),
-        vec![Finding::pass("c1", entity, vec![])],
+        vec![Finding::pass("c1", subject, vec![])],
     )
     .unwrap();
 
@@ -192,65 +294,28 @@ fn work_list_is_derived_from_latest_run() {
     assert!(work_list.is_empty(), "the fix in the newest run must clear the work list, ignoring the stale old run");
 }
 
-/// D2.0 §6 `staleness_is_hash_comparison` — a run whose pinned board hash
-/// differs from the board's current hash reports stale, with no flag
-/// written anywhere.
+/// Retained as a pure-function sanity check on `EvaluationRun::new`'s
+/// refusal path — `run_pins_are_complete` itself was rehomed onto
+/// production (`rust/tests/kyc_d21_gate_rehoming.rs::run_pins_are_complete_through_production`),
+/// but this constructor-level check is cheap, fast, and does not overlap
+/// with what that gate proves (the production gate checks what actually
+/// got persisted; this one checks the constructor refuses before anything
+/// would be persisted).
 #[test]
-fn staleness_is_hash_comparison() {
-    let control = ControlState::default();
-    let types = TypeRegistryState::default();
-    let board = empty_board(&control, &types);
-    let hash_now = board_state_hash(&board);
-
-    let run = EvaluationRun::new(Uuid::new_v4(), pins(vec!["c1".into()]), vec![]).unwrap();
-    assert!(run.is_stale(hash_now), "run pinned a different (test-fixture) hash — must report stale");
-
-    let fresh_run = EvaluationRun::new(
-        Uuid::new_v4(),
-        RunPins { board_state_hash: hash_now, ..pins(vec!["c1".into()]) },
-        vec![],
-    )
-    .unwrap();
-    assert!(!fresh_run.is_stale(hash_now), "a run pinned to the CURRENT hash must not report stale");
-
-    let control2 = ControlState {
-        structure_class: Some(StructureClass::Trust),
-        ..Default::default()
+fn evaluation_run_new_refuses_incomplete_pins() {
+    let missing_trigger = RunPins {
+        trigger: RunTrigger { verb_fqn: "".into(), session_id: Uuid::new_v4() },
+        ..pins(vec!["c1".into()])
     };
-    let board2 = empty_board(&control2, &types);
-    let hash_after_change = board_state_hash(&board2);
-    assert_ne!(hash_now, hash_after_change, "board_state_hash must be sensitive to structure_class");
-    assert!(fresh_run.is_stale(hash_after_change), "the board moved on — the old run must now report stale");
-}
-
-/// D2.0 §6 `runs_are_append_only` — re-running never mutates a prior run;
-/// the old verdicts stand.
-#[test]
-fn runs_are_append_only() {
-    let entity = EntityId(Uuid::new_v4());
-    let run1 =
-        EvaluationRun::new(Uuid::new_v4(), pins(vec!["c1".into()]), vec![Finding::fail("c1", entity, "bad", vec![])])
-            .unwrap();
-    let run1_id = run1.run_id;
-    let run1_verdict = run1.findings[0].verdict;
-
-    let mut history = vec![run1];
-    let run2 = EvaluationRun::new(Uuid::new_v4(), pins(vec!["c1".into()]), vec![Finding::pass("c1", entity, vec![])])
-        .unwrap();
-    history.push(run2);
-
-    let stood = history.iter().find(|r| r.run_id == run1_id).expect("prior run must still be present, unmutated");
-    assert!(matches!(stood.findings[0].verdict, Verdict::Fail), "prior run's verdict must be untouched");
-    assert_eq!(stood.findings[0].verdict as u8, run1_verdict as u8);
-    assert_eq!(history.len(), 2, "re-running creates a NEW run, never replaces one");
-}
-
-/// D2.0 §6 `run_pins_are_complete` — a run missing any pin is refused.
-#[test]
-fn run_pins_are_complete() {
-    let missing_trigger = RunPins { trigger: "".into(), ..pins(vec!["c1".into()]) };
     let err = EvaluationRun::new(Uuid::new_v4(), missing_trigger, vec![]).unwrap_err();
     assert!(matches!(err, KycError::IncompleteRun { .. }));
+
+    let missing_session = RunPins {
+        trigger: RunTrigger { verb_fqn: "test".into(), session_id: Uuid::nil() },
+        ..pins(vec!["c1".into()])
+    };
+    let err_session = EvaluationRun::new(Uuid::new_v4(), missing_session, vec![]).unwrap_err();
+    assert!(matches!(err_session, KycError::IncompleteRun { .. }));
 
     let missing_subject =
         RunPins { subject_root: ob_poc_kyc_substrate::SubjectId(Uuid::nil()), ..pins(vec!["c1".into()]) };

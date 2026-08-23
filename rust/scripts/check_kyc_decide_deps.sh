@@ -14,11 +14,20 @@
 # ob-poc-kyc-seam nowhere in its tree, while this script still reported PASS.
 # The evaluation pack now depends on ob-poc-kyc-read, which has no append.
 #
-# This is the structural proof behind EOP-DD-KYCUBO-TS.6 §8's
-# `evaluation_pack_cannot_write_facts`: the Evaluation pack (decide.approve,
-# decide.reject) cannot write to the fact stream not because a test checks
-# each op's body, but because the crate that hosts them has no dependency
-# edge to the crate that owns the only write path into it.
+# This is the structural proof behind EOP-DD-KYCUBO-D2.1 §7 Q1's
+# `evaluation_pack_dependency_graph_excludes_the_append_chokepoint`
+# (renamed 2026-08-23 from TS.6 §8's `evaluation_pack_cannot_write_facts`,
+# after a SECOND probe proved the stronger "cannot write facts" claim
+# false: ob-poc-kyc-decide holds an sqlx dependency and a live connection,
+# so raw SQL against kyc_intent_events reaches the table regardless of
+# what's in this script's forbidden-crate list). What this script actually
+# proves, and all it claims to prove: the crate that hosts decide.approve/
+# decide.reject/decide.obligation.waiver has no dependency edge to
+# ob-poc-kyc-seam (the GOVERNED append chokepoint every real dsl.kyc verb
+# dispatches through) or its underlying store. Two separate packs means no
+# Sage session can execute evaluation verbs against the assembly pack
+# (D2.1 §7 Q1) — that design property is what this script is a proof of,
+# not a claim about what raw SQL can technically reach.
 #
 # Usage: run from the rust/ workspace directory.
 #   ./scripts/check_kyc_decide_deps.sh

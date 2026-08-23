@@ -37,9 +37,10 @@ pub use determination::{
 };
 pub use error::KycError;
 pub use evaluation::{
-    applicability_holds, board_state_hash, in_scope_check_ids, work_list_from_history,
-    ApplicabilityCondition, BoardSnapshot, Check, EvaluationRun, Finding, RiskLevel, RunPins,
-    UnevaluableReason, Verdict,
+    applicability_holds, board_state_hash, evaluate_checks, in_scope_check_ids,
+    work_list_from_history, ApplicabilityCondition, BoardSnapshot, Check, EvaluationCatalogue,
+    EvaluationRun, Finding, ProvenTypeCheck, RiskLevel, RunPins, RunTrigger, UnevaluableReason,
+    Verdict,
 };
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{

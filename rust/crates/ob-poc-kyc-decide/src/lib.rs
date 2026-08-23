@@ -1,18 +1,27 @@
 //! KYC/UBO Evaluation-pack verdicts — `kyc_ubo.decide.subject.approve`, `kyc_ubo.decide.subject.reject`
 //! (EOP-DD-KYCUBO-TS.6 §1/§4, landed TS.6 P1/P2).
 //!
-//! **This crate must never depend on `ob-poc-kyc-seam`**, directly or
-//! transitively. `ob-poc-kyc-seam::append_in_scope` is the sole chokepoint
-//! for writes to the dsl.kyc fact stream (`"ob-poc".kyc_intent_events`); by
-//! having no dependency on it, this crate structurally cannot write a fact
-//! — `evaluation_pack_cannot_write_facts` (TS.6 §8) is proven by the
-//! crate-dependency graph, not by inspecting what each op happens to call.
+//! **This crate must never depend on `ob-poc-kyc-seam`** (or its underlying
+//! store, `ob-poc-kyc-store`), directly or transitively.
+//! `ob-poc-kyc-seam::append_in_scope` is the sole GOVERNED chokepoint for
+//! writes to the dsl.kyc fact stream (`"ob-poc".kyc_intent_events`); by
+//! having no dependency on it, the two-pack split holds — no Sage session
+//! can execute evaluation verbs against the assembly pack (D2.1 §7 Q1) —
+//! `evaluation_pack_dependency_graph_excludes_the_append_chokepoint`
+//! (renamed 2026-08-23 from TS.6 §8's `evaluation_pack_cannot_write_facts`,
+//! after a second probe proved the stronger "cannot write facts" claim
+//! false: this crate holds an `sqlx` dependency and a live connection via
+//! `scope.executor()`, so raw SQL against the table is reachable regardless
+//! of what's excluded from the dependency graph — see D2.1 §7 Q1). What
+//! the dependency-graph exclusion actually proves is narrower and load-
+//! bearing: this crate cannot reach the fact stream through the GOVERNED
+//! path, only through raw SQL a maintainer would have to write on purpose.
 //! `scripts/check_kyc_decide_deps.sh` is the CI-enforced proof, mirroring
 //! `ob-poc-kyc-substrate`'s existing `check_kyc_substrate_deps.sh` pattern.
 //!
 //! Both ops write only to `"ob-poc".kyc_decision_records` (migration
 //! `20260822_kyc_decision_records.sql`) — never to the fact stream. They
-//! read the fact stream (via `ob-poc-kyc-store` + `ob-poc-kyc-substrate`'s
+//! read the fact stream (via `ob-poc-kyc-read` + `ob-poc-kyc-substrate`'s
 //! pure fold) to compute the K-23 gate and the decision's basis, which is a
 //! permitted read, not a write.
 //!
@@ -34,10 +43,29 @@
 //! snapshot — no longer meaningful once `creation` (the only writer of a new
 //! `ObligationTracks` entry) is dissolved. A verdict now cites the
 //! `EvaluationRun` it relied on (§4/§6 `decide_cites_a_run`) — computed
-//! against `evaluation_lexicon`'s check catalogue (empty today; the
-//! catalogue's contents are D2.0 §7 Q2, explicitly out of scope here) and
-//! persisted to `"ob-poc".kyc_evaluation_runs` before the decision record
-//! that cites it is written.
+//! against a real check catalogue (`EvaluationCatalogue::default_catalogue()`,
+//! D2.1 §2 — the catalogue's CONTENTS remain D2.0 §7 Q2's explicit
+//! out-of-scope line; today it holds exactly the one proof check that
+//! exists to prove the machinery works) and persisted to
+//! `"ob-poc".kyc_evaluation_runs` before the decision record that cites it
+//! is written.
+//!
+//! **D2.1 §7 Q3 (RULED):** a run is an act in a session, not a background
+//! job — every run's trigger carries the session identity that acted, read
+//! from `ctx.extensions["session_id"]` (the same platform-extension slot
+//! `to_dsl_context` already reads it from in the main REPL dispatch path,
+//! `src/sem_os_runtime/verb_executor_adapter.rs`). A `VerbExecutionContext`
+//! with no session_id extension is refused — `session_identity_from_ctx`
+//! below is the ONLY path production code uses to obtain one. Tests that
+//! dispatch a `SemOsVerbOp` directly (not through a real REPL session) build
+//! a context with the `test-fixtures`-feature-gated
+//! `test_verb_execution_context_with_session` — a Cargo feature enabled
+//! only under `[dev-dependencies]` in the workspace root (mirroring
+//! `ob-poc-control-plane`'s `test-support` pattern), so it does not exist in
+//! a production build at all: `cfg(feature = "test-fixtures")` is false for
+//! `cargo build`/`cargo run` and true only for `cargo test`, which is what
+//! "structurally unreachable from production" means here (D2.1 §6
+//! `test_mode_side_door_is_named`).
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -50,9 +78,9 @@ use sem_os_postgres::ops::SemOsVerbOp;
 
 use ob_poc_kyc_read::PgKycEventReader;
 use ob_poc_kyc_substrate::{
-    board_state_hash, fold_control, fold_obligations_versioned, fold_type_registry,
-    in_scope_check_ids, ApplicabilityCondition, BoardSnapshot, Check, EvaluationRun, FoldRegistry,
-    Hash, RunPins, SubjectId, V1FoldImpl,
+    board_state_hash, evaluate_checks, fold_control, fold_obligations_versioned,
+    fold_type_registry, in_scope_check_ids, BoardSnapshot, EvaluationCatalogue, EvaluationRun,
+    FoldRegistry, Hash, RunPins, RunTrigger, SubjectId, V1FoldImpl,
 };
 
 // ── JSON arg extraction (local — `super::helpers` in `ob-poc` is
@@ -117,35 +145,44 @@ async fn load_board_state(
     Ok((control, type_registry, obligations))
 }
 
-/// No real checks exist yet — the check catalogue's contents are D2.0 §7
-/// Q2, explicitly out of scope for this tranche. This marker fixes the
-/// generic `Check` type parameter so the (real) in-scope-computation and
-/// run-construction machinery runs today, against an empty catalogue,
-/// rather than being left unwired until a catalogue exists.
-struct NoChecksYet;
-impl Check for NoChecksYet {
-    fn check_id(&self) -> &str {
-        unreachable!("NoChecksYet is never constructed — it only fixes the Check type parameter")
-    }
-    fn applicability(&self) -> &[ApplicabilityCondition] {
-        &[]
-    }
+/// D2.1 §7 Q3: extract the session identity from the SAME platform-extension
+/// slot the real REPL dispatch path reads it from
+/// (`src/sem_os_runtime/verb_executor_adapter.rs::to_dsl_context`'s
+/// `obj.get("session_id")`). Refuses if absent — "no side doors, except in
+/// test mode" (§7 Q3); tests that don't dispatch through a real session use
+/// `test_verb_execution_context_with_session` (below) instead.
+fn session_identity_from_ctx(ctx: &VerbExecutionContext) -> Result<Uuid> {
+    ctx.extensions
+        .as_object()
+        .and_then(|obj| obj.get("session_id"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "decide: no session_id in ctx.extensions — a run must be an act in a session \
+                 (D2.1 §7 Q3), not a background job with no origin"
+            )
+        })
 }
 
-/// D2.0 §6 `checks_run_at_any_board_state`: compute and persist a fresh
-/// `EvaluationRun` for `subject`, against today's (empty) check catalogue.
-/// The founding property holds regardless of catalogue size — a run over
-/// ANY board state produces a run, with verdicts (here, trivially none),
-/// and no error.
+/// D2.0 §6 `checks_run_at_any_board_state` / D2.1 §2: compute and persist a
+/// fresh `EvaluationRun` for `subject`, against the real check catalogue
+/// (`EvaluationCatalogue::default_catalogue()`). The founding property holds
+/// regardless of catalogue size — a run over ANY board state produces a
+/// run, with real verdicts, and no error.
 async fn compute_and_persist_run(
     scope: &mut dyn TransactionScope,
+    ctx: &VerbExecutionContext,
     subject: SubjectId,
     control: &ob_poc_kyc_substrate::ControlState,
     type_registry: &ob_poc_kyc_substrate::TypeRegistryState,
-    trigger: &str,
+    trigger_verb_fqn: &str,
 ) -> Result<EvaluationRun> {
+    let session_id = session_identity_from_ctx(ctx)?;
     let board = BoardSnapshot { control, type_registry, determination: None };
-    let in_scope = in_scope_check_ids::<NoChecksYet>(&[], &board);
+    let catalogue = EvaluationCatalogue::default_catalogue();
+    let in_scope = in_scope_check_ids(&catalogue, &board);
+    let findings = evaluate_checks(&catalogue, &board, subject);
     let now = chrono::Utc::now();
     let pins = RunPins {
         subject_root: subject,
@@ -155,10 +192,10 @@ async fn compute_and_persist_run(
         ),
         valid_time: now,
         knowledge_time: now,
-        trigger: trigger.to_string(),
+        trigger: RunTrigger { verb_fqn: trigger_verb_fqn.to_string(), session_id },
         in_scope_check_ids: in_scope,
     };
-    let run = EvaluationRun::new(Uuid::new_v4(), pins, vec![])
+    let run = EvaluationRun::new(Uuid::new_v4(), pins, findings)
         .map_err(|e| anyhow!("decide: run construction refused: {e}"))?;
     persist_run(scope, &run).await?;
     Ok(run)
@@ -168,8 +205,8 @@ async fn persist_run(scope: &mut dyn TransactionScope, run: &EvaluationRun) -> R
     sqlx::query(
         r#"INSERT INTO "ob-poc".kyc_evaluation_runs
            (run_id, subject_root, board_state_hash, evaluation_pack_version_hash,
-            valid_time, knowledge_time, trigger, in_scope_check_ids, findings)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+            valid_time, knowledge_time, trigger, triggering_session, in_scope_check_ids, findings)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
     )
     .bind(run.run_id)
     .bind(run.subject_root.0)
@@ -177,12 +214,10 @@ async fn persist_run(scope: &mut dyn TransactionScope, run: &EvaluationRun) -> R
     .bind(run.evaluation_pack_version_hash.to_hex())
     .bind(run.valid_time)
     .bind(run.knowledge_time)
-    .bind(&run.trigger)
+    .bind(&run.trigger.verb_fqn)
+    .bind(run.trigger.session_id)
     .bind(serde_json::to_value(&run.in_scope_check_ids).unwrap_or_default())
-    // `Finding` carries no `Serialize` today — every run's catalogue is
-    // empty (D2.0 §7 Q2 out of scope), so findings are always `[]`. Wiring
-    // real findings here is future work gated on a real check catalogue.
-    .bind(serde_json::json!([]))
+    .bind(serde_json::to_value(&run.findings).unwrap_or_default())
     .execute(scope.executor())
     .await
     .map_err(|e| anyhow!("decide: persist run failed: {e}"))?;
@@ -293,6 +328,7 @@ impl SemOsVerbOp for DecideApprove {
         let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
         let run = compute_and_persist_run(
             scope,
+            ctx,
             subject,
             &control,
             &type_registry,
@@ -300,10 +336,10 @@ impl SemOsVerbOp for DecideApprove {
         )
         .await?;
 
-        // K-23 gate: nothing in the run's work list (D2.0 §5 correction —
-        // replaces the dissolved obligation-fold `AllTerminal` check).
-        // Trivially satisfied today (the check catalogue is empty, D2.0 §7
-        // Q2 out of scope) — wired for real the moment a check exists.
+        // K-23 gate: nothing in the run's work list — D2.1 §2 makes this a
+        // REAL gate: the catalogue's one check (`ProvenTypeCheck`) can
+        // genuinely fail or come back unevaluable, and this refuses
+        // approval when it does (D2.1 §6 `k23_gate_can_fire`).
         if !run.work_list().is_empty() {
             return Err(anyhow!(
                 "kyc_ubo.decide.subject.approve rejected: subject {} has {} failing/unevaluable \
@@ -362,6 +398,7 @@ impl SemOsVerbOp for DecideReject {
         let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
         let run = compute_and_persist_run(
             scope,
+            ctx,
             subject,
             &control,
             &type_registry,
@@ -423,12 +460,27 @@ impl SemOsVerbOp for DecideObligationWaive {
         let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
         let run = compute_and_persist_run(
             scope,
+            ctx,
             subject,
             &control,
             &type_registry,
             "kyc_ubo.decide.obligation.waiver",
         )
         .await?;
+
+        // D2.1 §6 `waived_check_was_in_scope`: a waiver must name a check
+        // that was actually in the cited run's in-scope set — refusing the
+        // defect the reconciliation found (`sanctions.screen` waived while
+        // never in scope, never evaluated, and not a real check).
+        if !run.in_scope_check_ids.iter().any(|id| id == &check_id) {
+            return Err(anyhow!(
+                "kyc_ubo.decide.obligation.waiver rejected: check '{check_id}' was not in run {}'s \
+                 in-scope set {:?} — a waiver must name a check that was actually evaluated \
+                 (waived_check_was_in_scope)",
+                run.run_id,
+                run.in_scope_check_ids,
+            ));
+        }
 
         let basis = serde_json::json!({
             "run_id": run.run_id,
@@ -458,4 +510,22 @@ pub fn register(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
     registry.register(std::sync::Arc::new(DecideApprove));
     registry.register(std::sync::Arc::new(DecideReject));
     registry.register(std::sync::Arc::new(DecideObligationWaive));
+}
+
+/// D2.1 §6 `test_mode_side_door_is_named` — the ONLY way to build a
+/// `VerbExecutionContext` that `session_identity_from_ctx` will accept
+/// without dispatching through a real REPL session. `#[cfg(feature =
+/// "test-fixtures")]`: this feature is declared in this crate's own
+/// `Cargo.toml` and requested ONLY under `[dev-dependencies]` in the
+/// workspace root `Cargo.toml` (mirroring `ob-poc-control-plane`'s
+/// `test-support` pattern) — a plain `cargo build`/`cargo run` never
+/// enables it, so this function does not exist in a production binary at
+/// all, not merely "is unused." `cargo test` unifies `[dependencies]` and
+/// `[dev-dependencies]` features for test targets, which is what makes it
+/// reachable from `rust/tests/*.rs` external test binaries.
+#[cfg(feature = "test-fixtures")]
+pub fn test_verb_execution_context_with_session(session_id: Uuid) -> VerbExecutionContext {
+    let mut ctx = VerbExecutionContext::default();
+    ctx.extensions = serde_json::json!({ "session_id": session_id.to_string() });
+    ctx
 }

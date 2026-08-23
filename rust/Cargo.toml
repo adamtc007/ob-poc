@@ -184,6 +184,12 @@ smallvec = { version = "1.11", features = ["serde"] }
 # envelope-persistence tests, which need a real sealed ExecutionEnvelope.
 # Off in a plain `cargo build`; only unified in during `cargo test`.
 ob-poc-control-plane = { path = "crates/ob-poc-control-plane", features = ["test-support"] }
+# test-fixtures: exposes ob-poc-kyc-decide::test_verb_execution_context_with_session
+# (D2.1 §6 `test_mode_side_door_is_named`) for external `rust/tests/*.rs`
+# binaries that dispatch a `SemOsVerbOp` directly. Same pattern as
+# ob-poc-control-plane's test-support, above: off in a plain `cargo build`;
+# only unified in during `cargo test`.
+ob-poc-kyc-decide = { path = "crates/ob-poc-kyc-decide", features = ["test-fixtures"] }
 # bpmn-lite was extracted to github.com/adamtc007/bpmn-lite. Workspace
 # deps below resolve from the git tag; ~/.cargo/config.toml [patch]
 # redirects to the local ~/dev/bpmn-lite/ checkout during development.

@@ -32,6 +32,15 @@ chrono = { version = "0.4", features = ["serde"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
+# test-fixtures: exposes `test_verb_execution_context_with_session` (D2.1 §6
+# `test_mode_side_door_is_named`) for external test binaries that dispatch a
+# `SemOsVerbOp` directly, not through a real REPL session. Off in a plain
+# `cargo build`/`cargo run`; only unified in during `cargo test` — mirrors
+# `ob-poc-control-plane`'s `test-support` pattern (see the root workspace
+# Cargo.toml's `[dev-dependencies]` entry for this crate).
+[features]
+test-fixtures = []
+
 [lints.rust]
 unreachable_pub = "deny"
 dead_code = "deny"
