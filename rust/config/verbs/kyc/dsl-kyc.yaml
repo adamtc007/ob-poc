@@ -161,7 +161,11 @@ domains:
 
       evidence:
         flavour: attribute_mutating
-        description: Cite evidence for an asserted edge (moves edge from Asserted → Evidenced)
+        description: >-
+          Cite evidence for an asserted edge (moves edge from Asserted →
+          Evidenced), OR cite evidence for an entity's asserted type (moves
+          the type's proof from Alleged → Proved). Supply exactly one of
+          edge-id / entity-id — never both, never neither.
         effect_class: append_fact
         invocation_phrases:
           - "attach evidence"
@@ -174,6 +178,9 @@ domains:
           - "attach supporting evidence"
           - "cite evidence for this relationship"
           - "record evidence for control"
+          - "prove this entity's type"
+          - "attach evidence for this entity's type"
+          - "cite evidence for entity type"
         behavior: plugin
         metadata:
           tier: intent
@@ -190,8 +197,12 @@ domains:
             description: Determination root
           - name: edge-id
             type: uuid
-            required: true
-            description: The edge to evidence
+            required: false
+            description: The edge to evidence. Mutually exclusive with entity-id.
+          - name: entity-id
+            type: uuid
+            required: false
+            description: The entity whose asserted type to evidence (proves it). Mutually exclusive with edge-id.
         returns:
           type: record
           fields:

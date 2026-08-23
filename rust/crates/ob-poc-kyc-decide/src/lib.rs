@@ -201,7 +201,38 @@ async fn compute_and_persist_run(
     Ok(run)
 }
 
+/// D2.1 reconciliation Item 4 (ruled by Adam, 2026-08-24: "persist the run
+/// in its own committed unit, independent of the decision"): the run is
+/// committed on a FRESH connection off `scope.pool()`, deliberately NOT
+/// joined to the ambient `scope.executor()` transaction the calling op is
+/// running under.
+///
+/// Why: `DecideApprove::execute` computes and persists a run, then may
+/// refuse on the K-23 gate (`run.work_list()` non-empty) before ever
+/// inserting a decision record. Before this change, the run insert used
+/// `scope.executor()` — the same ambient transaction — so a K-23 refusal's
+/// rollback discarded the very run that justified it. The evidence an
+/// auditor most needs (why was this subject refused?) was exactly the
+/// evidence a refusal made unrecoverable.
+///
+/// Tradeoff, stated plainly (per the task's instruction to document the
+/// consequence, not hide it): run persistence and decision persistence are
+/// no longer atomic with each other. A crash or connection loss between
+/// this commit and `insert_decision_record` below leaves a committed
+/// `EvaluationRun` with no citing decision record — an orphan run, visible
+/// forever as a run whose subject was never actually decided. This is
+/// asymmetric by design: the reverse (a decision record citing a run that
+/// doesn't exist) remains impossible, because `assert_basis_cites_run`
+/// requires `run.run_id`, and by the time any caller can reference it the
+/// run is already durably committed. Orphan runs are inert (nothing reads
+/// `kyc_evaluation_runs` as evidence of a decision — `kyc_decision_records`
+/// is), so this asymmetry is a data-hygiene cost, not a correctness one.
 async fn persist_run(scope: &mut dyn TransactionScope, run: &EvaluationRun) -> Result<()> {
+    let mut tx = scope
+        .pool()
+        .begin()
+        .await
+        .map_err(|e| anyhow!("decide: persist run: begin failed: {e}"))?;
     sqlx::query(
         r#"INSERT INTO "ob-poc".kyc_evaluation_runs
            (run_id, subject_root, board_state_hash, evaluation_pack_version_hash,
@@ -218,9 +249,12 @@ async fn persist_run(scope: &mut dyn TransactionScope, run: &EvaluationRun) -> R
     .bind(run.trigger.session_id)
     .bind(serde_json::to_value(&run.in_scope_check_ids).unwrap_or_default())
     .bind(serde_json::to_value(&run.findings).unwrap_or_default())
-    .execute(scope.executor())
+    .execute(&mut *tx)
     .await
     .map_err(|e| anyhow!("decide: persist run failed: {e}"))?;
+    tx.commit()
+        .await
+        .map_err(|e| anyhow!("decide: persist run: commit failed: {e}"))?;
     Ok(())
 }
 
@@ -525,7 +559,8 @@ pub fn register(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
 /// reachable from `rust/tests/*.rs` external test binaries.
 #[cfg(feature = "test-fixtures")]
 pub fn test_verb_execution_context_with_session(session_id: Uuid) -> VerbExecutionContext {
-    let mut ctx = VerbExecutionContext::default();
-    ctx.extensions = serde_json::json!({ "session_id": session_id.to_string() });
-    ctx
+    VerbExecutionContext {
+        extensions: serde_json::json!({ "session_id": session_id.to_string() }),
+        ..Default::default()
+    }
 }

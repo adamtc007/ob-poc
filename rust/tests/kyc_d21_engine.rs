@@ -1,19 +1,41 @@
 //! EOP-DD-KYCUBO-D2.1 Tranche C — the evaluation engine, D2.1 §6 gates.
 //!
-//! `evaluation_pack_dependency_graph_excludes_the_append_chokepoint`
-//! (renamed from `evaluation_pack_cannot_write_facts`, D2.1 §7 Q1) already
-//! lives in `tests/kyc_pack_closure.rs` — not duplicated here. The other
-//! eight §6 gates for the engine are below, all driven through the real
-//! `SemOsVerbOp::execute` path.
+//! **2026-08-24 corrective tranche (Item 6, this file's own instance of the
+//! bug it now guards against):** the original header here said "the eight
+//! D2.1 §6 gates" and treated that as the complete, correct count — an
+//! undercount, silently absorbing the one D2.1 §6 gate never written
+//! (`in_scope_set_reflects_the_board`, now a proper four-field deferral
+//! below) without ever naming it. D2.1 §6 names NINE gates:
+//! `a_check_produces_a_verdict`, `findings_reach_the_run_record`,
+//! `in_scope_set_reflects_the_board`, `unevaluable_carries_its_reason`,
+//! `k23_gate_can_fire`, `waived_check_was_in_scope` (six, "for the engine"),
+//! plus `evaluation_pack_dependency_graph_excludes_the_append_chokepoint`,
+//! `run_trigger_is_a_session_identity`, `test_mode_side_door_is_named`
+//! (three, "for the boundary and the gates"). Of those nine:
+//! `evaluation_pack_dependency_graph_excludes_the_append_chokepoint` lives
+//! in `tests/kyc_pack_closure.rs` (not duplicated here); **eight** of the
+//! remaining are below as real `#[tokio::test]`/`#[test]` functions; **one**
+//! (`in_scope_set_reflects_the_board`) is a named, four-field deferral (see
+//! below) rather than a test, because it genuinely cannot be exercised
+//! through production without catalogue content that is out of scope.
+//!
+//! `unevaluable_is_not_fail_through_production` and
+//! `work_list_is_derived_from_latest_run_through_production` are NOT among
+//! D2.1's own nine §6 gates — they close two of D2.0's original nine §6
+//! gates that `kyc_d21_gate_rehoming.rs` previously, falsely, claimed were
+//! closed by this file's OTHER tests. See that file's header for what was
+//! wrong and why.
 
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::KycSubjectRegister;
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectAssertType, KycSubjectRegister};
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideApprove, DecideObligationWaive};
-use ob_poc_kyc_substrate::SubjectId;
+use ob_poc_kyc_substrate::{
+    work_list_from_history, EvaluationRun, Finding, Hash, RunTrigger, SubjectId, Verdict,
+};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -177,6 +199,174 @@ async fn unevaluable_carries_its_reason() {
     cleanup(&pool, &[subject]).await;
 }
 
+/// Reconstruct a subject's full `EvaluationRun` history from
+/// `kyc_evaluation_runs`, oldest-to-newest — the shape
+/// `work_list_from_history` requires. Built from OUTSIDE the crate under
+/// test, using only its public types (`Hash::from_hex`, public
+/// `EvaluationRun`/`RunTrigger` fields, `Finding`'s `Deserialize`), the same
+/// "independent recomputation" discipline `kyc_d21_gate_rehoming.rs` uses —
+/// this is the loader D2.0/D2.1 never needed because nothing before this
+/// tranche read a run BACK out of the database as a typed history.
+async fn load_run_history(pool: &PgPool, subject: SubjectId) -> Vec<EvaluationRun> {
+    let rows = sqlx::query(
+        r#"SELECT run_id, subject_root, board_state_hash, evaluation_pack_version_hash,
+                  valid_time, knowledge_time, trigger, triggering_session,
+                  in_scope_check_ids, findings
+           FROM "ob-poc".kyc_evaluation_runs WHERE subject_root = $1 ORDER BY created_at ASC"#,
+    )
+    .bind(subject.0)
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    rows.into_iter()
+        .map(|row| EvaluationRun {
+            run_id: row.get("run_id"),
+            subject_root: SubjectId(row.get("subject_root")),
+            board_state_hash: Hash::from_hex(&row.get::<String, _>("board_state_hash")).unwrap(),
+            evaluation_pack_version_hash: Hash::from_hex(&row.get::<String, _>("evaluation_pack_version_hash")).unwrap(),
+            valid_time: row.get("valid_time"),
+            knowledge_time: row.get("knowledge_time"),
+            trigger: RunTrigger { verb_fqn: row.get("trigger"), session_id: row.get("triggering_session") },
+            in_scope_check_ids: serde_json::from_value(row.get("in_scope_check_ids")).unwrap(),
+            findings: serde_json::from_value::<Vec<Finding>>(row.get("findings")).unwrap(),
+        })
+        .collect()
+}
+
+/// D2.1 §6 `unevaluable_is_not_fail`, rehomed through production.
+///
+/// The stated property (D2.0 §6, carried into D2.1): "a check whose facts
+/// are absent returns unevaluable with a reason, never fail. Property:
+/// adding the missing fact and re-running flips it to pass or fail, never
+/// the reverse." `kyc_d21_gate_rehoming.rs`'s header previously claimed this
+/// was closed by `a_check_produces_a_verdict`/`unevaluable_carries_its_reason`
+/// — false: neither re-runs the SAME subject after a board change to
+/// observe a flip. This test does.
+///
+/// This test exercises the Unevaluable -> Fail flip, via
+/// `kyc_ubo.assert.subject.member-withdrawal` (a real, board-only fact that
+/// makes a stuck proof permanently stuck). The Unevaluable -> Pass flip —
+/// deferred at the 2026-08-23 reconciliation pending Item 3's Alleged ->
+/// Proved wiring decision — is closed separately, in
+/// `unevaluable_flips_to_pass_through_production` below, now that Item 3a
+/// landed a dispatchable Proved path (2026-08-24 corrective tranche).
+#[tokio::test]
+async fn unevaluable_is_not_fail_through_production() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+
+    // Run 1: no type asserted at all -> Unevaluable(FactAbsent). Never Fail.
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1: fact absent" }), &pool).await;
+    let findings1 = findings_for(&pool, subject).await;
+    assert!(findings1[0]["verdict"].get("Unevaluable").is_some(), "no type asserted must be Unevaluable, never Fail: {findings1}");
+    assert!(findings1[0]["verdict"]["Unevaluable"]["reason"].get("FactAbsent").is_some());
+
+    // Add a fact that does NOT resolve it (still Alleged) -> re-run -> STILL
+    // Unevaluable, now for a DIFFERENT reason (AllegedType, not FactAbsent).
+    // Confirms "never the reverse" isn't trivially satisfied by staying put
+    // for the SAME reason.
+    run(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0, "entity-type": "natural_person" }), &pool).await;
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 2: still alleged" }), &pool).await;
+    let findings2 = findings_for(&pool, subject).await;
+    assert!(findings2[0]["verdict"].get("Unevaluable").is_some(), "an alleged type must stay Unevaluable: {findings2}");
+    assert!(findings2[0]["verdict"]["Unevaluable"]["reason"].get("Provisional").is_some(), "must now be the AllegedType reason, not FactAbsent: {findings2}");
+
+    // Add the fact that DOES resolve it (withdrawal — a real, board-only,
+    // irreversible fact) -> re-run -> FLIPS to Fail. This is the flip the
+    // property requires; it goes exactly one way.
+    withdraw_member(&pool, subject).await;
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 3: withdrawn, flips" }), &pool).await;
+    let findings3 = findings_for(&pool, subject).await;
+    assert!(findings3[0]["verdict"].get("Fail").is_some(), "withdrawal must flip Unevaluable -> Fail: {findings3}");
+
+    cleanup(&pool, &[subject]).await;
+}
+
+/// Closes the deferral `unevaluable_is_not_fail_through_production` left
+/// open: the Unevaluable -> Pass flip, now that Item 3a
+/// (2026-08-24 corrective tranche) wired a dispatchable Proved path —
+/// `kyc_ubo.assert.edge.evidence` called with `entity-id` (no `edge-id`)
+/// evidences an entity's asserted type instead of an edge, moving its proof
+/// Alleged -> Proved (`fold::type_registry`'s sole Proved-producing arm).
+/// Re-runs the SAME subject through Unevaluable(FactAbsent) ->
+/// Unevaluable(AllegedType) -> Pass, closing the property's other direction
+/// (`unevaluable_is_not_fail_through_production` closed the -> Fail side).
+#[tokio::test]
+async fn unevaluable_flips_to_pass_through_production() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1: fact absent" }), &pool).await;
+    let findings1 = findings_for(&pool, subject).await;
+    assert!(findings1[0]["verdict"].get("Unevaluable").is_some(), "no type asserted must be Unevaluable: {findings1}");
+
+    run(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0, "entity-type": "natural_person" }), &pool).await;
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 2: alleged" }), &pool).await;
+    let findings2 = findings_for(&pool, subject).await;
+    assert!(findings2[0]["verdict"].get("Unevaluable").is_some(), "an alleged type must stay Unevaluable: {findings2}");
+
+    // The fact that resolves it: real evidence attached to the ENTITY (not
+    // an edge) — the dispatchable-Proved path Item 3a wired.
+    use ob_poc::domain_ops::kyc_stream_ops::UboEdgeAttachEvidence;
+    run(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), &pool).await;
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 3: proved, flips to pass" }), &pool).await;
+    let findings3 = findings_for(&pool, subject).await;
+    assert_eq!(findings3[0]["verdict"], serde_json::json!("Pass"), "a proven type must flip Unevaluable -> Pass: {findings3}");
+
+    cleanup(&pool, &[subject]).await;
+}
+
+/// D2.1 §6 `work_list_is_derived_from_latest_run`, rehomed through
+/// production.
+///
+/// The property (D2.0 §6): "structural: no stored work-list state exists;
+/// the list is a query over the newest run." `kyc_d21_gate_rehoming.rs`'s
+/// header previously claimed this closed too — false: `work_list_from_history`
+/// was, before this test, called ONLY from the pure substrate fixture test
+/// (`crates/ob-poc-kyc-substrate/tests/d20_evaluation.rs`), never against a
+/// real persisted history. This builds TWO real runs on the same subject
+/// whose VERDICTS DIFFER (Unevaluable, then Fail), reconstructs the history
+/// from the database via `load_run_history`, and proves
+/// `work_list_from_history` returns ONLY the latest run's finding — a bug
+/// that concatenated both runs, or returned the first, would pass every
+/// existing gate and fail only this one.
+#[tokio::test]
+async fn work_list_is_derived_from_latest_run_through_production() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+
+    // Run 1 (older): Unevaluable(FactAbsent).
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1" }), &pool).await;
+
+    // Mutate the board so run 2's verdict genuinely differs: withdraw
+    // (unproven) -> Fail.
+    withdraw_member(&pool, subject).await;
+    run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 2" }), &pool).await;
+
+    let history = load_run_history(&pool, subject).await;
+    assert_eq!(history.len(), 2, "must have exactly two persisted runs");
+    assert!(
+        matches!(history[0].findings[0].verdict, Verdict::Unevaluable { .. }),
+        "sanity: run 1 (oldest) must be Unevaluable"
+    );
+    assert!(
+        matches!(history[1].findings[0].verdict, Verdict::Fail { .. }),
+        "sanity: run 2 (latest) must be Fail — verdicts genuinely differ between runs"
+    );
+
+    let work_list = work_list_from_history(&history);
+    assert_eq!(work_list.len(), 1, "work list must be exactly the latest run's findings, not both runs' combined: {work_list:?}");
+    assert!(
+        matches!(work_list[0].verdict, Verdict::Fail { .. }),
+        "work list must reflect the LATEST run's verdict (Fail), not the older run's (Unevaluable): {work_list:?}"
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
 /// D2.1 §6 `k23_gate_can_fire` — THE falsifiability test for the whole
 /// tranche. A subject with a failing/unevaluable finding is REFUSED
 /// approval. Prior to this tranche, the gate read an always-empty work
@@ -294,3 +484,45 @@ fn test_mode_side_door_is_named() {
         "the side door must be named AND cfg-gated, not a bare pub fn"
     );
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// D2.1 §6 `in_scope_set_reflects_the_board` — NAMED DEFERRAL, not silently
+// absent (2026-08-24 corrective tranche Item 2).
+//
+// WHAT: a gate driven through production proving the persisted
+//       `in_scope_check_ids` responds to board content — e.g. adding a
+//       trust to the board changes the set on the next run — as opposed to
+//       merely agreeing with an independent recomputation of a STATIC
+//       board (which is what `in_scope_set_is_computed_not_stored_through_production`
+//       in `kyc_d21_gate_rehoming.rs` actually tests, and which catches a
+//       fabricated/wrong set but cannot demonstrate RESPONSIVENESS to board
+//       changes).
+// WHY:  `EvaluationCatalogue::default_catalogue()` — the only catalogue any
+//       production op ever consults — holds exactly one check
+//       (`ProvenTypeCheck`), and its applicability is `Unconditional`
+//       (always in scope, regardless of board content). There is no
+//       conditional check in the real catalogue whose applicability could
+//       ever change when a trust (or anything else) is added to the board,
+//       so there is nothing for this property to observe end-to-end
+//       through production. Authoring a conditional check to make the gate
+//       observable is check-CATALOGUE-CONTENT — explicitly out of scope
+//       (D2.0 §7 Q2, reaffirmed D2.1 §2's scope line: "what a particular
+//       check concludes... is content and is out"). The MECHANISM this
+//       property depends on (`ApplicabilityCondition::holds`,
+//       `applicability_holds`'s OR-composition) is independently proven
+//       correct and responsive to board mutation —
+//       `entity_type_present_condition_reads_the_type_registry`
+//       (`crates/ob-poc-kyc-substrate/tests/d20_evaluation.rs`) shows
+//       `EntityTypePresent(Trust)` flips true/false exactly with the
+//       board's folded type registry — but that is a pure, direct call, not
+//       a run through a real op against a real catalogue, and asserting
+//       otherwise would be exactly the "redefine the deliverable to match
+//       what was built" failure this corrective tranche exists to close.
+// WHO:  whoever authors the first real, non-`Unconditional` check in the
+//       catalogue (same owner as D2.1 §4's existing "Check catalogue
+//       contents" deferral — Adam + compliance).
+// WHEN: falls out naturally the moment a second check with conditional
+//       applicability lands in `EvaluationCatalogue::default_catalogue()` —
+//       no separate ticket; write this gate in the same tranche that adds
+//       that check.
+// ══════════════════════════════════════════════════════════════════════════

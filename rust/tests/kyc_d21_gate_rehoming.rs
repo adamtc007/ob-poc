@@ -16,12 +16,28 @@
 //! INDEPENDENTLY recomputed expectation — so a gate here cannot be
 //! satisfied by production simply agreeing with itself.
 //!
-//! `unevaluable_is_not_fail` and `work_list_is_derived_from_latest_run`
-//! were deferred out of Tranche B pending a real catalogue; D2.1 Tranche C
-//! (2026-08-23) landed the engine and closed them — see
-//! `tests/kyc_d21_engine.rs` for their production-driven successors
-//! (`a_check_produces_a_verdict`, `findings_reach_the_run_record`,
-//! `unevaluable_carries_its_reason`).
+//! **Correction (2026-08-23 reconciliation, 2026-08-23 corrective tranche
+//! Item 1):** this file previously claimed `unevaluable_is_not_fail` and
+//! `work_list_is_derived_from_latest_run` were "closed" by Tranche C's
+//! `a_check_produces_a_verdict`/`findings_reach_the_run_record`/
+//! `unevaluable_carries_its_reason`. That was false — none of those tests
+//! re-run the SAME subject after a board change to observe a flip, and
+//! `work_list_from_history` was, at the time of that claim, called only from
+//! the pure substrate fixture (`crates/ob-poc-kyc-substrate/tests/d20_evaluation.rs`),
+//! never against a real persisted history. This is the exact
+//! redefine-and-report-landed failure D2.1 §3 exists to prevent, and it
+//! happened inside this file. Genuinely closed now, in
+//! `tests/kyc_d21_engine.rs`:
+//! `unevaluable_is_not_fail_through_production` (re-runs one subject through
+//! three real board states, observing the Unevaluable(FactAbsent) ->
+//! Unevaluable(AllegedType) -> Fail flip; the Pass-flip half remains a
+//! stated, four-field deferral pending Item 3's Alleged->Proved wiring
+//! decision — recorded in that test's own doc comment, not silently
+//! dropped) and `work_list_is_derived_from_latest_run_through_production`
+//! (two real runs with genuinely differing verdicts, reconstructed from the
+//! database via `load_run_history`, `work_list_from_history` proven to
+//! return only the latest). Both independently RED-proofed by perturbing
+//! production and restoring.
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Row, Transaction};
@@ -115,7 +131,7 @@ async fn independently_recompute_board_hash_and_scope(
     subject: SubjectId,
 ) -> (String, Vec<String>) {
     let mut conn = pool.acquire().await.unwrap();
-    let events = PgKycEventReader::load_events(&mut *conn, subject).await.unwrap();
+    let events = PgKycEventReader::load_events(&mut conn, subject).await.unwrap();
     let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
     let control = fold_control(&refs);
     let type_registry = fold_type_registry(&refs);
@@ -369,32 +385,9 @@ async fn runs_are_append_only_through_production() {
     cleanup(&pool, &[subject]).await;
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// DEFERRED — D2.1 §3 four-field deferral (NOT rehomed onto production in
-// this tranche; the pure substrate versions in
-// `crates/ob-poc-kyc-substrate/tests/d20_evaluation.rs` remain the only
-// coverage for these two properties until Tranche C lands):
-//
-//   unevaluable_is_not_fail
-//     WHAT: proving through a real op call that a check whose fact is
-//           absent persists Verdict::Unevaluable (never Fail), and that
-//           supplying the fact and re-running flips it — never the reverse.
-//     WHY:  no production path can produce ANY verdict today — `Check` has
-//           no `evaluate()`, the catalogue passed to every decide op is a
-//           literal `&[]`, and `findings` is hardcoded `json!([])` at the
-//           persist site. There is nothing for this gate to observe.
-//     WHO:  this same task, Tranche C (`Check::evaluate`, the real
-//           catalogue, and real findings persistence).
-//     WHEN: D2.1 Tranche C, same task.
-//
-//   work_list_is_derived_from_latest_run
-//     WHAT: proving through real persisted run history that the current
-//           work list is the LATEST run's failing/unevaluable findings,
-//           ignoring a stale prior run's findings.
-//     WHY:  same root cause as above — findings are always `[]` in every
-//           production run today, so two real runs are indistinguishable
-//           by work list regardless of ordering; the property has nothing
-//           to exercise.
-//     WHO:  this same task, Tranche C.
-//     WHEN: D2.1 Tranche C, same task.
-// ══════════════════════════════════════════════════════════════════════════
+// `unevaluable_is_not_fail` and `work_list_is_derived_from_latest_run`:
+// genuinely rehomed onto production in `tests/kyc_d21_engine.rs`
+// (`unevaluable_is_not_fail_through_production`,
+// `work_list_is_derived_from_latest_run_through_production`), 2026-08-23
+// corrective tranche Item 1 — see this file's header for what changed and
+// why the prior claim here was wrong.

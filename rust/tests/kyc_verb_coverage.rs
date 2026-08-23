@@ -562,16 +562,18 @@ async fn coverage_kyc_person_reject() {
 /// `kyc_evaluation_runs`, and the cited run's `board_state_hash` matches
 /// what `run_id` row actually recorded — not just present, but genuinely
 /// the run that ran. Exercises both landed verdicts: `kyc_ubo.decide.subject.approve`
-/// (against a genuinely EMPTY board — no production Assembly verb can
-/// reach `TypeProofStatus::Proved` today, since `UboEdgeAttachEvidence`
-/// always edge-scopes its target and `fold_type_registry` only reads
-/// `kyc_ubo.assert.edge.evidence` as a type-proof event when UNSCoped;
-/// `ProvenTypeCheck` passes vacuously on an empty board, D2.1 §2, so K-23
-/// does not refuse this run) and `kyc_ubo.decide.subject.reject` (citation
-/// recorded even though rejection is allowed at any stage, board has one
-/// registered-but-untyped entity so `ProvenTypeCheck` returns
-/// `Unevaluable` — irrelevant to reject, which never gates on the work
-/// list).
+/// (against a genuinely EMPTY board, vacuously satisfying `ProvenTypeCheck`,
+/// D2.1 §2, so K-23 does not refuse this run — deliberately the SIMPLEST
+/// passing case, not a claim that a real Proved board is unreachable:
+/// `UboEdgeAttachEvidence` called with `entity-id` instead of `edge-id`
+/// evidences an entity's type instead of an edge, reaching
+/// `TypeProofStatus::Proved` for real — wired 2026-08-24 corrective
+/// tranche Item 3a, exercised by `tests/kyc_d21_engine.rs`'s
+/// `unevaluable_flips_to_pass_through_production`, not duplicated here)
+/// and `kyc_ubo.decide.subject.reject` (citation recorded even though
+/// rejection is allowed at any stage, board has one registered-but-untyped
+/// entity so `ProvenTypeCheck` returns `Unevaluable` — irrelevant to
+/// reject, which never gates on the work list).
 #[tokio::test]
 async fn decide_cites_a_run() {
     let pool = pool().await;

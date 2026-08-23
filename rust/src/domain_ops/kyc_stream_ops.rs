@@ -276,6 +276,16 @@ impl SemOsVerbOp for UboEdgeAttachEvidence {
     fn fqn(&self) -> &str {
         "kyc_ubo.assert.edge.evidence"
     }
+    /// Dual-target (TS.1 §3 row 4, wired 2026-08-24 corrective tranche
+    /// Item 3a): `edge-id` evidences a control/economic edge (Asserted ->
+    /// Evidenced); `entity-id` evidences an entity's asserted type (Alleged
+    /// -> Proved — `fold::type_registry`'s sole Proved-producing arm,
+    /// unreachable from any op before this). Exactly one of the two must be
+    /// present — the board's own placement set (`type_registry_candidates`
+    /// vs. the edge-scoped main loop) never proposes both for the same
+    /// move, and neither shape's lexicon preconditions apply to the other
+    /// (`EdgeExists`/`EdgeActive` vs. `PriorTypeAsserted`/`MembershipActive`,
+    /// each vacuous when their own target field is absent).
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -283,11 +293,27 @@ impl SemOsVerbOp for UboEdgeAttachEvidence {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let edge = EdgeId(json_extract_uuid(args, ctx, "edge-id")?);
+        let edge_id = json_extract_uuid_opt(args, ctx, "edge-id").map(EdgeId);
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id").map(EntityId);
+        let target = match (edge_id, entity_id) {
+            (Some(edge), None) => TargetBinding::for_edge(subject, edge),
+            (None, Some(entity)) => {
+                TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) }
+            }
+            (Some(_), Some(_)) => {
+                return Err(anyhow!(
+                    "kyc_ubo.assert.edge.evidence: supply exactly one of edge-id (evidences an \
+                     edge) or entity-id (evidences a type), never both"
+                ));
+            }
+            (None, None) => {
+                return Err(anyhow!("Missing edge-id or entity-id argument"));
+            }
+        };
         let outcome = stream_append(
             "kyc_ubo.assert.edge.evidence",
             subject,
-            TargetBinding::for_edge(subject, edge),
+            target,
             args.clone(),
             "analyst.attach-evidence",
             Some("kyc_ubo.assert.edge.evidence"),

@@ -782,8 +782,19 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         ],
     );
     expected.insert(
+        // 2026-08-24 corrective tranche Item 3a: dual-target verb — edge
+        // pair vacuous when entity-scoped, entity pair vacuous when
+        // edge-scoped (each half's arm checks `event.target.*_id`, `None`
+        // is a no-op). Wires the `entity-id` half of TS.1 §3 row 4
+        // ("evidence a TYPE OR A LINKAGE — one verb, two possible
+        // targets") that was previously undispatchable.
         "kyc_ubo.assert.edge.evidence".to_string(),
-        vec![Precondition::EdgeExists, Precondition::EdgeActive],
+        vec![
+            Precondition::EdgeExists,
+            Precondition::EdgeActive,
+            Precondition::PriorTypeAsserted,
+            Precondition::MembershipActive,
+        ],
     );
     expected.insert(
         "kyc_ubo.assert.edge.supersession".to_string(),

@@ -384,11 +384,29 @@ pub fn assembly_lexicon() -> LexiconManifest {
         ),
         LexiconEntry::build(
             "kyc_ubo.assert.edge.evidence",
-            "Cite documentary proof for a control or economic edge",
+            "Cite documentary proof for a control/economic edge, OR for an \
+             entity's asserted type (TS.1 §3 row 4: \"this document/source \
+             evidences a TYPE OR A LINKAGE — one verb, two possible \
+             targets\"). Edge-scoped: moves the edge Asserted -> Evidenced. \
+             Entity-scoped (2026-08-24, Item 3a): moves the entity's type \
+             proof Alleged -> Proved (`fold::type_registry`'s sole Proved-\
+             producing arm).",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            // T6.2 row 3: target edge must exist and not be superseded.
-            vec![Precondition::EdgeExists, Precondition::EdgeActive],
+            // T6.2 row 3 (edge-scoped: target edge must exist and not be
+            // superseded) UNION TS.1 §3 row 4 (entity-scoped: a type must
+            // already be asserted and the member must not be withdrawn).
+            // Each pair is vacuous for the OTHER call shape (see
+            // `check_preconditions`'s `EdgeExists`/`EdgeActive`/
+            // `MembershipActive`/`PriorTypeAsserted` arms) — a single event
+            // is always exactly one shape, never both, so exactly one pair
+            // ever actually evaluates.
+            vec![
+                Precondition::EdgeExists,
+                Precondition::EdgeActive,
+                Precondition::PriorTypeAsserted,
+                Precondition::MembershipActive,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),

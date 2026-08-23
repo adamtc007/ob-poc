@@ -864,26 +864,36 @@ pub fn check_preconditions(
                 }
             }
             Precondition::EdgeExists => {
-                let eid = event.target.edge_id.ok_or_else(|| {
-                    KycError::MissingTarget("edge_id required for EdgeExists".into())
-                })?;
-                if !control.edges.contains_key(&eid) {
-                    return Err(KycError::EdgeNotFound(eid));
+                // 2026-08-24 corrective tranche (Item 3a): vacuous when the
+                // probe carries no `edge_id` — same "vacuous when probed
+                // without the field it checks" convention as
+                // `EntityRegistered`/`MembershipActive`/`PriorTypeAsserted`
+                // below. This is what makes `kyc_ubo.assert.edge.evidence`'s
+                // ENTITY-scoped half (evidencing a type, not an edge)
+                // reachable: that call shape never supplies `edge_id`, so
+                // this edge-only check correctly does not apply to it.
+                // `kyc_ubo.assert.edge.supersession` (the only other user of
+                // this precondition) always supplies `edge_id`, so this is a
+                // no-op change for it.
+                if let Some(eid) = event.target.edge_id {
+                    if !control.edges.contains_key(&eid) {
+                        return Err(KycError::EdgeNotFound(eid));
+                    }
                 }
             }
             Precondition::EdgeActive => {
-                let eid = event.target.edge_id.ok_or_else(|| {
-                    KycError::MissingTarget("edge_id required for EdgeActive".into())
-                })?;
-                match control.edges.get(&eid) {
-                    Some(e) if e.is_active() => {}
-                    Some(_) => {
-                        return Err(KycError::PreconditionFailed {
-                            verb: lexicon_entry.fqn.clone(),
-                            reason: format!("edge {eid:?} is superseded"),
-                        });
+                // Vacuous when probed without `edge_id` — see `EdgeExists` above.
+                if let Some(eid) = event.target.edge_id {
+                    match control.edges.get(&eid) {
+                        Some(e) if e.is_active() => {}
+                        Some(_) => {
+                            return Err(KycError::PreconditionFailed {
+                                verb: lexicon_entry.fqn.clone(),
+                                reason: format!("edge {eid:?} is superseded"),
+                            });
+                        }
+                        None => return Err(KycError::EdgeNotFound(eid)),
                     }
-                    None => return Err(KycError::EdgeNotFound(eid)),
                 }
             }
             Precondition::ObligationExists => {
