@@ -112,7 +112,13 @@ fn proven_type_check_passes_on_empty_board() {
     let control = ControlState::default();
     let types = TypeRegistryState::default();
     let board = empty_board(&control, &types);
-    assert!(matches!(ProvenTypeCheck.evaluate(&board), Verdict::Pass), "vacuously true — nothing to fail on");
+    let outcome = ProvenTypeCheck.evaluate(&board);
+    assert!(matches!(outcome.verdict, Verdict::Pass), "vacuously true — nothing to fail on");
+    assert!(
+        outcome.cites.is_empty(),
+        "a vacuous Pass (zero registered entities) must cite nothing — the mechanism-level half of \
+         `a_vacuous_pass_is_distinguishable`, at the pure `evaluate()` layer"
+    );
 }
 
 #[test]
@@ -147,8 +153,16 @@ fn proven_type_check_passes_when_every_entity_is_proved() {
     let mut control = ControlState::default();
     control.registered_entity_ids.insert(entity);
     let board = empty_board(&control, &types);
+    let outcome = ProvenTypeCheck.evaluate(&board);
+    let evidence_event_id = types.proof_event_id_of(entity).expect("entity must have a proof event once Proved");
+    assert_eq!(
+        outcome.cites,
+        vec![evidence_event_id],
+        "a real Pass must cite the exact event that proved the entity's type — the mechanism-level \
+         half of `a_real_pass_cites_its_evidence`, at the pure `evaluate()` layer"
+    );
     assert!(
-        matches!(ProvenTypeCheck.evaluate(&board), Verdict::Pass),
+        matches!(outcome.verdict, Verdict::Pass),
         "a type-scoped evidence event must fold the entity's proof to Proved"
     );
 }
@@ -176,7 +190,7 @@ fn proven_type_check_is_unevaluable_when_a_type_is_alleged() {
     let mut control = ControlState::default();
     control.registered_entity_ids.insert(entity);
     let board = empty_board(&control, &types);
-    match ProvenTypeCheck.evaluate(&board) {
+    match ProvenTypeCheck.evaluate(&board).verdict {
         Verdict::Unevaluable { reason: ob_poc_kyc_substrate::UnevaluableReason::Provisional(_) } => {}
         other => panic!("expected Unevaluable(Provisional(AllegedType)), got {other:?}"),
     }
@@ -189,7 +203,7 @@ fn proven_type_check_is_unevaluable_when_no_type_is_asserted_at_all() {
     control.registered_entity_ids.insert(entity);
     let types = TypeRegistryState::default();
     let board = empty_board(&control, &types);
-    match ProvenTypeCheck.evaluate(&board) {
+    match ProvenTypeCheck.evaluate(&board).verdict {
         Verdict::Unevaluable { reason: ob_poc_kyc_substrate::UnevaluableReason::FactAbsent { .. } } => {}
         other => panic!("expected Unevaluable(FactAbsent), got {other:?}"),
     }
@@ -203,7 +217,7 @@ fn proven_type_check_fails_on_a_withdrawn_unproven_entity() {
     let mut types = TypeRegistryState::default();
     types.withdrawn_members.insert(entity);
     let board = empty_board(&control, &types);
-    match ProvenTypeCheck.evaluate(&board) {
+    match ProvenTypeCheck.evaluate(&board).verdict {
         Verdict::Fail { detail } => assert!(detail.contains(&entity.0.to_string()), "detail must name the offending entity"),
         other => panic!("expected Fail, got {other:?}"),
     }

@@ -109,7 +109,16 @@ pub enum TypeProofStatus {
 pub struct EntityTypeRecord {
     pub entity_type: EntityType,
     pub proof: TypeProofStatus,
+    /// The event that last ASSERTED this type (`assert-type` or
+    /// `type-correction`) — stays pinned to that event even after a later
+    /// `attach-evidence` flips `proof` to `Proved`; it does not become "the
+    /// event that proved it."
     pub originating_event_id: EventId,
+    /// The event that flipped `proof` to `Proved` (`attach-evidence`,
+    /// type-scoped target) — `None` while `proof` is still `Alleged`. This,
+    /// not `originating_event_id`, is the fact a `Proved` conclusion rests
+    /// on (D2.0 §4: "findings citing the facts relied on").
+    pub proof_event_id: Option<EventId>,
 }
 
 /// One `correct-type` cascade record (TS.1 §4). Accumulates — corrections
@@ -178,6 +187,24 @@ impl TypeRegistryState {
     /// (`determination::compute_assurance`).
     pub fn proof_of(&self, entity: EntityId) -> Option<TypeProofStatus> {
         self.types.get(&entity).map(|r| r.proof)
+    }
+
+    /// The real `EventId` of the event that produced `entity`'s current
+    /// type-proof record (whichever of `assert-type`/`attach-evidence` set
+    /// it last) — `None` if no type has been asserted at all. This is the
+    /// fact a check citing a type-proof conclusion must cite (D2.0 §4:
+    /// "findings citing the facts relied on").
+    pub fn originating_event_id_of(&self, entity: EntityId) -> Option<EventId> {
+        self.types.get(&entity).map(|r| r.originating_event_id)
+    }
+
+    /// The real `EventId` of the event that PROVED `entity`'s type —
+    /// `None` when the entity has no type record, or its type is still
+    /// `Alleged`. Distinct from `originating_event_id_of`, which names the
+    /// assertion, not the proof. This is the fact a `Proved` conclusion
+    /// rests on (D2.0 §4).
+    pub fn proof_event_id_of(&self, entity: EntityId) -> Option<EventId> {
+        self.types.get(&entity).and_then(|r| r.proof_event_id)
     }
 }
 
@@ -264,6 +291,7 @@ pub(crate) fn apply_one_type_registry_event(
                         entity_type,
                         proof: TypeProofStatus::Alleged,
                         originating_event_id: event.id,
+                        proof_event_id: None,
                     },
                 );
             }
@@ -278,6 +306,7 @@ pub(crate) fn apply_one_type_registry_event(
             if let Some(eid) = event.target.entity_id {
                 if let Some(record) = state.types.get_mut(&eid) {
                     record.proof = TypeProofStatus::Proved;
+                    record.proof_event_id = Some(event.id);
                 }
             }
         }
@@ -303,6 +332,7 @@ pub(crate) fn apply_one_type_registry_event(
                         entity_type: corrected_type,
                         proof: TypeProofStatus::Alleged,
                         originating_event_id: event.id,
+                        proof_event_id: None,
                     },
                 );
                 for e in &invalidated_edges {

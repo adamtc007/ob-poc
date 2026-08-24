@@ -77,7 +77,8 @@ fn edge_with_status(mut e: EdgeState, status: EdgeStatus) -> EdgeState {
 }
 
 fn type_record(entity_type: EntityType, proof: TypeProofStatus, orig_tag: u128) -> EntityTypeRecord {
-    EntityTypeRecord { entity_type, proof, originating_event_id: evid(orig_tag) }
+    let proof_event_id = matches!(proof, TypeProofStatus::Proved).then(|| evid(orig_tag));
+    EntityTypeRecord { entity_type, proof, originating_event_id: evid(orig_tag), proof_event_id }
 }
 
 // ── Phase 0 baseline receipt lives in the module doc comment above ──────────

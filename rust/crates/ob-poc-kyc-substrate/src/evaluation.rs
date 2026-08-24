@@ -117,12 +117,30 @@ pub fn applicability_holds(conditions: &[ApplicabilityCondition], board: &BoardS
 pub trait Check {
     fn check_id(&self) -> &str;
     fn applicability(&self) -> &[ApplicabilityCondition];
-    /// Run this check against the board and produce a verdict. D2.1 §2/C1:
-    /// "a check that cannot be run is not a check." `Verdict` carries its own
-    /// reason/detail data (see below) so this single call fully determines
-    /// the outcome — no second pass, no risk of a reason disagreeing with
-    /// the verdict it explains.
-    fn evaluate(&self, board: &BoardSnapshot<'_>) -> Verdict;
+    /// Run this check against the board and produce an outcome. D2.1 §2/C1:
+    /// "a check that cannot be run is not a check" — this single call still
+    /// fully determines the outcome, no second pass. Widened 2026-08-24
+    /// (D2.0 §4: "a verdict plus findings citing the facts relied on") to
+    /// return citations alongside the verdict in the SAME call, rather than
+    /// adding a second `cites()` method — a second call against the same
+    /// board would reopen exactly the "risk of [two things] disagreeing"
+    /// C1 was ratified to close off, one layer over (verdict vs cites
+    /// instead of verdict vs reason). Ruled by Adam over widening `Verdict`
+    /// itself (touches ~39 existing `Verdict::Pass`/`Fail`/`Unevaluable`
+    /// sites and blurs D2.0 §4's own separation of "a verdict" from
+    /// "findings citing") and over a second trait method.
+    fn evaluate(&self, board: &BoardSnapshot<'_>) -> CheckOutcome;
+}
+
+/// A check's one-call result: the verdict, plus the real `EventId`s it
+/// relied on to reach it. Citing nothing is coherent exactly when the
+/// verdict's own data already explains the absence (`Unevaluable` — see
+/// `ProvenTypeCheck::evaluate`); a `Pass` or `Fail` over a non-empty board
+/// always rests on a real, citable fact.
+#[derive(Debug, Clone)]
+pub struct CheckOutcome {
+    pub verdict: Verdict,
+    pub cites: Vec<EventId>,
 }
 
 /// D2.1 §2 C3: "a real catalogue type the run consults, replacing the
@@ -177,7 +195,10 @@ pub fn evaluate_checks(
         .checks()
         .iter()
         .filter(|c| applicability_holds(c.applicability(), board))
-        .map(|c| Finding { check_id: c.check_id().to_string(), subject, verdict: c.evaluate(board), cites: vec![] })
+        .map(|c| {
+            let outcome = c.evaluate(board);
+            Finding { check_id: c.check_id().to_string(), subject, verdict: outcome.verdict, cites: outcome.cites }
+        })
         .collect()
 }
 
@@ -219,41 +240,84 @@ impl Check for ProvenTypeCheck {
         &[ApplicabilityCondition::Unconditional]
     }
 
-    fn evaluate(&self, board: &BoardSnapshot<'_>) -> Verdict {
+    fn evaluate(&self, board: &BoardSnapshot<'_>) -> CheckOutcome {
         for &entity in &board.control.registered_entity_ids {
             let withdrawn = board.type_registry.is_withdrawn(entity);
             if withdrawn && !matches!(board.type_registry.proof_of(entity), Some(TypeProofStatus::Proved)) {
-                return Verdict::Fail {
-                    detail: format!(
-                        "entity {} was withdrawn from the group with no proven type on record — \
-                         its type can no longer be proven (no further evidence will arrive for a \
-                         withdrawn member)",
-                        entity.0
-                    ),
+                // D2.0 §4: "a fail verdict is a finding, citing the facts
+                // it rests on." Cites whatever type-proof fact exists for
+                // this entity (an Alleged assertion, if one was ever made
+                // before withdrawal) — the fact this Fail actually rests
+                // on. Note the boundary: the withdrawal event ITSELF has no
+                // `EventId` tracked in `TypeRegistryState` today
+                // (`withdrawn_members` is a bare `BTreeSet<EntityId>`, not
+                // an event-keyed record) — a real, narrower gap than this
+                // tranche's scope (populating `Finding.cites` from data the
+                // board ALREADY carries, not widening the fold's state
+                // shape to carry more). When `proof_of` is `None` (no
+                // assertion ever made), there is genuinely nothing else to
+                // cite, and the verdict's own `detail` string explains why.
+                let cites = board.type_registry.originating_event_id_of(entity).into_iter().collect();
+                return CheckOutcome {
+                    verdict: Verdict::Fail {
+                        detail: format!(
+                            "entity {} was withdrawn from the group with no proven type on record — \
+                             its type can no longer be proven (no further evidence will arrive for a \
+                             withdrawn member)",
+                            entity.0
+                        ),
+                    },
+                    cites,
                 };
             }
         }
+        let mut cites = Vec::new();
         for &entity in &board.control.registered_entity_ids {
             if board.type_registry.is_withdrawn(entity) {
                 continue;
             }
             match board.type_registry.proof_of(entity) {
-                Some(TypeProofStatus::Proved) => continue,
+                Some(TypeProofStatus::Proved) => {
+                    // The fact this entity's contribution to a Pass rests
+                    // on: the event that PROVED its type (`attach-evidence`),
+                    // not `originating_event_id_of` (the type ASSERTION —
+                    // stays pinned to the pre-proof `assert-type` event even
+                    // after evidence flips `proof` to `Proved`; citing it
+                    // here would point at the allegation, not the proof).
+                    cites.extend(board.type_registry.proof_event_id_of(entity));
+                    continue;
+                }
                 Some(TypeProofStatus::Alleged) => {
-                    return Verdict::Unevaluable {
-                        reason: UnevaluableReason::Provisional(ProvisionalityReason::AllegedType { entity }),
+                    // Unevaluable citing nothing is coherent — the reason
+                    // itself (which entity, which distinction) already
+                    // explains the absence; there is no "proof" fact yet
+                    // to cite, only an allegation the check declined to
+                    // treat as proof.
+                    return CheckOutcome {
+                        verdict: Verdict::Unevaluable {
+                            reason: UnevaluableReason::Provisional(ProvisionalityReason::AllegedType { entity }),
+                        },
+                        cites: vec![],
                     };
                 }
                 None => {
-                    return Verdict::Unevaluable {
-                        reason: UnevaluableReason::FactAbsent {
-                            what: format!("entity {} has no type asserted at all", entity.0),
+                    return CheckOutcome {
+                        verdict: Verdict::Unevaluable {
+                            reason: UnevaluableReason::FactAbsent {
+                                what: format!("entity {} has no type asserted at all", entity.0),
+                            },
                         },
+                        cites: vec![],
                     };
                 }
             }
         }
-        Verdict::Pass
+        // A Pass over a non-empty board cites every entity's proving
+        // event; a Pass over an EMPTY board (no registered entities —
+        // vacuously true) cites nothing, by construction, since the loop
+        // above never ran. This is the exact distinction P3 makes
+        // self-evident in the persisted record.
+        CheckOutcome { verdict: Verdict::Pass, cites }
     }
 }
 
