@@ -317,3 +317,121 @@ async fn p3_vacuous_case_is_self_evident_in_the_record() {
 
     cleanup(&pool, &[empty_subject, real_subject, withdrawn_proved_subject]).await;
 }
+
+/// Item 1 (2026-08-24, citation-story close): `Unevaluable(Provisional(AllegedType))`
+/// rests on a real, resolvable fact — the type-assertion event that made
+/// the type Alleged in the first place — exactly the same reasoning that
+/// justifies the `Fail` path citing `originating_event_id_of` when a
+/// withdrawn entity's type is Alleged (`evaluation.rs`'s Fail arm). The
+/// prior "Unevaluable citing nothing is coherent" comment covered TWO
+/// distinct sub-cases as one: `FactAbsent` (nothing was ever asserted —
+/// genuinely nothing to cite) and `Provisional(AllegedType)` (something
+/// WAS asserted, just not yet proven — a real fact exists). RED today:
+/// `cites: vec![]` hardcoded on the Alleged arm regardless.
+#[tokio::test]
+async fn alleged_finding_cites_its_assertion() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let entity = Uuid::new_v4();
+    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false }), &pool).await;
+    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "entity-type": "private_limited_company" }), &pool).await;
+    let assertion_event_id = event_id_for(&pool, subject, "kyc_ubo.assert.subject.type").await;
+
+    run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "alleged_finding_cites_its_assertion" }), &pool).await;
+    let findings = findings_for(&pool, subject).await;
+    let arr = findings.as_array().unwrap();
+    assert!(
+        arr[0]["verdict"].get("Unevaluable").is_some()
+            && arr[0]["verdict"]["Unevaluable"]["reason"].get("Provisional").is_some(),
+        "sanity: must be Unevaluable(Provisional(AllegedType)): {findings}"
+    );
+    let cites: Vec<String> = serde_json::from_value(arr[0]["cites"].clone()).unwrap();
+    assert!(
+        !cites.is_empty(),
+        "Unevaluable(AllegedType) rests on a real fact (the assertion that made it Alleged) \
+         and must cite it: {findings}"
+    );
+    assert!(
+        cites.iter().any(|c| c == &assertion_event_id.to_string()),
+        "cites must include the REAL assertion event ({assertion_event_id}), got: {cites:?}"
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
+/// Every `EventId` this crate ever cites in a `Finding` must resolve to a
+/// real row in the fact stream — "a citation that points at nothing is
+/// worse than none" (Item 2's own words, restated here as a general gate
+/// over EVERY verdict shape this file exercises, not just Fail's new
+/// citation). Drives a real board through each of the three cited
+/// verdicts this file produces (Pass, Fail, Unevaluable(AllegedType)) and
+/// checks every cited id against `kyc_intent_events` directly.
+#[tokio::test]
+async fn every_cited_event_id_resolves_in_the_fact_stream() {
+    let pool = pool().await;
+
+    // Pass.
+    let pass_subject = SubjectId(Uuid::new_v4());
+    let entity = Uuid::new_v4();
+    build_real_proven_board(&pool, pass_subject, entity).await;
+    run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": pass_subject.0, "check-id": PROOF_CHECK_ID, "reason": "resolvability: Pass" }), &pool).await;
+
+    // Unevaluable(AllegedType).
+    let alleged_subject = SubjectId(Uuid::new_v4());
+    let alleged_entity = Uuid::new_v4();
+    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": alleged_subject.0, "entity-id": alleged_entity, "is_natural_person": false }), &pool).await;
+    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": alleged_subject.0, "entity-id": alleged_entity, "entity-type": "private_limited_company" }), &pool).await;
+    run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": alleged_subject.0, "check-id": PROOF_CHECK_ID, "reason": "resolvability: Unevaluable" }), &pool).await;
+
+    // Fail.
+    let fail_subject = SubjectId(Uuid::new_v4());
+    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": fail_subject.0, "is_natural_person": true }), &pool).await;
+    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0, "entity-type": "natural_person" }), &pool).await;
+    run_ok(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0 }), &pool).await;
+    run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": fail_subject.0, "check-id": PROOF_CHECK_ID, "reason": "resolvability: Fail" }), &pool).await;
+
+    for (label, subject) in [("Pass", pass_subject), ("Unevaluable", alleged_subject), ("Fail", fail_subject)] {
+        let findings = findings_for(&pool, subject).await;
+        let arr = findings.as_array().unwrap();
+        let cites: Vec<String> = serde_json::from_value(arr[0]["cites"].clone()).unwrap();
+        for cite in &cites {
+            let cite_uuid = Uuid::parse_str(cite).unwrap_or_else(|e| panic!("{label}: cite '{cite}' is not a valid UUID: {e}"));
+            let n: i64 = sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE event_id = $1"#)
+                .bind(cite_uuid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            assert_eq!(n, 1, "{label}: cited event_id {cite} does not resolve in kyc_intent_events — a citation pointing at nothing: {findings}");
+        }
+    }
+
+    cleanup(&pool, &[pass_subject, alleged_subject, fail_subject]).await;
+}
+
+/// Item 2 (2026-08-24, citation-story close): a `Fail` verdict must cite
+/// the withdrawal event that actually caused it — not just, as before,
+/// whatever type-assertion event happens to exist. RED today:
+/// `TypeRegistryState::withdrawn_members` is a bare `BTreeSet<EntityId>`,
+/// no `EventId` tracked for the withdrawal act itself, so nothing can cite
+/// it regardless of what else is in `cites`.
+#[tokio::test]
+async fn a_fail_cites_its_withdrawal() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0, "entity-type": "natural_person" }), &pool).await;
+    run_ok(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), &pool).await;
+    let withdrawal_event_id = event_id_for(&pool, subject, "kyc_ubo.assert.subject.member-withdrawal").await;
+
+    run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "a_fail_cites_its_withdrawal" }), &pool).await;
+    let findings = findings_for(&pool, subject).await;
+    let arr = findings.as_array().unwrap();
+    assert!(arr[0]["verdict"].get("Fail").is_some(), "sanity: must be Fail: {findings}");
+    let cites: Vec<String> = serde_json::from_value(arr[0]["cites"].clone()).unwrap();
+    assert!(
+        cites.iter().any(|c| c == &withdrawal_event_id.to_string()),
+        "Fail must cite the REAL withdrawal event ({withdrawal_event_id}) that caused it, got: {cites:?}"
+    );
+
+    cleanup(&pool, &[subject]).await;
+}

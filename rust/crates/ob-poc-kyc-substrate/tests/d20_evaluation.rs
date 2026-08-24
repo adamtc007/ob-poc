@@ -39,8 +39,8 @@ use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     applicability_holds, work_list_from_history, ApplicabilityCondition, BoardSnapshot,
-    ControlState, EntityId, EntityType, EvaluationRun, Finding, KycError, RunPins, RunTrigger,
-    SubjectId, TypeRegistryState, Verdict,
+    ControlState, EntityId, EntityType, EvaluationRun, EventId, Finding, KycError, RunPins,
+    RunTrigger, SubjectId, TypeRegistryState, Verdict,
 };
 
 fn empty_board<'a>(control: &'a ControlState, types: &'a TypeRegistryState) -> BoardSnapshot<'a> {
@@ -190,7 +190,14 @@ fn proven_type_check_is_unevaluable_when_a_type_is_alleged() {
     let mut control = ControlState::default();
     control.registered_entity_ids.insert(entity);
     let board = empty_board(&control, &types);
-    match ProvenTypeCheck.evaluate(&board).verdict {
+    let outcome = ProvenTypeCheck.evaluate(&board);
+    assert_eq!(
+        outcome.cites,
+        vec![assert_type.id],
+        "Unevaluable(AllegedType) must cite the assertion event that made the type Alleged — \
+         the mechanism-level half of `alleged_finding_cites_its_assertion`"
+    );
+    match outcome.verdict {
         Verdict::Unevaluable { reason: ob_poc_kyc_substrate::UnevaluableReason::Provisional(_) } => {}
         other => panic!("expected Unevaluable(Provisional(AllegedType)), got {other:?}"),
     }
@@ -215,12 +222,20 @@ fn proven_type_check_fails_on_a_withdrawn_unproven_entity() {
     let entity = EntityId(Uuid::new_v4());
     control.registered_entity_ids.insert(entity);
     let mut types = TypeRegistryState::default();
-    types.withdrawn_members.insert(entity);
+    let withdrawal_event = EventId(Uuid::new_v4());
+    types.withdrawn_members.insert(entity, withdrawal_event);
     let board = empty_board(&control, &types);
-    match ProvenTypeCheck.evaluate(&board).verdict {
+    let outcome = ProvenTypeCheck.evaluate(&board);
+    match outcome.verdict {
         Verdict::Fail { detail } => assert!(detail.contains(&entity.0.to_string()), "detail must name the offending entity"),
         other => panic!("expected Fail, got {other:?}"),
     }
+    assert!(
+        outcome.cites.contains(&withdrawal_event),
+        "Fail must cite the withdrawal event that caused it — the mechanism-level half \
+         of `a_fail_cites_its_withdrawal`: {:?}",
+        outcome.cites
+    );
 }
 
 // ── §4/§6 run book gates — pure-function coverage retained under a D2.1 §3

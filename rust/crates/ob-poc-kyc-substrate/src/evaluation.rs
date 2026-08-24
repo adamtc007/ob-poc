@@ -245,19 +245,19 @@ impl Check for ProvenTypeCheck {
             let withdrawn = board.type_registry.is_withdrawn(entity);
             if withdrawn && !matches!(board.type_registry.proof_of(entity), Some(TypeProofStatus::Proved)) {
                 // D2.0 §4: "a fail verdict is a finding, citing the facts
-                // it rests on." Cites whatever type-proof fact exists for
+                // it rests on." Cites the withdrawal event that actually
+                // CAUSED this Fail (`withdrawal_event_id_of`, the same
+                // discipline as `proof_event_id_of` — the real cause, not
+                // an assertion), plus whatever type-proof fact exists for
                 // this entity (an Alleged assertion, if one was ever made
-                // before withdrawal) — the fact this Fail actually rests
-                // on. Note the boundary: the withdrawal event ITSELF has no
-                // `EventId` tracked in `TypeRegistryState` today
-                // (`withdrawn_members` is a bare `BTreeSet<EntityId>`, not
-                // an event-keyed record) — a real, narrower gap than this
-                // tranche's scope (populating `Finding.cites` from data the
-                // board ALREADY carries, not widening the fold's state
-                // shape to carry more). When `proof_of` is `None` (no
-                // assertion ever made), there is genuinely nothing else to
-                // cite, and the verdict's own `detail` string explains why.
-                let cites = board.type_registry.originating_event_id_of(entity).into_iter().collect();
+                // before withdrawal). When `proof_of` is `None` (no
+                // assertion ever made), the assertion half is empty and the
+                // verdict's own `detail` string explains why — but the
+                // withdrawal citation is always present, since withdrawal
+                // is a precondition of reaching this branch at all.
+                let mut cites: Vec<EventId> =
+                    board.type_registry.withdrawal_event_id_of(entity).into_iter().collect();
+                cites.extend(board.type_registry.originating_event_id_of(entity));
                 return CheckOutcome {
                     verdict: Verdict::Fail {
                         detail: format!(
@@ -288,19 +288,24 @@ impl Check for ProvenTypeCheck {
                     continue;
                 }
                 Some(TypeProofStatus::Alleged) => {
-                    // Unevaluable citing nothing is coherent — the reason
-                    // itself (which entity, which distinction) already
-                    // explains the absence; there is no "proof" fact yet
-                    // to cite, only an allegation the check declined to
-                    // treat as proof.
+                    // This Unevaluable rests on a real, resolvable fact:
+                    // the assertion event that made the type Alleged in
+                    // the first place — the same accessor and the same
+                    // reasoning as the Fail path above (an Alleged
+                    // assertion IS a fact the verdict rests on, not
+                    // nothing). Distinct from the `None` arm below, where
+                    // there is genuinely no event to cite.
                     return CheckOutcome {
                         verdict: Verdict::Unevaluable {
                             reason: UnevaluableReason::Provisional(ProvisionalityReason::AllegedType { entity }),
                         },
-                        cites: vec![],
+                        cites: board.type_registry.originating_event_id_of(entity).into_iter().collect(),
                     };
                 }
                 None => {
+                    // Citing nothing here IS coherent — no assertion was
+                    // ever made, so there is no event to point at; the
+                    // verdict's own `FactAbsent` reason explains why.
                     return CheckOutcome {
                         verdict: Verdict::Unevaluable {
                             reason: UnevaluableReason::FactAbsent {

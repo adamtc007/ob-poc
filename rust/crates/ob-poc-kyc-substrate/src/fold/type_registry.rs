@@ -153,11 +153,15 @@ pub struct TypeRegistryState {
     /// (same "reclassify stays legal" discipline `structure_class`
     /// already uses), demoted-and-replaced on `correct-type`.
     pub types: BTreeMap<EntityId, EntityTypeRecord>,
-    /// Entities explicitly withdrawn from group membership (TS.1 move 6).
-    /// Never removes the entity from `ControlState.registered_entity_ids`
-    /// — that set is untouched by this axis (TS.1 §2c: the board is a
-    /// basket of references; withdrawal flags, never deletes).
-    pub withdrawn_members: BTreeSet<EntityId>,
+    /// Entities explicitly withdrawn from group membership (TS.1 move 6),
+    /// keyed to the `member-withdrawal` event that caused it — the same
+    /// discipline as `EntityTypeRecord::proof_event_id`, not a reuse of
+    /// `originating_event_id`: this is the actual cause, not the
+    /// assertion. Never removes the entity from
+    /// `ControlState.registered_entity_ids` — that set is untouched by
+    /// this axis (TS.1 §2c: the board is a basket of references;
+    /// withdrawal flags, never deletes).
+    pub withdrawn_members: BTreeMap<EntityId, EventId>,
     pub corrections: Vec<TypeCorrectionRecord>,
     pub enquiries: Vec<EnquiryRecord>,
     /// Edges flagged for re-assertion by the most recent cascade touching
@@ -176,7 +180,15 @@ impl TypeRegistryState {
     }
 
     pub fn is_withdrawn(&self, entity: EntityId) -> bool {
-        self.withdrawn_members.contains(&entity)
+        self.withdrawn_members.contains_key(&entity)
+    }
+
+    /// The real `EventId` of the `member-withdrawal` event that withdrew
+    /// `entity` — `None` if it was never withdrawn. This, not
+    /// `originating_event_id_of`, is the fact a `Fail` verdict citing
+    /// withdrawal-without-proof rests on (D2.0 §4).
+    pub fn withdrawal_event_id_of(&self, entity: EntityId) -> Option<EventId> {
+        self.withdrawn_members.get(&entity).copied()
     }
 
     /// `entity`'s type-proof status — `None` if no type has been asserted
@@ -352,7 +364,7 @@ pub(crate) fn apply_one_type_registry_event(
         }
         "kyc_ubo.assert.subject.member-withdrawal" => {
             if let Some(eid) = entity_id(p, "entity_id") {
-                state.withdrawn_members.insert(eid);
+                state.withdrawn_members.insert(eid, event.id);
             }
         }
         "kyc_ubo.assert.subject.enquiry" => {
