@@ -1,0 +1,537 @@
+//! R6 (`EOP-VS-UBO-GAME-001` §3.4): "Every surface builds the same event.
+//! One function maps declared arguments to a stored event; every surface
+//! calls it. A second constructor is how two surfaces come to disagree,
+//! and it is forbidden rather than merely discouraged."
+//!
+//! Before this module: three constructors existed —
+//! `IntentEventDraft::into_event` (the op layer, via `stream_append` in
+//! `ob-poc`'s `kyc_stream_ops.rs`), a second `IntentEvent::new` call inside
+//! `KycWorkbook::stage` (`ob-poc`'s `kyc_workbook.rs`), and a third,
+//! `placement::probe_event`, inside the board enumerator itself. The op
+//! layer built a correct target/payload split per verb, via five shared
+//! `normalize_*` functions plus three more verbs' worth of ad-hoc inline
+//! construction (`assert-type`, `type-correction`, `enquiry`,
+//! `member-withdrawal`) — 13 of 19 verbs needed one or the other. The
+//! workbook built target/payload by a single fixed rule (five hyphenated
+//! slot names always go to the target, everything else to the payload),
+//! with no per-verb knowledge at all. Where a verb's fold reads a
+//! target-slot-named field back out of the *payload* (`register`,
+//! `type`, `type-correction`, `member-withdrawal`, `structure-class`'s
+//! `entity_id`, `economic-interest`/`control`'s `edge_id` fallback, the
+//! three obligation-track verbs' `obligation_id`/`subject_id`), the two
+//! surfaces silently disagreed about where the same declared argument
+//! belongs. That disagreement is what this module deletes.
+//!
+//! `canonical_event_shape` is now the **only** place that decides.
+
+use anyhow::{anyhow, bail, Result};
+use uuid::Uuid;
+
+use ob_poc_kyc_substrate::{
+    EdgeId, EntityId, ObligationId, SubjectId, TargetBinding, EDGE_KIND_WIRE_VALUES,
+    ENTITY_TYPE_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
+};
+
+// ── Pure arg-extraction (no ctx, no @symbol — see the module-level scope note) ──
+
+/// Parse a plain UUID-string literal from `args`. Deliberately no
+/// `@symbol`/session-binding resolution: `canonical_event_shape` is called
+/// from the workbook (which resolves entity handles into UUID literals
+/// during recognition, before staging, and has no session-binding concept
+/// at all) as well as the op layer. A caller that needs `@symbol` support
+/// for a field resolves it into its own `args` clone before calling this
+/// function — exactly the contract `subject` itself already has to satisfy
+/// (it arrives here as a resolved `SubjectId`, never a raw arg).
+fn uuid_arg(args: &serde_json::Value, name: &str) -> Option<Uuid> {
+    args.get(name)?.as_str().and_then(|s| Uuid::parse_str(s).ok())
+}
+
+fn required_uuid_arg(verb_fqn: &str, args: &serde_json::Value, name: &str) -> Result<Uuid> {
+    uuid_arg(args, name).ok_or_else(|| anyhow!("{verb_fqn}: missing or invalid `{name}` argument"))
+}
+
+fn string_arg<'a>(args: &'a serde_json::Value, name: &str) -> Option<&'a str> {
+    args.get(name)?.as_str()
+}
+
+fn required_string_arg<'a>(verb_fqn: &str, args: &'a serde_json::Value, name: &str) -> Result<&'a str> {
+    string_arg(args, name).ok_or_else(|| anyhow!("{verb_fqn}: missing `{name}` argument"))
+}
+
+// ── The one constructor ──────────────────────────────────────────────────────
+
+/// Map one verb's declared arguments to `(target, payload, edge_id)`.
+///
+/// `edge_id` is `Some` exactly when this call creates or addresses an edge
+/// (control/economic-interest mint one if the caller didn't supply one and
+/// return it either way — VS §8 Q3's "the system mints it and returns it",
+/// applied to today's verbs without forcing Q3's stronger, not-yet-ratified
+/// "a caller-chosen id is disallowed" reading onto them; see this crate's
+/// `docs` note in the seam module for the full reasoning) or evidence
+/// targets an existing one.
+///
+/// Deliberately excluded, not silently missing — see the module doc:
+/// - `kyc_ubo.decide.determination.freeze` (§3.2: computes a verdict from
+///   live state, not from declared arguments — call it, don't route it here).
+/// - `kyc_ubo.decide.subject.{approve,reject}` / `.decide.obligation.waiver`
+///   — never build an `IntentEvent` (TS.6 P2); calling this with one of
+///   these FQNs is a caller bug, not a shape question, hence `bail!`.
+/// - `kyc_ubo.assert.subject.type-correction`'s `invalidated_edge_ids` —
+///   a computed consequence of live `ControlState`/`TypeRegistryState`
+///   (the §4 cascade), not a declared argument. This function returns the
+///   args-derivable base payload (`entity_id`/`entity_type`); the caller
+///   merges the cascade field in afterward, same as today.
+/// - `kyc_ubo.assert.edge.control`'s `pierced-from` existence/kind/active
+///   check — needs a live DB read; stays a separate op-layer step around
+///   this call, same principle.
+pub fn canonical_event_shape(
+    verb_fqn: &str,
+    subject: SubjectId,
+    args: &serde_json::Value,
+) -> Result<(TargetBinding, serde_json::Value, Option<EdgeId>)> {
+    let subj_target = TargetBinding::for_subject(subject);
+
+    match verb_fqn {
+        "kyc_ubo.assert.subject.register" => {
+            let entity_id = uuid_arg(args, "entity-id").unwrap_or(subject.0);
+            let mut payload = serde_json::json!({ "entity_id": entity_id });
+            if let Some(v) = args.get("is_natural_person") {
+                payload["is_natural_person"] = v.clone();
+            }
+            Ok((subj_target, payload, None))
+        }
+
+        "kyc_ubo.assert.subject.structure-class" => {
+            let entity_id = uuid_arg(args, "entity-id").unwrap_or(subject.0);
+            let class = required_string_arg(verb_fqn, args, "structure-class")?;
+            if !STRUCTURE_CLASS_WIRE_VALUES.contains(&class) {
+                bail!(
+                    "{verb_fqn}: unrecognized structure-class '{class}' — valid wire values: {}",
+                    STRUCTURE_CLASS_WIRE_VALUES.join(", ")
+                );
+            }
+            let payload = serde_json::json!({ "entity_id": entity_id, "structure_class": class });
+            Ok((subj_target, payload, None))
+        }
+
+        "kyc_ubo.assert.subject.type" | "kyc_ubo.assert.subject.type-correction" => {
+            let entity = EntityId(required_uuid_arg(verb_fqn, args, "entity-id")?);
+            let entity_type = required_string_arg(verb_fqn, args, "entity-type")?;
+            if !ENTITY_TYPE_WIRE_VALUES.contains(&entity_type) {
+                bail!(
+                    "{verb_fqn}: unrecognized entity-type '{entity_type}' — valid wire values: {}",
+                    ENTITY_TYPE_WIRE_VALUES.join(", ")
+                );
+            }
+            let target = TargetBinding { entity_id: Some(entity), ..subj_target };
+            let payload = serde_json::json!({ "entity_id": entity.0, "entity_type": entity_type });
+            Ok((target, payload, None))
+        }
+
+        "kyc_ubo.assert.subject.member-withdrawal" => {
+            let entity = EntityId(required_uuid_arg(verb_fqn, args, "entity-id")?);
+            let target = TargetBinding { entity_id: Some(entity), ..subj_target };
+            let payload = serde_json::json!({ "entity_id": entity.0 });
+            Ok((target, payload, None))
+        }
+
+        "kyc_ubo.assert.subject.enquiry" => {
+            let payload = serde_json::json!({
+                "sources_consulted": args.get("sources-consulted").cloned().unwrap_or_else(|| serde_json::json!([])),
+                "searches_run": args.get("searches-run").cloned().unwrap_or_else(|| serde_json::json!([])),
+            });
+            Ok((subj_target, payload, None))
+        }
+
+        "kyc_ubo.assert.edge.control" => {
+            let edge = EdgeId(uuid_arg(args, "edge-id").unwrap_or_else(Uuid::new_v4));
+            let from = required_uuid_arg(verb_fqn, args, "from_entity_id")?;
+            let to = required_uuid_arg(verb_fqn, args, "to_entity_id")?;
+            let kind = required_string_arg(verb_fqn, args, "kind")?;
+            let pierced_from = uuid_arg(args, "pierced-from");
+            if kind == "nominee" && pierced_from.is_some() {
+                bail!(
+                    "{verb_fqn}: a pierce cannot produce another nominee edge (K-8, fail-closed) \
+                     — `kind` must be the UNDERLYING kind the nominator actually holds"
+                );
+            }
+            if !EDGE_KIND_WIRE_VALUES.contains(&kind) {
+                bail!(
+                    "{verb_fqn}: unrecognized kind '{kind}' — valid wire values: {}",
+                    EDGE_KIND_WIRE_VALUES.join(", ")
+                );
+            }
+            let mut payload = serde_json::json!({
+                "edge_id": edge.0,
+                "from_entity_id": from,
+                "to_entity_id": to,
+                "kind": kind,
+            });
+            if let Some(p) = args.get("percentage") {
+                payload["percentage"] = p.clone();
+            }
+            if let Some(v) = args.get("trust-revocable") {
+                payload["trust_revocable"] = v.clone();
+            }
+            if let Some(pf) = pierced_from {
+                payload["pierced_from"] = serde_json::Value::String(pf.to_string());
+            }
+            let target = TargetBinding::for_edge(subject, edge);
+            Ok((target, payload, Some(edge)))
+        }
+
+        "kyc_ubo.assert.edge.economic-interest" => {
+            let edge = EdgeId(uuid_arg(args, "edge-id").unwrap_or_else(Uuid::new_v4));
+            let from = required_uuid_arg(verb_fqn, args, "from_entity_id")?;
+            let to = required_uuid_arg(verb_fqn, args, "to_entity_id")?;
+            let mut payload = serde_json::json!({
+                "edge_id": edge.0,
+                "from_entity_id": from,
+                "to_entity_id": to,
+            });
+            if let Some(p) = args.get("percentage") {
+                payload["percentage"] = p.clone();
+            }
+            let target = TargetBinding::for_edge(subject, edge);
+            Ok((target, payload, Some(edge)))
+        }
+
+        "kyc_ubo.assert.edge.evidence" => {
+            let edge = uuid_arg(args, "edge-id").map(EdgeId);
+            let entity = uuid_arg(args, "entity-id").map(EntityId);
+            match (edge, entity) {
+                (Some(edge), None) => {
+                    let target = TargetBinding::for_edge(subject, edge);
+                    Ok((target, serde_json::json!({}), Some(edge)))
+                }
+                (None, Some(entity)) => {
+                    let target = TargetBinding { entity_id: Some(entity), ..subj_target };
+                    Ok((target, serde_json::json!({}), None))
+                }
+                (Some(_), Some(_)) => bail!(
+                    "{verb_fqn}: supply exactly one of edge-id (evidences an edge) or entity-id \
+                     (evidences a type), never both"
+                ),
+                (None, None) => bail!("{verb_fqn}: missing edge-id or entity-id argument"),
+            }
+        }
+
+        "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.supersession" => {
+            let edge = EdgeId(required_uuid_arg(verb_fqn, args, "edge-id")?);
+            let target = TargetBinding::for_edge(subject, edge);
+            Ok((target, serde_json::json!({}), Some(edge)))
+        }
+
+        "kyc_ubo.assert.edge.reconciliation" => {
+            let mut payload = serde_json::json!({});
+            if let Some(r) = args.get("resolution") {
+                payload["resolution"] = r.clone();
+            }
+            Ok((subj_target, payload, None))
+        }
+
+        "kyc_ubo.assert.entity.identity"
+        | "kyc_ubo.assert.entity.screening"
+        | "kyc_ubo.assert.entity.risk" => {
+            let obligation = ObligationId(required_uuid_arg(verb_fqn, args, "obligation-id")?);
+            let mut payload = args.clone();
+            if let Some(obj) = payload.as_object_mut() {
+                obj.remove("obligation-id");
+                obj.insert("obligation_id".into(), serde_json::Value::String(obligation.0.to_string()));
+                obj.remove("subject-id");
+                obj.insert("subject_id".into(), serde_json::Value::String(subject.0.to_string()));
+            }
+            Ok((subj_target, payload, None))
+        }
+
+        "kyc_ubo.decide.determination.freeze" => bail!(
+            "{verb_fqn}: exempt by design (EOP-VS-UBO-GAME-001 §3.2) — a surface that cannot \
+             compute the determination basis may not produce the verdict; freeze's payload is \
+             assembled by the caller from a live fold, never from declared arguments alone"
+        ),
+
+        "kyc_ubo.decide.subject.approve"
+        | "kyc_ubo.decide.subject.reject"
+        | "kyc_ubo.decide.obligation.waiver" => bail!(
+            "{verb_fqn}: never builds an IntentEvent (TS.6 P2) — it writes directly to \
+             kyc_decision_records/kyc_evaluation_runs, not the fact stream; calling \
+             canonical_event_shape with this FQN is a caller error, not a shape question"
+        ),
+
+        other => bail!("canonical_event_shape: unrecognized verb_fqn '{other}'"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn subj() -> SubjectId {
+        SubjectId(Uuid::new_v4())
+    }
+
+    /// The exact defect P1's RED test proved: `register`'s `entity-id`
+    /// must land in the PAYLOAD (as `entity_id`), never only the target —
+    /// the fold reads it from the payload. This is the one assertion that
+    /// must never regress.
+    #[test]
+    fn register_entity_id_lands_in_payload() {
+        let s = subj();
+        let entity = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "entity-id": entity });
+        let (target, payload, edge) =
+            canonical_event_shape("kyc_ubo.assert.subject.register", s, &args).unwrap();
+        assert_eq!(payload["entity_id"], entity.to_string());
+        assert_eq!(target.subject_root, Some(s));
+        assert!(edge.is_none());
+    }
+
+    #[test]
+    fn register_defaults_entity_id_to_subject() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0 });
+        let (_, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.subject.register", s, &args).unwrap();
+        assert_eq!(payload["entity_id"], s.0.to_string());
+    }
+
+    #[test]
+    fn structure_class_kebab_renamed_to_snake() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0, "structure-class": "private_company" });
+        let (_, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.subject.structure-class", s, &args).unwrap();
+        assert_eq!(payload["structure_class"], "private_company");
+        assert_eq!(payload["entity_id"], s.0.to_string());
+    }
+
+    #[test]
+    fn structure_class_rejects_unknown_wire_value() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0, "structure-class": "not_a_real_class" });
+        assert!(canonical_event_shape("kyc_ubo.assert.subject.structure-class", s, &args).is_err());
+    }
+
+    #[test]
+    fn assert_type_entity_id_and_type_land_in_target_and_payload() {
+        let s = subj();
+        let entity = Uuid::new_v4();
+        let args = serde_json::json!({
+            "subject-id": s.0, "entity-id": entity, "entity-type": "natural_person"
+        });
+        let (target, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.subject.type", s, &args).unwrap();
+        assert_eq!(target.entity_id, Some(EntityId(entity)));
+        assert_eq!(payload["entity_id"], entity.to_string());
+        assert_eq!(payload["entity_type"], "natural_person");
+    }
+
+    #[test]
+    fn assert_type_rejects_unknown_entity_type() {
+        let s = subj();
+        let args = serde_json::json!({
+            "subject-id": s.0, "entity-id": Uuid::new_v4(), "entity-type": "spaceship"
+        });
+        assert!(canonical_event_shape("kyc_ubo.assert.subject.type", s, &args).is_err());
+    }
+
+    #[test]
+    fn member_withdrawal_entity_id_in_target_and_payload() {
+        let s = subj();
+        let entity = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "entity-id": entity });
+        let (target, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.subject.member-withdrawal", s, &args).unwrap();
+        assert_eq!(target.entity_id, Some(EntityId(entity)));
+        assert_eq!(payload["entity_id"], entity.to_string());
+    }
+
+    #[test]
+    fn enquiry_kebab_lists_renamed_to_snake() {
+        let s = subj();
+        let args = serde_json::json!({
+            "subject-id": s.0, "sources-consulted": ["GLEIF"], "searches-run": ["registry"]
+        });
+        let (_, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.subject.enquiry", s, &args).unwrap();
+        assert_eq!(payload["sources_consulted"], serde_json::json!(["GLEIF"]));
+        assert_eq!(payload["searches_run"], serde_json::json!(["registry"]));
+    }
+
+    #[test]
+    fn control_mints_edge_id_when_absent_and_returns_it() {
+        let s = subj();
+        let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
+        let args = serde_json::json!({
+            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to, "kind": "board_appointment"
+        });
+        let (target, payload, edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).unwrap();
+        let minted = edge.expect("control must mint and return an edge id");
+        assert_eq!(target.edge_id, Some(minted));
+        assert_eq!(payload["edge_id"], minted.0.to_string());
+    }
+
+    #[test]
+    fn control_accepts_caller_supplied_edge_id() {
+        let s = subj();
+        let chosen = Uuid::new_v4();
+        let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
+        let args = serde_json::json!({
+            "subject-id": s.0, "edge-id": chosen, "from_entity_id": from, "to_entity_id": to,
+            "kind": "voting_rights"
+        });
+        let (_, payload, edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).unwrap();
+        assert_eq!(edge, Some(EdgeId(chosen)));
+        assert_eq!(payload["edge_id"], chosen.to_string());
+    }
+
+    #[test]
+    fn control_kebab_trust_revocable_and_pierced_from_renamed() {
+        let s = subj();
+        let (from, to, pierced) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        let args = serde_json::json!({
+            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to,
+            "kind": "trust_settlor", "trust-revocable": true, "pierced-from": pierced
+        });
+        let (_, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).unwrap();
+        assert_eq!(payload["trust_revocable"], true);
+        assert_eq!(payload["pierced_from"], pierced.to_string());
+    }
+
+    #[test]
+    fn control_rejects_nominee_kind_with_pierced_from() {
+        let s = subj();
+        let (from, to, pierced) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        let args = serde_json::json!({
+            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to,
+            "kind": "nominee", "pierced-from": pierced
+        });
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).is_err());
+    }
+
+    #[test]
+    fn control_rejects_unknown_kind() {
+        let s = subj();
+        let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
+        let args = serde_json::json!({
+            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to, "kind": "made_up_kind"
+        });
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).is_err());
+    }
+
+    #[test]
+    fn economic_interest_mints_and_returns_edge_id() {
+        let s = subj();
+        let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
+        let args = serde_json::json!({
+            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to, "percentage": 25.0
+        });
+        let (target, payload, edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.economic-interest", s, &args).unwrap();
+        let minted = edge.unwrap();
+        assert_eq!(target.edge_id, Some(minted));
+        assert_eq!(payload["percentage"], 25.0);
+    }
+
+    #[test]
+    fn evidence_edge_scoped() {
+        let s = subj();
+        let edge = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "edge-id": edge });
+        let (target, _, returned_edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).unwrap();
+        assert_eq!(target.edge_id, Some(EdgeId(edge)));
+        assert_eq!(returned_edge, Some(EdgeId(edge)));
+    }
+
+    #[test]
+    fn evidence_entity_scoped() {
+        let s = subj();
+        let entity = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "entity-id": entity });
+        let (target, _, returned_edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).unwrap();
+        assert_eq!(target.entity_id, Some(EntityId(entity)));
+        assert!(returned_edge.is_none());
+    }
+
+    #[test]
+    fn evidence_rejects_both_edge_and_entity() {
+        let s = subj();
+        let args = serde_json::json!({
+            "subject-id": s.0, "edge-id": Uuid::new_v4(), "entity-id": Uuid::new_v4()
+        });
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).is_err());
+    }
+
+    #[test]
+    fn evidence_rejects_neither_edge_nor_entity() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0 });
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).is_err());
+    }
+
+    #[test]
+    fn verification_and_supersession_target_the_edge() {
+        let s = subj();
+        let edge = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "edge-id": edge });
+        for fqn in ["kyc_ubo.assert.edge.verification", "kyc_ubo.assert.edge.supersession"] {
+            let (target, _, returned_edge) = canonical_event_shape(fqn, s, &args).unwrap();
+            assert_eq!(target.edge_id, Some(EdgeId(edge)), "{fqn}");
+            assert_eq!(returned_edge, Some(EdgeId(edge)), "{fqn}");
+        }
+    }
+
+    #[test]
+    fn reconciliation_is_subject_scoped() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0 });
+        let (target, _, edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.reconciliation", s, &args).unwrap();
+        assert_eq!(target.subject_root, Some(s));
+        assert!(edge.is_none());
+    }
+
+    #[test]
+    fn obligation_track_verbs_rename_obligation_and_subject_id() {
+        let s = subj();
+        let obligation = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "obligation-id": obligation });
+        for fqn in [
+            "kyc_ubo.assert.entity.identity",
+            "kyc_ubo.assert.entity.screening",
+            "kyc_ubo.assert.entity.risk",
+        ] {
+            let (_, payload, _) = canonical_event_shape(fqn, s, &args).unwrap();
+            assert_eq!(payload["obligation_id"], obligation.to_string(), "{fqn}");
+            assert_eq!(payload["subject_id"], s.0.to_string(), "{fqn}");
+        }
+    }
+
+    /// The three verbs this function must refuse, by design, not omission.
+    #[test]
+    fn excluded_verbs_bail_with_a_named_reason() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0 });
+        for fqn in [
+            "kyc_ubo.decide.determination.freeze",
+            "kyc_ubo.decide.subject.approve",
+            "kyc_ubo.decide.subject.reject",
+            "kyc_ubo.decide.obligation.waiver",
+        ] {
+            let err = canonical_event_shape(fqn, s, &args).unwrap_err();
+            assert!(!err.to_string().is_empty(), "{fqn}");
+        }
+    }
+
+    #[test]
+    fn unknown_verb_fqn_bails() {
+        let s = subj();
+        let args = serde_json::json!({});
+        assert!(canonical_event_shape("not.a.real.verb", s, &args).is_err());
+    }
+}

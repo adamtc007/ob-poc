@@ -42,6 +42,16 @@
 //!   stamping flow, not a bare parse-to-shape step. `stage()` builds the real
 //!   `IntentEvent` via `IntentEvent::new` directly once `ParsedMove` plus the
 //!   caller-supplied principal/authority/as_of are all in hand.
+//! - **T1 (`EOP-VS-UBO-GAME-001` §3.4 R6, this tranche):** `sexpr_to_parsed_move`
+//!   used to decide target-vs-payload itself, by a fixed rule (five
+//!   hyphenated slot names always go to the target, everything else to the
+//!   payload) — with zero per-verb knowledge, so a verb whose fold reads a
+//!   target-slot-named field back out of the *payload* (`register`'s
+//!   `entity-id`, among 12 others) silently never worked through this
+//!   surface. That branch is deleted; every slot now flows into one flat
+//!   args map, and `ob_poc_kyc_seam::canonical_event_shape` — the SAME
+//!   function the op layer calls — decides target vs payload. Two
+//!   surfaces, one decision.
 
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
@@ -50,12 +60,12 @@ use uuid::Uuid;
 use dsl_parser::{RawAtom, RawValue};
 use dsl_runtime::TransactionScope;
 
-use ob_poc_kyc_seam::{append_in_scope, map_principal};
+use ob_poc_kyc_seam::{append_in_scope, canonical_event_shape, map_principal};
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
     check_preconditions, enumerate_placement_set, assembly_lexicon, preview,
-    render_intent_event_to_sexpr, AuthorityRef, ControlState, EdgeId, EntityId, FoldRegistry,
-    IntentEvent, KycError, LexiconManifest, MoveId, ObligationId, ObligationState, PersonId,
+    render_intent_event_to_sexpr, AuthorityRef, ControlState, FoldRegistry,
+    IntentEvent, KycError, LexiconManifest, MoveId, ObligationState,
     SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
@@ -183,16 +193,19 @@ fn raw_value_to_json(value: &RawValue) -> Result<serde_json::Value, RecognitionE
     }
 }
 
-/// Map one parsed top-level atom to a `ParsedMove`. Target-binding fields
-/// render (and so must parse) under their canonical hyphenated DSL arg names
-/// (`subject-id`, `edge-id`, `entity-id`, `person-id`, `obligation-id` —
-/// `render.rs`'s slot list verbatim); every other slot is a payload entry,
-/// keyed exactly as typed (payload keys are snake_case verb args, e.g.
-/// `edge_id`/`from_entity_id` on `kyc_ubo.assert.edge.control` — a different
-/// name from the target's hyphenated `edge-id`, so the two never collide).
-/// `subject-id`, if typed, must match `workbook_subject`; if absent, the
-/// workbook's own subject fills it (the caller already knows which subject
-/// this session is open against).
+/// Map one parsed top-level atom to a `ParsedMove`.
+///
+/// T1 (R6): this function no longer decides target-vs-payload itself. Every
+/// slot — including the five that used to be hard-routed to the target
+/// (`subject-id`/`edge-id`/`entity-id`/`person-id`/`obligation-id`) — flows
+/// into one flat args map, keyed exactly as typed. `subject-id`, if typed,
+/// is checked against `workbook_subject` here (a workbook-specific
+/// concern, not a shape concern) and then included in the args map like
+/// everything else, so `canonical_event_shape` sees the same input the op
+/// layer would build from identical DSL text. `canonical_event_shape` —
+/// the SAME function the op layer calls via `stream_append` — decides
+/// which declared arguments become the target and which become the
+/// payload, and under what key names.
 fn sexpr_to_parsed_move(
     atom: &RawAtom,
     workbook_subject: SubjectId,
@@ -203,42 +216,30 @@ fn sexpr_to_parsed_move(
         )));
     }
 
-    let mut target = TargetBinding::default();
-    let mut payload = serde_json::Map::new();
-
+    let mut args = serde_json::Map::new();
     for (slot, value) in &atom.slots {
-        match slot.as_str() {
-            "subject-id" => {
-                let id = parse_uuid_slot(slot, value)?;
-                if id != workbook_subject.0 {
-                    return Err(RecognitionError::SubjectMismatch {
-                        typed: id,
-                        workbook: workbook_subject.0,
-                    });
-                }
-                target.subject_root = Some(SubjectId(id));
-            }
-            "edge-id" => target.edge_id = Some(EdgeId(parse_uuid_slot(slot, value)?)),
-            "entity-id" => target.entity_id = Some(EntityId(parse_uuid_slot(slot, value)?)),
-            "person-id" => target.person_id = Some(PersonId(parse_uuid_slot(slot, value)?)),
-            "obligation-id" => {
-                target.obligation_id = Some(ObligationId(parse_uuid_slot(slot, value)?))
-            }
-            _ => {
-                payload.insert(slot.clone(), raw_value_to_json(value)?);
+        if slot == "subject-id" {
+            let id = parse_uuid_slot(slot, value)?;
+            if id != workbook_subject.0 {
+                return Err(RecognitionError::SubjectMismatch {
+                    typed: id,
+                    workbook: workbook_subject.0,
+                });
             }
         }
+        args.insert(slot.clone(), raw_value_to_json(value)?);
     }
+    // subject-id defaults to the workbook's own subject if the caller
+    // omitted it — canonical_event_shape's `subject: SubjectId` parameter
+    // carries this, not the args map, so no default-injection is needed
+    // here; the SubjectMismatch check above already covers the only case
+    // where an explicit value matters (it disagreeing with the workbook).
 
-    if target.subject_root.is_none() {
-        target.subject_root = Some(workbook_subject);
-    }
+    let (target, payload, _minted_edge_id) =
+        canonical_event_shape(&atom.kind, workbook_subject, &serde_json::Value::Object(args))
+            .map_err(|e| RecognitionError::UnsupportedValue(format!("{}: {e}", atom.kind)))?;
 
-    Ok(ParsedMove {
-        verb_fqn: VerbFqn(atom.kind.clone()),
-        target,
-        payload: serde_json::Value::Object(payload),
-    })
+    Ok(ParsedMove { verb_fqn: VerbFqn(atom.kind.clone()), target, payload })
 }
 
 // ── The session model (design §5) ───────────────────────────────────────────

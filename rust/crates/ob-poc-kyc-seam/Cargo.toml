@@ -15,6 +15,10 @@ sem_os_core.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.4", features = ["v4", "v5", "serde"] }
 serde_json = "1.0"
+# T1 (EOP-VS-UBO-GAME-001 §3.4 R6): canonical_event_shape's pure per-verb
+# arg validation (bad kind/entity-type/mutual-exclusion) reuses anyhow, the
+# same error-construction idiom the op layer already uses for the same checks.
+anyhow = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

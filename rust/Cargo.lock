@@ -4473,6 +4473,7 @@ dependencies = [
 name = "ob-poc-kyc-seam"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "dsl-runtime",
  "ob-poc-kyc-store",
