@@ -84,7 +84,7 @@
 //! `kyc_ubo.assert.subject.register`, the existing `kyc_ubo.assert.edge.evidence` (now
 //! also type-scoped, `fold/type_registry.rs`), and `preview()` respectively.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -264,32 +264,47 @@ fn entity_move_id(verb_fqn: &str, entity: EntityId) -> MoveId {
     MoveId(format!("{verb_fqn}::entity:{}", entity.0))
 }
 
-const ASSERT_TYPE: &str = "kyc_ubo.assert.subject.type";
-const CORRECT_TYPE: &str = "kyc_ubo.assert.subject.type-correction";
-const WITHDRAW_MEMBER: &str = "kyc_ubo.assert.subject.member-withdrawal";
+const PLACE: &str = "kyc_ubo.assert.subject.place";
+const REMOVE: &str = "kyc_ubo.assert.subject.remove";
+// `kyc_ubo.assert.subject.type-correction` DISSOLVED (EOP-VS-UBO-GAME-001
+// T2 §8 Q1, 2026-08-27) — its candidate-enumeration block, `CORRECT_TYPE`
+// const, and `is_type_registry_move` membership are all deleted in this
+// diff, alongside its lexicon entry, fold arm, and op. Correcting a type is
+// `remove` then `place`, two ordinary moves through the arms below.
 const RECORD_ENQUIRY: &str = "kyc_ubo.assert.subject.enquiry";
 const TYPE_SCOPED_ATTACH_EVIDENCE: &str = "kyc_ubo.assert.edge.evidence";
 
 /// Entity-scoped verbs (`TargetBinding.entity_id`) that the main
 /// `enumerate_placement_set` loop below must NOT probe with its generic
 /// bare-subject target — they are enumerated per-entity by
-/// `type_registry_candidates` instead. (`record-enquiry` is subject-scoped,
-/// not entity-scoped, and stays in this exclusion list only so its single
-/// candidate is emitted exactly once, by `type_registry_candidates`, rather
-/// than potentially twice.)
+/// `place_and_remove_candidates` instead. (`record-enquiry` is
+/// subject-scoped, not entity-scoped, and stays in this exclusion list only
+/// so its single candidate is emitted exactly once, rather than potentially
+/// twice.)
 fn is_type_registry_move(fqn: &str) -> bool {
-    matches!(fqn, ASSERT_TYPE | CORRECT_TYPE | WITHDRAW_MEMBER | RECORD_ENQUIRY)
+    matches!(fqn, PLACE | REMOVE | RECORD_ENQUIRY)
 }
 
-/// The four D1 TS.1 §3 moves now in `assembly_lexicon()` (module doc), plus
-/// the type-scoped half of `attach-evidence` — the edge-scoped half stays
-/// handled entirely by the main `lexicon.entries` loop, unchanged. All
-/// lexicon-declared studs — `EntityRegistered`, and (Phase 2 of the
-/// tree-cleanup follow-up tranche, EOP-STATE-KYCUBO-D1 §4/§7)
-/// `MembershipActive`/`PriorTypeAsserted` — are checked via the single REAL
-/// `check_control_preconditions` oracle; no hand-rolled `TypeRegistryState`
-/// check remains here for withdraw-member/correct-type.
-fn type_registry_candidates(
+/// `place`/`remove` (EOP-VS-UBO-GAME-001 §3.1/§3.2), plus the type-scoped
+/// half of `attach-evidence` — the edge-scoped half stays handled entirely
+/// by the main `lexicon.entries` loop, unchanged. All lexicon-declared
+/// studs are checked via the single REAL `check_control_preconditions`
+/// oracle; no hand-rolled `TypeRegistryState` check lives here.
+///
+/// **T1's P4 deferral, closed for the re-placeable population (T2 P2
+/// finding — reported before implementing, see state-of-play §5n):**
+/// `place` candidates are entity-scoped and real, not the old generic
+/// bare-subject "register anything" candidate — "already placed" is now a
+/// board property (§8 Q1's `NotCurrentlyPlaced`), not a precondition that
+/// only fired at commit. The board can enumerate exactly two populations:
+/// the subject's own not-yet-placed entity (always known, no discovery data
+/// needed) and every currently-withdrawn (previously-placed, now
+/// re-placeable) member. A brand-new, non-subject entity's first-ever
+/// placement has no board candidate — there is no data source anywhere in
+/// the fold for "entities that could exist but never have" — so it is not
+/// reachable through `KycWorkbook::stage()`'s frontier gate, only through
+/// the op layer directly (`check_preconditions` only, no board gate there).
+fn place_and_remove_candidates(
     subject: SubjectId,
     state: &ControlState,
     type_registry: &TypeRegistryState,
@@ -310,63 +325,61 @@ fn type_registry_candidates(
         });
     }
 
-    let assert_type_entry = lexicon.get(ASSERT_TYPE);
-    let withdraw_member_entry = lexicon.get(WITHDRAW_MEMBER);
-    let correct_type_entry = lexicon.get(CORRECT_TYPE);
+    let place_entry = lexicon.get(PLACE);
+    let remove_entry = lexicon.get(REMOVE);
 
+    // place: the subject's own entity + every currently-withdrawn member —
+    // see the function doc for why this is the whole enumerable population.
+    // Whether a candidate is ACTUALLY currently placed (and so refused) is
+    // decided solely by `check_control_preconditions`'s `NotCurrentlyPlaced`
+    // arm below, not a hand-rolled duplicate here (no_stud_is_duplicated).
+    if let Some(entry) = place_entry {
+        let subject_entity = EntityId(subject.0);
+        let mut candidates: BTreeSet<EntityId> = type_registry.withdrawn_members.keys().copied().collect();
+        candidates.insert(subject_entity);
+        for entity in candidates {
+            let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
+            let probe = probe_event(subject, PLACE, target.clone());
+            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
+                moves.push(LegalMove {
+                    move_id: entity_move_id(PLACE, entity),
+                    verb_fqn: VerbFqn(PLACE.to_string()),
+                    target,
+                    proposed_edge: None,
+                });
+            }
+        }
+    }
+
+    // remove: every registered entity. Whether a candidate is ACTUALLY
+    // still active (and so removable) is decided solely by
+    // `check_control_preconditions`'s `MembershipActive` arm below, not a
+    // hand-rolled duplicate here (no_stud_is_duplicated).
+    if let Some(entry) = remove_entry {
+        for &entity in &state.registered_entity_ids {
+            let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
+            let probe = probe_event(subject, REMOVE, target.clone());
+            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
+                moves.push(LegalMove {
+                    move_id: entity_move_id(REMOVE, entity),
+                    verb_fqn: VerbFqn(REMOVE.to_string()),
+                    target,
+                    proposed_edge: None,
+                });
+            }
+        }
+    }
+
+    // correct-type: DISSOLVED (EOP-VS-UBO-GAME-001 T2 §8 Q1, 2026-08-27) —
+    // no candidate block survives it here, alongside its deleted lexicon
+    // entry, fold arm, and op. Correcting a type is `remove` then `place`,
+    // two ordinary moves through the blocks above.
+
+    // attach-evidence, type-scoped half (row 4): "target assertion exists
+    // and is not withdrawn" — a type is asserted, member active.
     for &entity in &state.registered_entity_ids {
-        let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
-
-        // assert-type (row 2): "entity exists" (EntityRegistered, checked
-        // via the real oracle). Reclassification stays legal (last-wins,
-        // mirrors `structure_class`), so always admitted once registered,
-        // regardless of any prior type.
-        if let Some(entry) = assert_type_entry {
-            let probe = probe_event(subject, ASSERT_TYPE, target.clone());
-            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
-                moves.push(LegalMove {
-                    move_id: entity_move_id(ASSERT_TYPE, entity),
-                    verb_fqn: VerbFqn(ASSERT_TYPE.to_string()),
-                    target: target.clone(),
-                    proposed_edge: None,
-                });
-            }
-        }
-
-        // withdraw-member (row 6): "membership exists and is active" —
-        // EntityRegistered + MembershipActive, both via the oracle (Phase 2:
-        // MembershipActive is a real Precondition now, not a hand-rolled
-        // TypeRegistryState check here).
-        if let Some(entry) = withdraw_member_entry {
-            let probe = probe_event(subject, WITHDRAW_MEMBER, target.clone());
-            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
-                moves.push(LegalMove {
-                    move_id: entity_move_id(WITHDRAW_MEMBER, entity),
-                    verb_fqn: VerbFqn(WITHDRAW_MEMBER.to_string()),
-                    target: target.clone(),
-                    proposed_edge: None,
-                });
-            }
-        }
-
-        // correct-type (row 7): EntityRegistered via the oracle, plus "a
-        // type was already asserted" (no Precondition primitive — nothing
-        // to correct otherwise, that is assert-type's job).
-        if let Some(entry) = correct_type_entry {
-            let probe = probe_event(subject, CORRECT_TYPE, target.clone());
-            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
-                moves.push(LegalMove {
-                    move_id: entity_move_id(CORRECT_TYPE, entity),
-                    verb_fqn: VerbFqn(CORRECT_TYPE.to_string()),
-                    target: target.clone(),
-                    proposed_edge: None,
-                });
-            }
-        }
-
-        // attach-evidence, type-scoped half (row 4): "target assertion
-        // exists and is not withdrawn" — a type is asserted, member active.
         if type_registry.type_of(entity).is_some() && !type_registry.is_withdrawn(entity) {
+            let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
             moves.push(LegalMove {
                 move_id: entity_move_id(TYPE_SCOPED_ATTACH_EVIDENCE, entity),
                 verb_fqn: VerbFqn(TYPE_SCOPED_ATTACH_EVIDENCE.to_string()),
@@ -490,7 +503,7 @@ pub fn enumerate_placement_set(
         }
     }
 
-    for m in type_registry_candidates(subject, state, type_registry, lexicon) {
+    for m in place_and_remove_candidates(subject, state, type_registry, lexicon) {
         candidates.insert(m.move_id.clone(), m);
     }
 

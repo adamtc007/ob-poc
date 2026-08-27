@@ -148,53 +148,16 @@ fn economic_interest_unknown_target_is_provisional() {
         assert_eq!(c.pipe, None, "target={target:?}: must carry NO concrete pipe — unresolved, not guessed");
     }
 
-    // Item 4b, the propagation half — reported finding, not silently
-    // absorbed: this crate has no "assurance" field (assurance is D2
-    // territory per TS.1 §0, out of this tranche's SCOPE FENCE), and the
-    // one real D1 consumer of `pipe_of` today —
-    // `kyc_ubo.assert.subject.type-correction`'s §4 cascade
-    // (`src/domain_ops/kyc_stream_ops.rs::KycSubjectCorrectType`) — turns
-    // out to be SAFE regardless of this fix: `NonVotingShares` (the old
-    // fabricated default) is geometrically permitted as a pipe-TARGET only
-    // into `PrivateLimitedCompany`/`PublicListedCompany`, both already
-    // inside TS.2 §3's ratified bucket, and the cascade's SOURCE-correction
-    // branch classifies against the (unchanged) far end, not the corrected
-    // type — so no live scenario against that one call site can discriminate
-    // old from new behavior; an attempted live-DB test proving otherwise
-    // (`rust/tests/kyc_ts1_moves_live.rs`) was written, found to assert a
-    // false premise under BOTH the old and new code, and deleted rather than
-    // left in as a misleading pass. The propagation guarantee that DOES
-    // hold, and is checked directly below, is the type-level one: `pipe:
+    // Item 4b (the propagation half, a source-scan of
+    // `KycSubjectCorrectType`'s op body) REMOVED — EOP-VS-UBO-GAME-001 T2
+    // (2026-08-27, §8 Q1) DISSOLVED `kyc_ubo.assert.subject.type-correction`
+    // and its op entirely; there is no longer a real D1 consumer of
+    // `pipe_of` to source-scan for this property. The propagation guarantee
+    // that survives, and matters regardless of any one caller, is the
+    // type-level one already checked above and restated here: `pipe:
     // Option<Pipe>` makes it a compile error for ANY caller — today's or a
     // future D2/assurance one — to extract a certain `Pipe` from an
     // unresolved classification without an explicit branch.
-    let correct_type_src = std::fs::read_to_string(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../src/domain_ops/kyc_stream_ops.rs"
-    ))
-    .expect("read kyc_stream_ops.rs");
-    let op_start = correct_type_src
-        .find("impl SemOsVerbOp for KycSubjectCorrectType {")
-        .expect("KycSubjectCorrectType impl must exist");
-    let op_end = correct_type_src[op_start..]
-        .find("\npub struct KycSubjectWithdrawMember;")
-        .map(|i| op_start + i)
-        .expect("KycSubjectCorrectType impl must be followed by KycSubjectWithdrawMember");
-    let op_body = &correct_type_src[op_start..op_end];
-    assert!(
-        op_body.contains("match pipe_of(&edge.kind, Some(target_type_for_pipe)).pipe {"),
-        "KycSubjectCorrectType must pattern-match pipe_of(..).pipe, not unwrap it — an \
-         unresolved (None) classification must be a reachable, handled arm, not a panic \
-         or a silent default"
-    );
-    assert!(
-        op_body.contains("Some(pipe) => known_tuples.push"),
-        "the Some(pipe) arm must exist — the certain-classification path"
-    );
-    assert!(
-        !op_body.contains(".pipe.unwrap()") && !op_body.contains(".pipe.expect("),
-        "KycSubjectCorrectType must never unwrap an unresolved classification"
-    );
 }
 
 // ── every_geometry_pipe_is_assertable (the tranche's closure tooth) ────────

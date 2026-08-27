@@ -21,12 +21,17 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionOutcome};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectAssertType, KycSubjectRegister, KycSubjectWithdrawMember, UboEdgeAttachEvidence,
+    KycSubjectPlace, KycSubjectRemove, UboEdgeAttachEvidence,
 };
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideApprove, DecideObligationWaive};
-use ob_poc_kyc_substrate::SubjectId;
+use ob_poc_kyc_seam::append_in_scope;
+use ob_poc_kyc_substrate::{
+    assembly_lexicon, AuthorityRef, FoldRegistry, IntentEvent, Principal, SubjectId,
+    TargetBinding, V1FoldImpl,
+};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
+use std::sync::Arc;
 
 const PROOF_CHECK_ID: &str = "board.every-entity-has-a-proven-type";
 
@@ -63,6 +68,29 @@ async fn run_ok(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) ->
         VerbExecutionOutcome::Record(v) => v,
         other => serde_json::json!({ "non_record_outcome": format!("{other:?}") }),
     }
+}
+
+/// Historical `register`-only shape (T2 retired it as a separate op — see
+/// `kyc_d21_engine.rs`'s identical helper for the full rationale). Used
+/// only where a test genuinely needs "registered, no type yet" — a state
+/// `place` can no longer produce, but the evaluation engine must still
+/// handle correctly for pre-existing streams.
+async fn append_historical_register(subject: SubjectId, is_natural_person: bool, pool: &PgPool) {
+    let mut registry = FoldRegistry::new();
+    registry.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
+    let mut scope = Scope::begin(pool).await;
+    let event = IntentEvent::new(
+        subject,
+        "kyc_ubo.assert.subject.register",
+        Principal::test_analyst(),
+        AuthorityRef("test.historical-shape".into()),
+        TargetBinding::for_subject(subject),
+        serde_json::json!({ "entity_id": subject.0, "is_natural_person": is_natural_person }),
+        chrono::Utc::now(),
+    )
+    .with_lexicon_hash(assembly_lexicon().hash);
+    append_in_scope(&mut scope, &registry, &event, "", |_, _, _| Ok(())).await.unwrap();
+    scope.tx.commit().await.unwrap();
 }
 
 async fn findings_for(pool: &PgPool, subject: SubjectId) -> serde_json::Value {
@@ -103,8 +131,7 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 /// (D2.1 corrective tranche Item 3a). Returns the attach-evidence event's
 /// real `event_id` — the fact this board's Pass must cite.
 async fn build_real_proven_board(pool: &PgPool, subject: SubjectId, entity: Uuid) -> Uuid {
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false }), pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "entity-type": "private_limited_company" }), pool).await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false, "entity-type": "private_limited_company" }), pool).await;
     run_ok(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": subject.0, "entity-id": entity }), pool).await;
     event_id_for(pool, subject, "kyc_ubo.assert.edge.evidence").await
 }
@@ -208,7 +235,7 @@ async fn every_verdict_cites_something_or_says_why() {
 
     // Unevaluable: registered, no type asserted at all (FactAbsent).
     let unevaluable_subject = SubjectId(Uuid::new_v4());
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": unevaluable_subject.0, "is_natural_person": true }), &pool).await;
+    append_historical_register(unevaluable_subject, true, &pool).await;
     run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": unevaluable_subject.0, "check-id": PROOF_CHECK_ID, "reason": "cites property: Unevaluable arm" }), &pool).await;
     let unevaluable_findings = findings_for(&pool, unevaluable_subject).await;
     let unevaluable_arr = unevaluable_findings.as_array().unwrap();
@@ -221,10 +248,9 @@ async fn every_verdict_cites_something_or_says_why() {
 
     // Fail: registered, type asserted (Alleged, never proven), then withdrawn.
     let fail_subject = SubjectId(Uuid::new_v4());
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": fail_subject.0, "is_natural_person": true }), &pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0, "entity-type": "natural_person" }), &pool).await;
-    let alleged_event_id = event_id_for(&pool, fail_subject, "kyc_ubo.assert.subject.type").await;
-    run_ok(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0 }), &pool).await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": fail_subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    let alleged_event_id = event_id_for(&pool, fail_subject, "kyc_ubo.assert.subject.place").await;
+    run_ok(&KycSubjectRemove, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0 }), &pool).await;
     run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": fail_subject.0, "check-id": PROOF_CHECK_ID, "reason": "cites property: Fail arm" }), &pool).await;
     let fail_findings = findings_for(&pool, fail_subject).await;
     let fail_arr = fail_findings.as_array().unwrap();
@@ -295,10 +321,9 @@ async fn p3_vacuous_case_is_self_evident_in_the_record() {
     // nothing here either — `cites: []` is consistent, not ambiguous.
     let withdrawn_proved_subject = SubjectId(Uuid::new_v4());
     let withdrawn_entity = Uuid::new_v4();
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity, "is_natural_person": true }), &pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity, "entity-type": "natural_person" }), &pool).await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
     run_ok(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity }), &pool).await;
-    run_ok(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity }), &pool).await;
+    run_ok(&KycSubjectRemove, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity }), &pool).await;
     let mut ctx3 = test_verb_execution_context_with_session(Uuid::new_v4());
     let mut scope3 = Scope::begin(&pool).await;
     DecideApprove.execute(&serde_json::json!({ "subject-id": withdrawn_proved_subject.0 }), &mut ctx3, &mut scope3).await.expect("withdrawn-but-proved board must approve");
@@ -333,9 +358,8 @@ async fn alleged_finding_cites_its_assertion() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     let entity = Uuid::new_v4();
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false }), &pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "entity-type": "private_limited_company" }), &pool).await;
-    let assertion_event_id = event_id_for(&pool, subject, "kyc_ubo.assert.subject.type").await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false, "entity-type": "private_limited_company" }), &pool).await;
+    let assertion_event_id = event_id_for(&pool, subject, "kyc_ubo.assert.subject.place").await;
 
     run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "alleged_finding_cites_its_assertion" }), &pool).await;
     let findings = findings_for(&pool, subject).await;
@@ -379,15 +403,13 @@ async fn every_cited_event_id_resolves_in_the_fact_stream() {
     // Unevaluable(AllegedType).
     let alleged_subject = SubjectId(Uuid::new_v4());
     let alleged_entity = Uuid::new_v4();
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": alleged_subject.0, "entity-id": alleged_entity, "is_natural_person": false }), &pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": alleged_subject.0, "entity-id": alleged_entity, "entity-type": "private_limited_company" }), &pool).await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": alleged_subject.0, "entity-id": alleged_entity, "is_natural_person": false, "entity-type": "private_limited_company" }), &pool).await;
     run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": alleged_subject.0, "check-id": PROOF_CHECK_ID, "reason": "resolvability: Unevaluable" }), &pool).await;
 
     // Fail.
     let fail_subject = SubjectId(Uuid::new_v4());
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": fail_subject.0, "is_natural_person": true }), &pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0, "entity-type": "natural_person" }), &pool).await;
-    run_ok(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0 }), &pool).await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": fail_subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run_ok(&KycSubjectRemove, serde_json::json!({ "subject-id": fail_subject.0, "entity-id": fail_subject.0 }), &pool).await;
     run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": fail_subject.0, "check-id": PROOF_CHECK_ID, "reason": "resolvability: Fail" }), &pool).await;
 
     for (label, subject) in [("Pass", pass_subject), ("Unevaluable", alleged_subject), ("Fail", fail_subject)] {
@@ -418,10 +440,9 @@ async fn every_cited_event_id_resolves_in_the_fact_stream() {
 async fn a_fail_cites_its_withdrawal() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
-    run_ok(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0, "entity-type": "natural_person" }), &pool).await;
-    run_ok(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), &pool).await;
-    let withdrawal_event_id = event_id_for(&pool, subject, "kyc_ubo.assert.subject.member-withdrawal").await;
+    run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run_ok(&KycSubjectRemove, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), &pool).await;
+    let withdrawal_event_id = event_id_for(&pool, subject, "kyc_ubo.assert.subject.remove").await;
 
     run_ok(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "a_fail_cites_its_withdrawal" }), &pool).await;
     let findings = findings_for(&pool, subject).await;

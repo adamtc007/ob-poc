@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAssertEconomicInterest, UboEdgeReconcileConflict,
 };
 use ob_poc_kyc_store::PgKycEventStore;
@@ -122,9 +122,9 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
     let p3 = Uuid::new_v4();
 
     run(
-        &KycSubjectRegister,
+        &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false,
+            "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company",
         }),
         &pool,
     )
@@ -139,9 +139,9 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
     .await;
     for p in [p1, p2, p3] {
         run(
-            &KycSubjectRegister,
+            &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true,
+                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
             }),
             &pool,
         )
@@ -271,9 +271,9 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
     let subject = SubjectId(Uuid::new_v4());
 
     run(
-        &KycSubjectRegister,
+        &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false,
+            "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company",
         }),
         &pool,
     )
@@ -339,17 +339,17 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
     let p1 = Uuid::new_v4();
 
     run(
-        &KycSubjectRegister,
+        &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false,
+            "subject-id": subject.0, "is_natural_person": false, "entity-type": "lp_fund",
         }),
         &pool,
     )
     .await;
     run(
-        &KycSubjectRegister,
+        &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "entity-id": p1, "is_natural_person": true,
+            "subject-id": subject.0, "entity-id": p1, "is_natural_person": true, "entity-type": "natural_person",
         }),
         &pool,
     )

@@ -481,7 +481,25 @@ pub(crate) fn apply_one_control_event(
 ) -> ControlState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
+        // Historical only (EOP-VS-UBO-GAME-001 T2 retired the verb; the arm
+        // stays so any pre-existing stream with real `register` events
+        // still folds correctly — R5, nothing is deleted). No new event of
+        // this kind can be produced going forward: absent from
+        // `assembly_lexicon()` and unregistered as an op.
         "kyc_ubo.assert.subject.register" => {
+            state.registered = true;
+            state.register_event_id = Some(event.id);
+            if let Some(eid) = entity_id(p, "entity_id") {
+                state.registered_entity_ids.insert(eid);
+            }
+        }
+
+        // §3.2: `place` absorbs register + assert-type — one event, both
+        // axes. This arm writes the ControlGraph axis (membership);
+        // `fold::type_registry::apply_one_type_registry_event` writes the
+        // TypeRegistry axis (type + un-withdraws on re-placement) from the
+        // SAME event, independently (T6.1(a) — two pure folds over one stream).
+        "kyc_ubo.assert.subject.place" => {
             state.registered = true;
             state.register_event_id = Some(event.id);
             if let Some(eid) = entity_id(p, "entity_id") {
@@ -998,6 +1016,25 @@ pub fn check_preconditions(
                 // (`ProvisionalityReason::AllegedType`/`GeometryUnevaluable`),
                 // not here — this checker has no side channel to record into.
             }
+            Precondition::NotCurrentlyPlaced => {
+                // EOP-VS-UBO-GAME-001 §8 Q1 — `place` never carries update
+                // semantics. Vacuous when probed without `entity_id` — same
+                // convention as `EntityRegistered` above.
+                if let Some(EntityId(eid)) = event.target.entity_id {
+                    let currently_placed = control.registered_entity_ids.contains(&EntityId(eid))
+                        && !type_registry.is_withdrawn(EntityId(eid));
+                    if currently_placed {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!(
+                                "entity {eid:?} is already placed on the board; place never \
+                                 carries update semantics (§8 Q1) — remove it first, then \
+                                 place the correction"
+                            ),
+                        });
+                    }
+                }
+            }
         }
     }
     Ok(())
@@ -1320,7 +1357,12 @@ pub fn reconciled_trust_edges(state: &ControlState) -> Vec<ReconciledTrustEdge> 
 pub fn natural_persons_from_events(events: &[&IntentEvent]) -> BTreeSet<PersonId> {
     let mut persons = BTreeSet::new();
     for event in events {
-        if event.verb_fqn.as_str() == "kyc_ubo.assert.subject.register"
+        // `place` (EOP-VS-UBO-GAME-001 T2) carries `is_natural_person` the
+        // same way `register` (now historical-only, see its fold arm's own
+        // comment) always did — recognizing both keeps this helper correct
+        // for pre-T2 streams and every stream going forward.
+        if (event.verb_fqn.as_str() == "kyc_ubo.assert.subject.register"
+            || event.verb_fqn.as_str() == "kyc_ubo.assert.subject.place")
             && event
                 .payload
                 .get("is_natural_person")

@@ -60,7 +60,7 @@ pub use fold::registry::{
     fold_control_versioned, fold_obligations_versioned, FoldImpl, FoldRegistry, V1FoldImpl,
 };
 pub use fold::type_registry::{
-    edges_invalidated_by_correction, entity_type_from_wire, fold_type_registry, EnquiryRecord,
+    entity_type_from_wire, fold_type_registry, EnquiryRecord,
     EntityTypeRecord, TypeCorrectionRecord, TypeProofStatus, TypeRegistryState,
     ENTITY_TYPE_WIRE_VALUES,
 };

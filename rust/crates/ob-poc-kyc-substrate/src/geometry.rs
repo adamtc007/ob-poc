@@ -337,14 +337,17 @@ pub fn check_type_geometry(
 
 // ── Pipe derivation (TS.2 §3) ───────────────────────────────────────────────
 //
-// **Pulled forward from the D1-Part-B tranche.** `kyc_ubo.assert.subject.type-correction`'s
-// §4 cascade (`fold::type_registry::edges_invalidated_by_correction`) needs a
-// `Pipe` classification for each edge touching the corrected entity — that is
-// exactly TS.2's `pipe_of(edge_kind, target_entity_type) -> Pipe` deliverable.
-// Built here, now, against TODAY's 11-variant `EdgeKind` so Part A's
-// `correct-type` op is genuinely real rather than stubbed; Part B's B2 step
-// widens the match for the 6 `EdgeKind` variants it adds and does not need to
-// invent this function fresh.
+// **Pulled forward from the D1-Part-B tranche.** Originally motivated by
+// `kyc_ubo.assert.subject.type-correction`'s §4 cascade
+// (`fold::type_registry::edges_invalidated_by_correction`), which needed a
+// `Pipe` classification for each edge touching the corrected entity — that
+// verb and its cascade were DISSOLVED by EOP-VS-UBO-GAME-001 T2 (§8 Q1,
+// 2026-08-27), but `pipe_of` itself outlived its original motivating caller:
+// TS.5's `Precondition::TypeGeometryPermits` (the live write-path geometry
+// check) is its real consumer now. Built here, now, against TODAY's
+// 11-variant `EdgeKind` so Part A's original op was genuinely real rather
+// than stubbed; Part B's B2 step widens the match for the 6 `EdgeKind`
+// variants it adds and does not need to invent this function fresh.
 
 /// A `Pipe` classification derived from a stored edge. `provisional: true`
 /// means the classification is genuinely UNRESOLVED — `pipe` is `None`, not

@@ -10,7 +10,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectRegister, UboEdgeAssertControl};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeAssertControl};
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{fold_control, SubjectId};
 use ob_poc_types::TransactionScopeId;
@@ -93,8 +93,8 @@ async fn unparseable_wire_value_is_not_dominant_influence() {
     let to = Uuid::new_v4();
 
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0 }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;

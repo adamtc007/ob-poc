@@ -31,13 +31,16 @@ use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectAssertType, KycSubjectRegister};
+use ob_poc::domain_ops::kyc_stream_ops::KycSubjectPlace;
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideApprove, DecideObligationWaive};
+use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_substrate::{
-    work_list_from_history, EvaluationRun, Finding, Hash, RunTrigger, SubjectId, Verdict,
+    assembly_lexicon, work_list_from_history, AuthorityRef, EvaluationRun, FoldRegistry, Finding,
+    Hash, IntentEvent, Principal, RunTrigger, SubjectId, TargetBinding, V1FoldImpl, Verdict,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
+use std::sync::Arc;
 
 const PROOF_CHECK_ID: &str = "board.every-entity-has-a-proven-type";
 
@@ -76,6 +79,42 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) {
     let mut ctx = test_verb_execution_context_with_session(Uuid::new_v4());
     let mut scope = Scope::begin(pool).await;
     op.execute(&args, &mut ctx, &mut scope).await.unwrap_or_else(|e| panic!("{}: {e}", op.fqn()));
+    scope.tx.commit().await.unwrap();
+}
+
+fn historical_registry() -> FoldRegistry {
+    let mut r = FoldRegistry::new();
+    r.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
+    r
+}
+
+/// Constructs a `register`-only or `type`-only event, exactly the shape a
+/// pre-T2 stream carries (EOP-VS-UBO-GAME-001 T2 retired both as separate
+/// op-dispatchable verbs, merged into `place` — no NEW write can produce an
+/// entity that is registered but untyped, or type-asserted independently of
+/// registration, any more). Used only by
+/// `unevaluable_is_not_fail_through_production` /
+/// `unevaluable_flips_to_pass_through_production`, which test the
+/// evaluation engine's `ProvenTypeCheck::FactAbsent`/`AllegedType` distinction
+/// — a real, still-valid fold state for historical data, reachable no other
+/// way post-T2. Bypasses `SemOsVerbOp` entirely (there is no live op for
+/// these FQNs); appends directly via the same `append_in_scope` chokepoint
+/// every op uses, so this is still a real governed append, just of a
+/// historical-shaped event.
+async fn append_historical(verb_fqn: &str, subject: SubjectId, payload: serde_json::Value, pool: &PgPool) {
+    let registry = historical_registry();
+    let mut scope = Scope::begin(pool).await;
+    let event = IntentEvent::new(
+        subject,
+        verb_fqn,
+        Principal::test_analyst(),
+        AuthorityRef("test.historical-shape".into()),
+        TargetBinding::for_subject(subject),
+        payload,
+        chrono::Utc::now(),
+    )
+    .with_lexicon_hash(assembly_lexicon().hash);
+    append_in_scope(&mut scope, &registry, &event, "", |_, _, _| Ok(())).await.unwrap();
     scope.tx.commit().await.unwrap();
 }
 
@@ -134,7 +173,7 @@ async fn a_check_produces_a_verdict() {
 
     // (2) UNEVALUABLE — an entity registered, no type ever asserted.
     let s_unevaluable = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": s_unevaluable.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": s_unevaluable.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": s_unevaluable.0, "check-id": PROOF_CHECK_ID, "reason": "unevaluable case" }), &pool).await;
     let findings_unevaluable = findings_for(&pool, s_unevaluable).await;
     assert!(
@@ -145,7 +184,7 @@ async fn a_check_produces_a_verdict() {
     // (3) FAIL — a withdrawn, unproven member, via the real production op
     // `kyc_ubo.assert.subject.member-withdrawal` (TS.1 move 6).
     let s_fail = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": s_fail.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": s_fail.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
     withdraw_member(&pool, s_fail).await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": s_fail.0, "check-id": PROOF_CHECK_ID, "reason": "fail case" }), &pool).await;
     let findings_fail = findings_for(&pool, s_fail).await;
@@ -157,8 +196,8 @@ async fn a_check_produces_a_verdict() {
 /// `kyc_ubo.assert.subject.member-withdrawal` — TS.1 move 6, the real
 /// production op, used here to build the FAIL board above.
 async fn withdraw_member(pool: &PgPool, subject: SubjectId) {
-    use ob_poc::domain_ops::kyc_stream_ops::KycSubjectWithdrawMember;
-    run(&KycSubjectWithdrawMember, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), pool).await;
+    use ob_poc::domain_ops::kyc_stream_ops::KycSubjectRemove;
+    run(&KycSubjectRemove, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), pool).await;
 }
 
 /// D2.1 §6 `findings_reach_the_run_record` — a run's persisted `findings`
@@ -184,7 +223,16 @@ async fn findings_reach_the_run_record() {
 async fn unevaluable_carries_its_reason() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    // Historical shape — see `append_historical`'s own doc: this test needs
+    // FactAbsent (no type asserted at all), which `place` can no longer
+    // produce (it always types atomically).
+    append_historical(
+        "kyc_ubo.assert.subject.register",
+        subject,
+        serde_json::json!({ "entity_id": subject.0, "is_natural_person": true }),
+        &pool,
+    )
+    .await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "reason probe" }), &pool).await;
     let findings = findings_for(&pool, subject).await;
     let reason = findings[0]["verdict"]["Unevaluable"]["reason"].clone();
@@ -254,7 +302,15 @@ async fn load_run_history(pool: &PgPool, subject: SubjectId) -> Vec<EvaluationRu
 async fn unevaluable_is_not_fail_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    // Historical shape (T2 retired register/type as separate ops — see
+    // `append_historical`'s own doc): registered, no type yet.
+    append_historical(
+        "kyc_ubo.assert.subject.register",
+        subject,
+        serde_json::json!({ "entity_id": subject.0, "is_natural_person": true }),
+        &pool,
+    )
+    .await;
 
     // Run 1: no type asserted at all -> Unevaluable(FactAbsent). Never Fail.
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1: fact absent" }), &pool).await;
@@ -266,7 +322,13 @@ async fn unevaluable_is_not_fail_through_production() {
     // Unevaluable, now for a DIFFERENT reason (AllegedType, not FactAbsent).
     // Confirms "never the reverse" isn't trivially satisfied by staying put
     // for the SAME reason.
-    run(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0, "entity-type": "natural_person" }), &pool).await;
+    append_historical(
+        "kyc_ubo.assert.subject.type",
+        subject,
+        serde_json::json!({ "entity_id": subject.0, "entity_type": "natural_person" }),
+        &pool,
+    )
+    .await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 2: still alleged" }), &pool).await;
     let findings2 = findings_for(&pool, subject).await;
     assert!(findings2[0]["verdict"].get("Unevaluable").is_some(), "an alleged type must stay Unevaluable: {findings2}");
@@ -296,13 +358,26 @@ async fn unevaluable_is_not_fail_through_production() {
 async fn unevaluable_flips_to_pass_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    // Historical shape — see `append_historical`'s own doc.
+    append_historical(
+        "kyc_ubo.assert.subject.register",
+        subject,
+        serde_json::json!({ "entity_id": subject.0, "is_natural_person": true }),
+        &pool,
+    )
+    .await;
 
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1: fact absent" }), &pool).await;
     let findings1 = findings_for(&pool, subject).await;
     assert!(findings1[0]["verdict"].get("Unevaluable").is_some(), "no type asserted must be Unevaluable: {findings1}");
 
-    run(&KycSubjectAssertType, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0, "entity-type": "natural_person" }), &pool).await;
+    append_historical(
+        "kyc_ubo.assert.subject.type",
+        subject,
+        serde_json::json!({ "entity_id": subject.0, "entity_type": "natural_person" }),
+        &pool,
+    )
+    .await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 2: alleged" }), &pool).await;
     let findings2 = findings_for(&pool, subject).await;
     assert!(findings2[0]["verdict"].get("Unevaluable").is_some(), "an alleged type must stay Unevaluable: {findings2}");
@@ -336,7 +411,7 @@ async fn unevaluable_flips_to_pass_through_production() {
 async fn work_list_is_derived_from_latest_run_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
 
     // Run 1 (older): Unevaluable(FactAbsent).
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1" }), &pool).await;
@@ -378,7 +453,7 @@ async fn k23_gate_can_fire() {
     // A registered-but-untyped entity produces Unevaluable -> non-empty
     // work list -> approve MUST be refused.
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
     let err = run_expect_err(&DecideApprove, serde_json::json!({ "subject-id": subject.0 }), &pool).await;
     assert!(err.contains("K-23"), "approval of a subject with a non-empty work list must be refused citing K-23: {err}");
 
@@ -397,7 +472,7 @@ async fn k23_gate_can_fire() {
 async fn waived_check_was_in_scope() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
 
     let err = run_expect_err(
         &DecideObligationWaive,

@@ -46,13 +46,14 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister,
+    KycSubjectClassifyStructure, KycSubjectPlace,
     UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
     UboEdgeReconcileConflict,
 };
+use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, assembly_lexicon, DeterminationStrategy, FoldRegistry, IntentEvent,
-    SubjectId, V1FoldImpl,
+    fold_control_versioned, assembly_lexicon, AuthorityRef, DeterminationStrategy, EdgeId,
+    FoldRegistry, IntentEvent, Principal, SubjectId, TargetBinding, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -131,6 +132,52 @@ async fn run_fallible(
     })
 }
 
+/// Appends a `kyc_ubo.assert.edge.control` event directly, bypassing
+/// `check_control_preconditions` (so `TypeGeometryPermits`, TS.5) — for
+/// test (d) only, which deliberately puts an INCOMPATIBLE-geometry
+/// `gp_statutory` edge onto a typed cooperative subject to prove
+/// `cooperative_member_strategy`'s own kind filter excludes it. Pre-T2,
+/// `register` never typed the subject, so this edge's geometry was always
+/// `Unevaluable` (vacuous) on the live path; post-T2, `place` mandates a
+/// type (§3.2), and no single `EntityType` permits both `VotingShares` and
+/// `GpDesignation` (there is no real-world entity that is simultaneously
+/// share-voted and GP-designated) — so this fixture's premise (both kinds
+/// landing on the same typed subject, filtered by the STRATEGY layer, not
+/// geometry) is only reachable as a historical-shaped append, same pattern
+/// as `kyc_d21_engine.rs`'s `append_historical`.
+async fn append_historical_control_edge(
+    subject: SubjectId,
+    from: Uuid,
+    to: Uuid,
+    kind: &str,
+    pool: &PgPool,
+) {
+    let mut reg = FoldRegistry::new();
+    reg.register(assembly_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
+    let edge = EdgeId(Uuid::new_v4());
+    let payload = serde_json::json!({
+        "edge_id": edge.0,
+        "from_entity_id": from,
+        "to_entity_id": to,
+        "kind": kind,
+    });
+    let mut scope = Scope::begin(pool).await;
+    let event = IntentEvent::new(
+        subject,
+        "kyc_ubo.assert.edge.control",
+        Principal::test_analyst(),
+        AuthorityRef("test.historical-shape".into()),
+        TargetBinding::for_edge(subject, edge),
+        payload,
+        chrono::Utc::now(),
+    )
+    .with_lexicon_hash(assembly_lexicon().hash);
+    append_in_scope(&mut scope, &reg, &event, "", |_, _, _| Ok(()))
+        .await
+        .unwrap();
+    scope.commit().await;
+}
+
 async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
     for s in subjects {
         for t in [
@@ -160,16 +207,16 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 /// Register subject + natural persons, then classify with `structure_class`.
 async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], class: &str) {
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         pool,
     )
     .await;
     for p in persons {
         run(
-            &KycSubjectRegister,
+            &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true,
+                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
             }),
             pool,
         )
@@ -485,15 +532,10 @@ async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
         &pool,
     )
     .await;
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject.0, "from_entity_id": gp_holder, "to_entity_id": subject.0,
-            "kind": "gp_statutory",
-        }),
-        &pool,
-    )
-    .await;
+    // gp_statutory geometrically cannot land on a typed cooperative subject
+    // (no EntityType permits both VotingShares and GpDesignation) — bypass
+    // geometry via a historical-shaped append; see the helper's doc comment.
+    append_historical_control_edge(subject, gp_holder, subject.0, "gp_statutory", &pool).await;
     run(
         &UboEdgeReconcileConflict,
         serde_json::json!({ "subject-id": subject.0 }),

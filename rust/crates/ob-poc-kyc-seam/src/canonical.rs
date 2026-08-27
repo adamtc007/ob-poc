@@ -76,11 +76,6 @@ fn required_string_arg<'a>(verb_fqn: &str, args: &'a serde_json::Value, name: &s
 /// - `kyc_ubo.decide.subject.{approve,reject}` / `.decide.obligation.waiver`
 ///   — never build an `IntentEvent` (TS.6 P2); calling this with one of
 ///   these FQNs is a caller bug, not a shape question, hence `bail!`.
-/// - `kyc_ubo.assert.subject.type-correction`'s `invalidated_edge_ids` —
-///   a computed consequence of live `ControlState`/`TypeRegistryState`
-///   (the §4 cascade), not a declared argument. This function returns the
-///   args-derivable base payload (`entity_id`/`entity_type`); the caller
-///   merges the cascade field in afterward, same as today.
 /// - `kyc_ubo.assert.edge.control`'s `pierced-from` existence/kind/active
 ///   check — needs a live DB read; stays a separate op-layer step around
 ///   this call, same principle.
@@ -92,13 +87,28 @@ pub fn canonical_event_shape(
     let subj_target = TargetBinding::for_subject(subject);
 
     match verb_fqn {
-        "kyc_ubo.assert.subject.register" => {
-            let entity_id = uuid_arg(args, "entity-id").unwrap_or(subject.0);
-            let mut payload = serde_json::json!({ "entity_id": entity_id });
+        // EOP-VS-UBO-GAME-001 T2, §3.2: `place` absorbs register +
+        // assert-type — one move, one event, both membership and type.
+        // Entity-scoped target (unlike register's old bare-subject target):
+        // needed so `placement.rs` can offer real, non-vacuous per-entity
+        // `place` candidates (T1's P4 deferral, closed for the re-placeable
+        // population). `entity-id` still defaults to the subject's own
+        // entity — the one candidate that needs no discovery data.
+        "kyc_ubo.assert.subject.place" => {
+            let entity = EntityId(uuid_arg(args, "entity-id").unwrap_or(subject.0));
+            let entity_type = required_string_arg(verb_fqn, args, "entity-type")?;
+            if !ENTITY_TYPE_WIRE_VALUES.contains(&entity_type) {
+                bail!(
+                    "{verb_fqn}: unrecognized entity-type '{entity_type}' — valid wire values: {}",
+                    ENTITY_TYPE_WIRE_VALUES.join(", ")
+                );
+            }
+            let target = TargetBinding { entity_id: Some(entity), ..subj_target };
+            let mut payload = serde_json::json!({ "entity_id": entity.0, "entity_type": entity_type });
             if let Some(v) = args.get("is_natural_person") {
                 payload["is_natural_person"] = v.clone();
             }
-            Ok((subj_target, payload, None))
+            Ok((target, payload, None))
         }
 
         "kyc_ubo.assert.subject.structure-class" => {
@@ -114,21 +124,17 @@ pub fn canonical_event_shape(
             Ok((subj_target, payload, None))
         }
 
-        "kyc_ubo.assert.subject.type" | "kyc_ubo.assert.subject.type-correction" => {
-            let entity = EntityId(required_uuid_arg(verb_fqn, args, "entity-id")?);
-            let entity_type = required_string_arg(verb_fqn, args, "entity-type")?;
-            if !ENTITY_TYPE_WIRE_VALUES.contains(&entity_type) {
-                bail!(
-                    "{verb_fqn}: unrecognized entity-type '{entity_type}' — valid wire values: {}",
-                    ENTITY_TYPE_WIRE_VALUES.join(", ")
-                );
-            }
-            let target = TargetBinding { entity_id: Some(entity), ..subj_target };
-            let payload = serde_json::json!({ "entity_id": entity.0, "entity_type": entity_type });
-            Ok((target, payload, None))
-        }
+        // `kyc_ubo.assert.subject.type` retired by T2 (absorbed into
+        // `place`, above) — no longer a live arm here.
+        //
+        // `kyc_ubo.assert.subject.type-correction` DISSOLVED by T2 (§8 Q1,
+        // 2026-08-27) — no live arm here either. Correcting a type is
+        // `remove` then `place`, two ordinary moves through the arms
+        // already above, never a superseding placement.
 
-        "kyc_ubo.assert.subject.member-withdrawal" => {
+        // EOP-VS-UBO-GAME-001 T2, §3.2: `remove` absorbs member-withdrawal
+        // — identical shape, new name.
+        "kyc_ubo.assert.subject.remove" => {
             let entity = EntityId(required_uuid_arg(verb_fqn, args, "entity-id")?);
             let target = TargetBinding { entity_id: Some(entity), ..subj_target };
             let payload = serde_json::json!({ "entity_id": entity.0 });
@@ -275,24 +281,44 @@ mod tests {
     /// the fold reads it from the payload. This is the one assertion that
     /// must never regress.
     #[test]
-    fn register_entity_id_lands_in_payload() {
+    fn place_entity_id_and_type_land_in_target_and_payload() {
         let s = subj();
         let entity = Uuid::new_v4();
-        let args = serde_json::json!({ "subject-id": s.0, "entity-id": entity });
+        let args = serde_json::json!({
+            "subject-id": s.0, "entity-id": entity, "entity-type": "private_limited_company"
+        });
         let (target, payload, edge) =
-            canonical_event_shape("kyc_ubo.assert.subject.register", s, &args).unwrap();
+            canonical_event_shape("kyc_ubo.assert.subject.place", s, &args).unwrap();
+        assert_eq!(target.entity_id, Some(EntityId(entity)));
         assert_eq!(payload["entity_id"], entity.to_string());
-        assert_eq!(target.subject_root, Some(s));
+        assert_eq!(payload["entity_type"], "private_limited_company");
         assert!(edge.is_none());
     }
 
     #[test]
-    fn register_defaults_entity_id_to_subject() {
+    fn place_defaults_entity_id_to_subject() {
         let s = subj();
-        let args = serde_json::json!({ "subject-id": s.0 });
-        let (_, payload, _) =
-            canonical_event_shape("kyc_ubo.assert.subject.register", s, &args).unwrap();
+        let args = serde_json::json!({ "subject-id": s.0, "entity-type": "natural_person" });
+        let (target, payload, _) =
+            canonical_event_shape("kyc_ubo.assert.subject.place", s, &args).unwrap();
+        assert_eq!(target.entity_id, Some(EntityId(s.0)));
         assert_eq!(payload["entity_id"], s.0.to_string());
+    }
+
+    #[test]
+    fn place_rejects_unknown_entity_type() {
+        let s = subj();
+        let args = serde_json::json!({
+            "subject-id": s.0, "entity-id": Uuid::new_v4(), "entity-type": "spaceship"
+        });
+        assert!(canonical_event_shape("kyc_ubo.assert.subject.place", s, &args).is_err());
+    }
+
+    #[test]
+    fn place_requires_entity_type() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0, "entity-id": Uuid::new_v4() });
+        assert!(canonical_event_shape("kyc_ubo.assert.subject.place", s, &args).is_err());
     }
 
     #[test]
@@ -313,35 +339,12 @@ mod tests {
     }
 
     #[test]
-    fn assert_type_entity_id_and_type_land_in_target_and_payload() {
-        let s = subj();
-        let entity = Uuid::new_v4();
-        let args = serde_json::json!({
-            "subject-id": s.0, "entity-id": entity, "entity-type": "natural_person"
-        });
-        let (target, payload, _) =
-            canonical_event_shape("kyc_ubo.assert.subject.type", s, &args).unwrap();
-        assert_eq!(target.entity_id, Some(EntityId(entity)));
-        assert_eq!(payload["entity_id"], entity.to_string());
-        assert_eq!(payload["entity_type"], "natural_person");
-    }
-
-    #[test]
-    fn assert_type_rejects_unknown_entity_type() {
-        let s = subj();
-        let args = serde_json::json!({
-            "subject-id": s.0, "entity-id": Uuid::new_v4(), "entity-type": "spaceship"
-        });
-        assert!(canonical_event_shape("kyc_ubo.assert.subject.type", s, &args).is_err());
-    }
-
-    #[test]
-    fn member_withdrawal_entity_id_in_target_and_payload() {
+    fn remove_entity_id_in_target_and_payload() {
         let s = subj();
         let entity = Uuid::new_v4();
         let args = serde_json::json!({ "subject-id": s.0, "entity-id": entity });
         let (target, payload, _) =
-            canonical_event_shape("kyc_ubo.assert.subject.member-withdrawal", s, &args).unwrap();
+            canonical_event_shape("kyc_ubo.assert.subject.remove", s, &args).unwrap();
         assert_eq!(target.entity_id, Some(EntityId(entity)));
         assert_eq!(payload["entity_id"], entity.to_string());
     }
@@ -533,5 +536,23 @@ mod tests {
         let s = subj();
         let args = serde_json::json!({});
         assert!(canonical_event_shape("not.a.real.verb", s, &args).is_err());
+    }
+
+    /// T2 (EOP-VS-UBO-GAME-001 §3.2) retired `register`/`type` (merged into
+    /// `place`) and `member-withdrawal` (renamed `remove`). A stale match
+    /// arm silently reappearing for any of these would let a second
+    /// constructor back in through the side door; this guards that.
+    #[test]
+    fn retired_verbs_are_no_longer_recognized() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0, "entity-id": Uuid::new_v4() });
+        for fqn in [
+            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.type",
+            "kyc_ubo.assert.subject.type-correction",
+            "kyc_ubo.assert.subject.member-withdrawal",
+        ] {
+            assert!(canonical_event_shape(fqn, s, &args).is_err(), "{fqn} must no longer be recognized");
+        }
     }
 }

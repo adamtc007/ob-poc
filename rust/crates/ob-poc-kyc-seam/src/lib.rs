@@ -9,9 +9,16 @@
 //!    the `EOP-VS-UBO-GAME-001` rip-and-replace): maps a verb's declared
 //!    arguments to `(TargetBinding, payload, Option<EdgeId>)`. Every
 //!    surface that builds a `kyc_ubo.*` `IntentEvent` calls this — the op
-//!    layer and the workbook both, no exceptions besides the three
-//!    documented on the function itself (freeze, the three decide.*
-//!    verdicts, and one state-dependent payload field of type-correction).
+//!    layer and the workbook both. Two documented exceptions remain, as of
+//!    T2 (§8 Q1, 2026-08-27, which dissolved the third — `type-correction`'s
+//!    computed `invalidated_edge_ids` payload field, the one state-dependent
+//!    enrichment that used to keep this function impure for one verb):
+//!    `freeze` (computes a verdict from live state, not declared args) and
+//!    the internal W5 screening-hook fan-out (synthesizes events from
+//!    fold-derived data, not a caller's declared arguments — not a "surface"
+//!    in R6's sense). The three `decide.*` verdicts are a different kind of
+//!    exclusion entirely — they never build an `IntentEvent` at all, living
+//!    in `ob-poc-kyc-decide`, outside this constructor's domain.
 //! 2. [`append_in_scope`] — the §3.6 chokepoint: run the §3 append inside the
 //!    `TransactionScope` the Sequencer already owns. Every KYC stream append
 //!    routes through this one function, so the guard/audit have a single

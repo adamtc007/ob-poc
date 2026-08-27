@@ -13,8 +13,8 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_type_geometry, edges_invalidated_by_correction, enumerate_placement_set,
-    fold_type_registry, assembly_lexicon, AuthorityRef, EdgeId, EntityId, EntityType,
+    check_type_geometry, enumerate_placement_set,
+    fold_type_registry, assembly_lexicon, AuthorityRef, EntityId, EntityType,
     GeometryError, IntentEvent, LinkageSource, ObligationState, Pipe, Principal, SubjectId,
     TargetBinding, ALL_ENTITY_TYPES, ALL_PIPES,
 };
@@ -37,27 +37,6 @@ fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> Intent
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
         serde_json::json!({ "entity_id": entity.0.to_string(), "entity_type": wire }),
-        as_of(),
-    )
-}
-
-fn correct_type_event(
-    subject: SubjectId,
-    entity: EntityId,
-    wire: &str,
-    invalidated: &[EdgeId],
-) -> IntentEvent {
-    IntentEvent::new(
-        subject,
-        "kyc_ubo.assert.subject.type-correction",
-        Principal::test_analyst(),
-        AuthorityRef("test".into()),
-        TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
-        serde_json::json!({
-            "entity_id": entity.0.to_string(),
-            "entity_type": wire,
-            "invalidated_edge_ids": invalidated.iter().map(|e| e.0.to_string()).collect::<Vec<_>>(),
-        }),
         as_of(),
     )
 }
@@ -334,39 +313,11 @@ fn mandate_refuses_person_source() {
     }
 }
 
-// ── Gate 7 ───────────────────────────────────────────────────────────────────
-
-#[test]
-fn correct_type_demotes_never_deletes() {
-    let subj = subject();
-    let entity = EntityId(Uuid::new_v4());
-
-    // Entity originally typed as a corporate holds a ManagementMandate into
-    // a fund — valid under PrivateLimitedCompany (corporate-only source).
-    let touching = [(EdgeId(Uuid::new_v4()), Pipe::ManagementMandate, EntityType::Sicav, true)];
-    let edge_id = touching[0].0;
-
-    // Corrected to GeneralPartnership: ManagementMandate's source rule
-    // (corporates only) no longer admits it -> invalidated.
-    let invalidated = edges_invalidated_by_correction(EntityType::GeneralPartnership, &touching);
-    assert_eq!(invalidated, vec![edge_id]);
-
-    let e1 = assert_type_event(subj, entity, "private_limited_company");
-    let e2 = correct_type_event(subj, entity, "general_partnership", &invalidated);
-    let state = fold_type_registry(&[&e1, &e2]);
-
-    // Flagged, never deleted: nothing in this axis removes an edge id from
-    // anywhere once flagged — `flagged_edges` only grows (a `BTreeSet`,
-    // never `.remove()`d anywhere in `apply_one_type_registry_event`).
-    assert!(state.flagged_edges.contains(&edge_id), "invalidated edge must be flagged, not deleted");
-    assert!(state.determination_stale, "a correction that invalidates edges marks the determination stale");
-    assert_eq!(state.corrections.len(), 1);
-    assert_eq!(state.corrections[0].invalidated_edges, vec![edge_id]);
-    assert_eq!(state.corrections[0].previous_type, Some(EntityType::PrivateLimitedCompany));
-    assert_eq!(state.corrections[0].corrected_type, EntityType::GeneralPartnership);
-    // The entity's current type is the corrected one — corrected, not erased.
-    assert_eq!(state.type_of(entity), Some(EntityType::GeneralPartnership));
-}
+// Gate 7 (`correct_type_demotes_never_deletes`) REMOVED — EOP-VS-UBO-GAME-001
+// T2 (2026-08-27, §8 Q1) DISSOLVED `kyc_ubo.assert.subject.type-correction`
+// and its cascade (`edges_invalidated_by_correction`, deleted); correcting a
+// type is now `remove` then `place`, two ordinary moves. See
+// `tests/kyc_t2_place_remove.rs`'s `type_correction_is_remove_then_place`.
 
 // ── Gate 8 ───────────────────────────────────────────────────────────────────
 
@@ -490,8 +441,17 @@ fn construct_is_pure() {
 
 /// Proves the full loop, not just the isolated pieces: registering group
 /// members, geometry gating `assert-control` on/off as types are asserted,
-/// and every new TS.1 move surfacing as a candidate through the SAME
-/// `enumerate_placement_set` entry point the workbook (T4/T4.5) calls.
+/// and the board's `place`/`remove` candidates surfacing correctly through
+/// the SAME `enumerate_placement_set` entry point the workbook (T4/T4.5)
+/// calls.
+///
+/// **T2 note (EOP-VS-UBO-GAME-001):** `register`/`type` retired, merged
+/// into `place` — real writes can no longer produce "registered but
+/// untyped." `register`/`assert_type_event` below build that state
+/// directly at the pure-fold level (their fold arms remain, historical
+/// replay only — R5) purely to keep exercising the geometry gate's
+/// before/after distinction this test exists for; no live surface can
+/// build it this way any more.
 #[test]
 fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     let subj = subject();
@@ -519,10 +479,10 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     assert!(control.registered);
     assert_eq!(control.registered_entity_ids.len(), 2);
 
-    // BEFORE any assert-type: geometry cannot be evaluated for either
-    // entity, so the two geometry-gated verbs must NOT appear — even
-    // though the stud layer alone (SubjectRegistered=true) would admit
-    // them. This is the K-G5 gap TS.1 closes.
+    // BEFORE any type: geometry cannot be evaluated for either entity, so
+    // the two geometry-gated verbs must NOT appear — even though the stud
+    // layer alone (SubjectRegistered=true) would admit them. This is the
+    // K-G5 gap TS.1 closes.
     let untyped_registry = ob_poc_kyc_substrate::TypeRegistryState::default();
     let set_before = enumerate_placement_set(subj, &control, &obligation, &untyped_registry, &lexicon);
     assert!(
@@ -533,36 +493,38 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
         !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.economic-interest"),
         "assert-economic-interest must be refused before any group member has an asserted type"
     );
-    // But the new moves are already surfaced: assert-type for both members,
-    // record-enquiry for the group, no withdraw-member/correct-type yet
-    // relevant distinctions beyond "types not yet asserted".
+    // `place` no longer appears for person/company (T2 §3.1): they are
+    // registered but not currently-withdrawn, so they are not in the
+    // enumerable "not currently placed" population (T1's P4 finding) — the
+    // board correctly has nothing to offer for re-placing an entity that
+    // isn't withdrawn. `remove` DOES still offer both — untyped is still
+    // "on the board" for removal purposes, a real, worth-documenting
+    // consequence, not an oversight. `enquiry` is unaffected.
+    assert!(!set_before
+        .moves
+        .iter()
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.place"
+            && (m.target.entity_id == Some(person) || m.target.entity_id == Some(company))));
     assert!(set_before
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.remove"
             && m.target.entity_id == Some(person)));
     assert!(set_before
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.remove"
             && m.target.entity_id == Some(company)));
     assert!(set_before
         .moves
         .iter()
         .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.enquiry"));
-    assert!(
-        !set_before
-            .moves
-            .iter()
-            .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type-correction"),
-        "correct-type must not be offered before any type has been asserted"
-    );
 
-    // AFTER assert-type on both (person -> NaturalPerson, company ->
+    // AFTER typing both (person -> NaturalPerson, company ->
     // PrivateLimitedCompany): a VotingShares linkage from person into
     // company is geometrically possible (§2 row 1, §2a row 1) — the
-    // geometry-gated verbs must now appear, AND correct-type must now be
-    // offered for both (a type exists to correct).
+    // geometry-gated verbs must now appear. `remove` stays offered for
+    // both, unaffected by typing.
     let e1 = assert_type_event(subj, person, "natural_person");
     let e2 = assert_type_event(subj, company, "private_limited_company");
     let typed_registry = fold_type_registry(&[&e1, &e2]);
@@ -577,12 +539,12 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     assert!(set_after
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type-correction"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.remove"
             && m.target.entity_id == Some(person)));
     assert!(set_after
         .moves
         .iter()
-        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.type-correction"
+        .any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.remove"
             && m.target.entity_id == Some(company)));
 
     // Sanity: person is never a target anywhere in geometry — asserting

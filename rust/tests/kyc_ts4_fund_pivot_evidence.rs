@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAttachEvidence, UboEdgeReconcileConflict,
 };
 use ob_poc_types::TransactionScopeId;
@@ -118,14 +118,14 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     let mandate_edge = Uuid::new_v4();
 
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject, "entity-id": alice, "is_natural_person": true }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject, "entity-id": alice, "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;

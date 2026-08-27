@@ -35,7 +35,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectRegister, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
+    KycSubjectPlace, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
     UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede,
 };
 use ob_poc_kyc_substrate::SubjectId;
@@ -94,9 +94,9 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 }
 
 async fn register(scope: &mut Scope, subject: SubjectId) {
-    KycSubjectRegister
+    KycSubjectPlace
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
             &mut VerbExecutionContext::default(),
             scope,
         )
@@ -438,10 +438,10 @@ async fn row9_register_blocks_true_duplicate_entity_id() {
     let subject = SubjectId(Uuid::new_v4());
     let mut scope = Scope::begin(&pool).await;
     let entity = Uuid::new_v4();
-    KycSubjectRegister
+    KycSubjectPlace
         .execute(
             &serde_json::json!({
-                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true
+                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true, "entity-type": "natural_person"
             }),
             &mut VerbExecutionContext::default(),
             &mut scope,
@@ -449,10 +449,10 @@ async fn row9_register_blocks_true_duplicate_entity_id() {
         .await
         .expect("first registration of a fresh (subject, entity) pair must be admitted");
 
-    let result = KycSubjectRegister
+    let result = KycSubjectPlace
         .execute(
             &serde_json::json!({
-                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true
+                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true, "entity-type": "natural_person"
             }),
             &mut VerbExecutionContext::default(),
             &mut scope,
@@ -479,10 +479,10 @@ async fn row9_register_admits_multi_person_distinct_entity_ids() {
     // — the real production shape (kyc_m3_remediation.rs) that a bare
     // per-subject `registered` boolean would have wrongly blocked.
     for candidate in [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()] {
-        let result = KycSubjectRegister
+        let result = KycSubjectPlace
             .execute(
                 &serde_json::json!({
-                    "subject-id": subject.0, "entity-id": candidate, "is_natural_person": true
+                    "subject-id": subject.0, "entity-id": candidate, "is_natural_person": true, "entity-type": "natural_person"
                 }),
                 &mut VerbExecutionContext::default(),
                 &mut scope,

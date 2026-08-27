@@ -21,9 +21,9 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use ob_poc_kyc_seam::{append_in_scope, canonical_event_shape, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
 use ob_poc_kyc_substrate::{
-    check_preconditions, edges_invalidated_by_correction,
-    entity_type_from_wire, find_subject_entity, fold_control_versioned, fold_obligations_versioned,
-    fold_type_registry, natural_persons_from_events, assembly_lexicon, pipe_of,
+    check_preconditions,
+    find_subject_entity, fold_control_versioned, fold_obligations_versioned,
+    fold_type_registry, natural_persons_from_events, assembly_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
     CooperativeMemberStrategy, EdgeId, EdgeKind, FoldRegistry, FoundationCouncilStrategy,
     FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId,
@@ -776,14 +776,19 @@ impl SemOsVerbOp for UboDeterminationFreeze {
     }
 }
 
-// ── Subject registration verbs ────────────────────────────────────────────────
+// ── Subject placement verbs ───────────────────────────────────────────────────
 
-pub struct KycSubjectRegister;
+/// `kyc_ubo.assert.subject.place` — EOP-VS-UBO-GAME-001 T2, §3.2. Absorbs
+/// `register` + `assert-type` (both retired — see their fold arms' own
+/// comments). One move, one event, both membership and type; refuses a
+/// currently-placed entity (`Precondition::NotCurrentlyPlaced`, §8 Q1 —
+/// place never carries update semantics, correction is `remove` then `place`).
+pub struct KycSubjectPlace;
 
 #[async_trait]
-impl SemOsVerbOp for KycSubjectRegister {
+impl SemOsVerbOp for KycSubjectPlace {
     fn fqn(&self) -> &str {
-        "kyc_ubo.assert.subject.register"
+        "kyc_ubo.assert.subject.place"
     }
     async fn execute(
         &self,
@@ -793,20 +798,14 @@ impl SemOsVerbOp for KycSubjectRegister {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.subject.register", subject, args)?;
-        // T6 row 9 CLOSED (2026-08-17, corrects EOP-DD-KYCUBO-KIT-T6 §5 —
-        // see the lexicon entry's own comment): `NotAlreadyRegistered` is
-        // now keyed off `entity_id`, not the bare per-subject `registered`
-        // bool, so it no longer conflicts with this verb's real
-        // multi-call-per-stream usage (one call per entity under a shared
-        // subject_root).
+            canonical_event_shape("kyc_ubo.assert.subject.place", subject, args)?;
         let outcome = stream_append(
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             subject,
             target,
             payload,
-            "analyst.register",
-            Some("kyc_ubo.assert.subject.register"),
+            "analyst.place",
+            Some("kyc_ubo.assert.subject.place"),
             ctx,
             scope,
         )
@@ -856,17 +855,35 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
     }
 }
 
-// ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new type-registry moves ──────────
+// ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the remaining type-registry moves ─────────
+// `kyc_ubo.assert.subject.type` RETIRED (T2, §3.2) — absorbed into
+// `KycSubjectPlace` above; its op struct is deleted, not left unregistered
+// (nothing dispatches to it — dead code, not a fold-target the way T1's
+// dispatching-fold pattern keeps specialist structs alive).
 
-/// `kyc_ubo.assert.subject.type` — TS.1 move 2. Always folds to `Alleged`
-/// (CTN-2f); `Proved` is reachable only via a subsequent type-scoped
-/// `kyc_ubo.assert.edge.evidence` (`fold/type_registry.rs`).
-pub struct KycSubjectAssertType;
+// `KycSubjectCorrectType` (`kyc_ubo.assert.subject.type-correction`) DELETED
+// — EOP-VS-UBO-GAME-001 T2 (2026-08-27, §8 Q1) DISSOLVED this verb. §8 Q1
+// RULED: correcting a type is `remove` then `place`, two ordinary moves,
+// never a superseding placement or a computed cascade. 0 real committed
+// events existed for this FQN (confirmed by DB query before deletion), so
+// this is a full K-G7 deletion — no fold-arm-kept historical retirement, no
+// unregistered dispatch target. Its op-layer cascade computation
+// (`edges_invalidated_by_correction`) is deleted from
+// `ob-poc-kyc-substrate::fold::type_registry` in the same diff.
+
+/// `kyc_ubo.assert.subject.remove` — EOP-VS-UBO-GAME-001 T2, §3.2. Absorbs
+/// `member-withdrawal` (retired — see its fold arm's own comment).
+/// Membership must exist (`EntityRegistered`) AND be active
+/// (`MembershipActive`), enforced by `check_preconditions` inside
+/// `stream_append` below, under the append lock, TOCTOU-safe. §2: withdraws
+/// the placement, never the entity — it remains a group member and can be
+/// placed again.
+pub struct KycSubjectRemove;
 
 #[async_trait]
-impl SemOsVerbOp for KycSubjectAssertType {
+impl SemOsVerbOp for KycSubjectRemove {
     fn fqn(&self) -> &str {
-        "kyc_ubo.assert.subject.type"
+        "kyc_ubo.assert.subject.remove"
     }
     async fn execute(
         &self,
@@ -876,173 +893,14 @@ impl SemOsVerbOp for KycSubjectAssertType {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.subject.type", subject, args)?;
+            canonical_event_shape("kyc_ubo.assert.subject.remove", subject, args)?;
         let outcome = stream_append(
-            "kyc_ubo.assert.subject.type",
+            "kyc_ubo.assert.subject.remove",
             subject,
             target,
             payload,
-            "analyst.assert-type",
-            Some("kyc_ubo.assert.subject.type"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
-
-/// `kyc_ubo.assert.subject.type-correction` — TS.1 move 7 (§4 cascade). Op-layer duties,
-/// no primitive exists for either (same "no Precondition, enforced here,
-/// fail-closed" pattern as `kyc_ubo.assert.edge.nominee-piercing`'s nominee-kind check):
-///
-/// 1. The entity must already carry a prior type assertion — otherwise
-///    there is nothing to correct (that is `assert-type`'s job).
-/// 2. Compute which active edges touching the entity the geometry matrix no
-///    longer permits under the corrected type (`edges_invalidated_by_correction`),
-///    classifying each via `pipe_of` (TS.2, pulled forward). An edge whose
-///    OTHER end has no recorded type is flagged conservatively — geometry
-///    cannot be certified permitted without a definite type on both ends,
-///    and TS.1 §4 forbids silently passing an uncertain edge through.
-pub struct KycSubjectCorrectType;
-
-#[async_trait]
-impl SemOsVerbOp for KycSubjectCorrectType {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.subject.type-correction"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        // The args-derivable part of the shape (entity_id/entity_type,
-        // validated) comes from the one constructor. `invalidated_edge_ids`
-        // does not — it is a computed CONSEQUENCE of live ControlState/
-        // TypeRegistryState (the §4 cascade), not a declared argument, so
-        // it cannot live inside a pure `canonical_event_shape` call (same
-        // principle as freeze's exemption, scoped to this one payload field
-        // rather than the whole verb — see that function's doc). Merged in
-        // below, exactly as this op did before T1.
-        let (target, mut payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.subject.type-correction", subject, args)?;
-        // Already validated by canonical_event_shape above — derive from
-        // its output rather than re-parsing raw args, so there is exactly
-        // one source of truth for "is this a real entity-id/entity-type".
-        let entity = target.entity_id.expect("type-correction always targets an entity");
-        let entity_type_wire = payload["entity_type"]
-            .as_str()
-            .expect("canonical_event_shape always stamps entity_type")
-            .to_string();
-        let corrected_type = entity_type_from_wire(&entity_type_wire)
-            .expect("canonical_event_shape already validated this against ENTITY_TYPE_WIRE_VALUES");
-
-        let events = PgKycEventStore::load_events(scope.executor(), subject)
-            .await
-            .map_err(|e| anyhow!("correct-type: load events failed: {e}"))?;
-        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-        let control = fold_control_versioned(&refs, &KYC_REGISTRY)
-            .map_err(|e| anyhow!("correct-type: control fold failed: {e}"))?;
-        let type_registry = fold_type_registry(&refs);
-        // Phase 2 of the tree-cleanup follow-up tranche (EOP-STATE-KYCUBO-D1
-        // §4/§7): "prior type must exist" is no longer hand-checked here —
-        // it is `Precondition::PriorTypeAsserted`, enforced by the single
-        // `check_preconditions` checker inside `stream_append` below, under
-        // the append lock (TOCTOU-safe, an improvement over this pre-fetch
-        // fold, which could have raced a concurrent correction).
-
-        let mut invalidated: std::collections::BTreeSet<EdgeId> = std::collections::BTreeSet::new();
-        let mut known_tuples: Vec<(EdgeId, ob_poc_kyc_substrate::Pipe, ob_poc_kyc_substrate::EntityType, bool)> =
-            Vec::new();
-        for edge in control
-            .edges
-            .values()
-            .filter(|e| e.is_active() && (e.from == entity || e.to == entity))
-        {
-            let this_is_source = edge.from == entity;
-            let other = if this_is_source { edge.to } else { edge.from };
-            match type_registry.type_of(other) {
-                Some(other_type) => {
-                    let target_type_for_pipe = if this_is_source { other_type } else { corrected_type };
-                    match pipe_of(&edge.kind, Some(target_type_for_pipe)).pipe {
-                        Some(pipe) => known_tuples.push((edge.id, pipe, other_type, this_is_source)),
-                        None => {
-                            // Classification unresolved (D1 corrective
-                            // tranche Item 4: e.g. an EconomicInterest edge
-                            // whose target type falls outside TS.2 §3's
-                            // three ratified buckets) — cannot certify
-                            // geometry permits it; flag conservatively,
-                            // same discipline as the untyped-other-end case
-                            // below (TS.1 §4 — never silently upgrade an
-                            // unresolved classification to certainty).
-                            invalidated.insert(edge.id);
-                        }
-                    }
-                }
-                None => {
-                    // Other end untyped — cannot certify permitted; flag
-                    // conservatively rather than silently pass (TS.1 §4).
-                    invalidated.insert(edge.id);
-                }
-            }
-        }
-        invalidated.extend(edges_invalidated_by_correction(corrected_type, &known_tuples));
-        let invalidated_edge_ids: Vec<Uuid> = invalidated.iter().map(|e| e.0).collect();
-
-        // Merge the computed cascade field into canonical_event_shape's
-        // args-derivable base payload — the one place this state-dependent
-        // enrichment happens, documented on the constructor itself.
-        payload["invalidated_edge_ids"] = serde_json::json!(invalidated_edge_ids);
-        let outcome = stream_append(
-            "kyc_ubo.assert.subject.type-correction",
-            subject,
-            target,
-            payload,
-            "senior-analyst.correct-type",
-            Some("kyc_ubo.assert.subject.type-correction"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(json!({
-            "seq": outcome.seq,
-            "invalidated_edge_count": invalidated_edge_ids.len(),
-        })))
-    }
-}
-
-/// `kyc_ubo.assert.subject.member-withdrawal` — TS.1 move 6. Membership must exist
-/// (`EntityRegistered`) AND be active (`MembershipActive`, Phase 2 of the
-/// tree-cleanup follow-up tranche, EOP-STATE-KYCUBO-D1 §4/§7 — no longer
-/// hand-checked here; enforced by `check_preconditions` inside
-/// `stream_append` below, under the append lock, TOCTOU-safe).
-pub struct KycSubjectWithdrawMember;
-
-#[async_trait]
-impl SemOsVerbOp for KycSubjectWithdrawMember {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.subject.member-withdrawal"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.subject.member-withdrawal", subject, args)?;
-        let outcome = stream_append(
-            "kyc_ubo.assert.subject.member-withdrawal",
-            subject,
-            target,
-            payload,
-            "analyst.withdraw-member",
-            Some("kyc_ubo.assert.subject.member-withdrawal"),
+            "analyst.remove",
+            Some("kyc_ubo.assert.subject.remove"),
             ctx,
             scope,
         )

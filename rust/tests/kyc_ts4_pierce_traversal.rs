@@ -22,7 +22,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede,
 };
 use ob_poc_types::TransactionScopeId;
@@ -118,16 +118,25 @@ async fn cleanup(pool: &PgPool, subject: Uuid) {
 }
 
 async fn setup_subject(pool: &PgPool, subject: Uuid, natural_persons: &[Uuid], class: &str) {
+    // Entity-type must actually admit this structure-class's real control
+    // edges through TS.5's TypeGeometryPermits (T2 makes `place`'s type
+    // mandatory, TS.1 §1) — `trust` is the one class in this file whose own
+    // fixture asserts a same-kind-pipe edge (trust_trustee, via the pierce)
+    // between two TYPED endpoints, so it needs a real trust EntityType, not
+    // the private_limited_company default every other class here happens
+    // to get away with (their control edges all originate from an untyped,
+    // never-placed entity, which is geometry-Unevaluable regardless).
+    let entity_type = if class == "trust" { "discretionary_trust" } else { "private_limited_company" };
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": entity_type }),
         pool,
     )
     .await;
     for p in natural_persons {
         run(
-            &KycSubjectRegister,
-            serde_json::json!({ "subject-id": subject, "entity-id": p, "is_natural_person": true }),
+            &KycSubjectPlace,
+            serde_json::json!({ "subject-id": subject, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person" }),
             pool,
         )
         .await;

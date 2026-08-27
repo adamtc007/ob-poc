@@ -34,7 +34,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectClassifyStructure, KycSubjectRegister};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectClassifyStructure, KycSubjectPlace};
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -91,9 +91,9 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 }
 
 async fn register(scope: &mut Scope, subject: SubjectId) {
-    KycSubjectRegister
+    KycSubjectPlace
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
             &mut VerbExecutionContext::default(),
             scope,
         )
@@ -143,9 +143,9 @@ async fn row9_register_admits_fresh_subject() {
     let subject = SubjectId(Uuid::new_v4());
     let mut scope = Scope::begin(&pool).await;
 
-    let result = KycSubjectRegister
+    let result = KycSubjectPlace
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )

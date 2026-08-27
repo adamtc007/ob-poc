@@ -19,9 +19,8 @@ use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_workbook::{open_workbook, StagedMove};
 use ob_poc_kyc_seam::{append_in_scope, canonical_event_shape};
 use ob_poc_kyc_substrate::{
-    assembly_lexicon, enumerate_placement_set, render_intent_event_to_sexpr, AuthorityRef, EdgeId,
-    EntityId, FoldRegistry, IntentEvent, LexiconManifest, MoveId, Principal, SubjectId,
-    TargetBinding, V1FoldImpl,
+    assembly_lexicon, render_intent_event_to_sexpr, AuthorityRef, EdgeId, FoldRegistry,
+    IntentEvent, LexiconManifest, MoveId, Principal, SubjectId, TargetBinding, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_core::principal::Principal as RuntimePrincipal;
@@ -172,7 +171,7 @@ async fn session_roundtrip() {
     // now has a realistic 4th predecessor move instead of 3.
     workbook
         .stage(
-            "(kyc_ubo.assert.subject.register)",
+            "(kyc_ubo.assert.subject.place :entity-type \"private_limited_company\")",
             &principal,
             AuthorityRef("analyst.register".into()),
             as_of,
@@ -309,7 +308,7 @@ async fn new_ubo_from_baseplate() {
     drop(conn);
     workbook
         .stage(
-            "(kyc_ubo.assert.subject.register)",
+            "(kyc_ubo.assert.subject.place :entity-type \"private_limited_company\")",
             &principal,
             AuthorityRef("analyst.register".into()),
             as_of,
@@ -333,165 +332,15 @@ async fn new_ubo_from_baseplate() {
 
 // ── T1 (EOP-VS-UBO-GAME-001 §3.4 R6/C2): entity-id via the real DSL surface ──
 
-/// T1 gate (RED before this tranche's `canonical_event_shape` landed —
-/// see the history below — GREEN now). Through the workbook s-expression
-/// surface ONLY — no hand-built `IntentEvent`, no `manual_staged_move`
-/// escape hatch — stage `(kyc_ubo.assert.subject.register :subject-id S
-/// :entity-id E)` using the exact kebab-case arg names `config/verbs/kyc/
-/// dsl-kyc.yaml` declares, commit it, and check whether `E` actually landed
-/// in `registered_entity_ids`. R6 says one function builds every surface's
-/// event; C2 says the board offers only what the append admits. If the
-/// workbook and the op layer disagree about where `entity-id` goes, both
-/// cannot be true at once — this is the test that proves whether they do.
-///
-/// Prior research (`sexpr_to_parsed_move`, `kyc_workbook.rs:209-230`):
-/// `entity-id` is one of the five fixed target-binding slots, so it is
-/// routed into `ParsedMove.target.entity_id`, never into the payload. The
-/// fold arm for `register` (`fold/control.rs`) reads `entity_id` off the
-/// **payload**, not the target. Predicted failure: the entity is silently
-/// never registered. This test also surfaces a second, earlier symptom of
-/// the same root cause: `enumerate_placement_set`'s candidate for
-/// `register` is always target-bare (`TargetBinding::for_subject`, general
-/// branch, `placement.rs`) since `register` is not edge-scoped, not
-/// geometry-gated, not type-registry-scoped — so a parsed target carrying
-/// `entity_id: Some(E)` cannot equality-match ANY enumerated candidate's
-/// target, and `stage()`'s frontier-membership gate refuses the call
-/// before the fold is ever reached. Either failure is the same underlying
-/// defect (R6: two paths build the event's target/payload split
-/// differently) surfacing at a different point in the pipeline — this test
-/// does not assume which one fires, only that the board never ends up
-/// knowing about the entity.
-#[tokio::test]
-async fn t1_register_with_entity_id_via_workbook_surface() {
-    let pool = connect().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let entity = Uuid::new_v4();
-    let registry = v1_registry();
-    let principal = runtime_principal("analyst-1");
-    let as_of = fixed_ts();
-
-    let mut conn = pool.acquire().await.unwrap();
-    let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
-    drop(conn);
-
-    // Step 1: stage, through the real DSL parser, using the YAML-declared
-    // kebab-case arg names verbatim — no hand-built IntentEvent anywhere.
-    let stage_result = workbook.stage(
-        &format!(r#"(kyc_ubo.assert.subject.register :subject-id "{subject}" :entity-id "{entity}")"#,
-            subject = subject.0),
-        &principal,
-        AuthorityRef("analyst.register".into()),
-        as_of,
-    );
-
-    let staged = match stage_result {
-        Ok(staged) => staged.clone(),
-        Err(e) => {
-            // The predicted-secondary failure mode: stage() itself refuses
-            // the call because the parsed target (carrying entity_id)
-            // cannot equality-match enumerate_placement_set's target-bare
-            // candidate for `register`. Still RED, still proves the same
-            // R6 defect (two surfaces disagree about what belongs on the
-            // target vs the payload) — just caught one step earlier than
-            // a silent post-commit fold miss.
-            panic!(
-                "RED (as predicted, via the frontier-membership gate rather than a silent \
-                 fold miss): stage() refused a real DSL call carrying `:entity-id` because \
-                 the workbook's own board-move enumerator never produces an entity-id-bearing \
-                 candidate for `register` — got: {e:?}"
-            );
-        }
-    };
-
-    // Step 1 (commit).
-    let mut scope = TestScope::begin(&pool).await;
-    workbook
-        .commit(&mut scope, &registry)
-        .await
-        .expect("register has no preconditions that would block this commit");
-    scope.commit().await;
-
-    // Step 2: the fold must have recorded E.
-    let mut conn2 = pool.acquire().await.unwrap();
-    let reopened = open_workbook(&mut conn2, subject).await.unwrap();
-    let (state, _obligation, _type_registry) = reopened.validate().unwrap();
-    assert!(
-        state.registered_entity_ids.contains(&EntityId(entity)),
-        "R6/C2 RED: the workbook staged+committed \
-         `(kyc_ubo.assert.subject.register :subject-id S :entity-id E)` through the real DSL \
-         surface (staged event payload: {:?}), yet E={entity} is NOT in \
-         registered_entity_ids={:?} — the workbook routed :entity-id into the TARGET binding, \
-         but the register fold arm reads entity_id from the PAYLOAD. Two surfaces, two \
-         different ideas of what `entity-id` means — exactly what R6 forbids.",
-        staged.event.payload, state.registered_entity_ids
-    );
-
-    // Step 3: the board must now offer a geometry-gated connect candidate
-    // touching E. A geometry-gated candidate needs TWO registered, TYPED
-    // entities (`placement.rs`'s `is_geometry_gated` branch pairs every
-    // registered member against every other) — register and type a second
-    // entity, through the same real DSL surface, no escape hatch.
-    let second = Uuid::new_v4();
-    workbook = reopened;
-    workbook
-        .stage(
-            &format!(r#"(kyc_ubo.assert.subject.register :subject-id "{s}" :entity-id "{second}")"#, s = subject.0),
-            &principal,
-            AuthorityRef("analyst.register".into()),
-            as_of,
-        )
-        .expect("second registration must recognise — register has no preconditions blocking it");
-    workbook
-        .stage(
-            &format!(
-                r#"(kyc_ubo.assert.subject.type :subject-id "{s}" :entity-id "{entity}" :entity-type "natural_person")"#,
-                s = subject.0
-            ),
-            &principal,
-            AuthorityRef("analyst.assert-type".into()),
-            as_of,
-        )
-        .expect("typing E as natural_person must recognise against the frontier AFTER E is registered");
-    workbook
-        .stage(
-            &format!(
-                r#"(kyc_ubo.assert.subject.type :subject-id "{s}" :entity-id "{second}" :entity-type "private_limited_company")"#,
-                s = subject.0
-            ),
-            &principal,
-            AuthorityRef("analyst.assert-type".into()),
-            as_of,
-        )
-        .expect("typing the second entity must recognise against the frontier");
-
-    let mut scope2 = TestScope::begin(&pool).await;
-    workbook
-        .commit(&mut scope2, &registry)
-        .await
-        .expect("three legal moves (register + 2×assert-type) must commit");
-    scope2.commit().await;
-
-    let mut conn3 = pool.acquire().await.unwrap();
-    let final_workbook = open_workbook(&mut conn3, subject).await.unwrap();
-    let lexicon = assembly_lexicon();
-    let (control, obligation, type_registry) = final_workbook.validate().unwrap();
-    let placement = enumerate_placement_set(
-        subject, &control, &obligation, &type_registry, &lexicon,
-    );
-    let has_connect_candidate = placement
-        .moves
-        .iter()
-        .any(|m| m.proposed_edge.is_some());
-    assert!(
-        has_connect_candidate,
-        "R6/C2 GREEN-line check: with E and a second entity both registered and typed, the \
-         board must offer at least one geometry-gated connect candidate; \
-         enumerate_placement_set returned {} moves, none carrying a proposed_edge",
-        placement.moves.len()
-    );
-
-    cleanup(&pool, subject).await;
-}
+// T1's flagship gate here, `t1_register_with_entity_id_via_workbook_surface`,
+// is RETIRED (EOP-VS-UBO-GAME-001 T2): it proved `register`/`type`'s
+// entity-id routed correctly through the workbook surface, a claim that no
+// longer parses — both verbs are gone, merged into `place`. Its core claim
+// (one move, entity-scoped target, real board candidate) is superseded by
+// `kyc_t2_place_remove.rs::place_records_entity_and_type_in_one_move`. Its
+// step 3 (two typed entities produce a geometry-gated connect candidate) is
+// a real, still-valid property, but about `connect`'s own candidate
+// enumeration — T3's edge moves, out of this tranche's SCOPE FENCE.
 
 // ── both_surfaces_agree_from_declared_args ──────────────────────────────────
 //
@@ -513,29 +362,31 @@ async fn t1_register_with_entity_id_via_workbook_surface() {
 async fn both_surfaces_agree_from_declared_args() {
     let pool = connect().await;
     let subject = SubjectId(Uuid::new_v4());
-    let entity = Uuid::new_v4();
     let principal = runtime_principal("analyst-1");
     let as_of = fixed_ts();
 
-    // Op-layer path: exactly what kyc_stream_ops.rs's KycSubjectRegister::execute does.
-    let args = serde_json::json!({ "entity-id": entity.to_string() });
+    // Op-layer path: exactly what kyc_stream_ops.rs's KycSubjectPlace::execute
+    // does. Self-placement (entity-id = subject) — the one candidate the
+    // workbook path below can also board-enumerate without discovery data
+    // (T2 P2 finding), so both paths are exercising the SAME real move.
+    let args = serde_json::json!({ "entity-id": subject.0.to_string(), "entity-type": "private_limited_company" });
     let (op_target, op_payload, op_edge) =
-        canonical_event_shape("kyc_ubo.assert.subject.register", subject, &args)
+        canonical_event_shape("kyc_ubo.assert.subject.place", subject, &args)
             .expect("op-layer canonical_event_shape call");
-    assert!(op_edge.is_none(), "register never mints an edge");
+    assert!(op_edge.is_none(), "place never mints an edge");
 
-    // Workbook-layer path: a real DSL parse + stage, same declared value.
+    // Workbook-layer path: a real DSL parse + stage, same declared values.
     let mut conn = pool.acquire().await.unwrap();
     let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
     drop(conn);
     let staged = workbook
         .stage(
             &format!(
-                r#"(kyc_ubo.assert.subject.register :subject-id "{subject}" :entity-id "{entity}")"#,
+                r#"(kyc_ubo.assert.subject.place :subject-id "{subject}" :entity-id "{subject}" :entity-type "private_limited_company")"#,
                 subject = subject.0
             ),
             &principal,
-            AuthorityRef("analyst.register".into()),
+            AuthorityRef("analyst.place".into()),
             as_of,
         )
         .expect("workbook-layer stage");
@@ -549,6 +400,50 @@ async fn both_surfaces_agree_from_declared_args() {
         staged.event.payload, op_payload,
         "R6 VIOLATION: op layer and workbook layer built different payload from the same \
          declared :entity-id — a second constructor exists"
+    );
+
+    // Commit the placement for real, so `remove` below has a legally
+    // removable entity to target (EntityRegistered + MembershipActive).
+    let mut scope = TestScope::begin(&pool).await;
+    workbook
+        .commit(&mut scope, &v1_registry())
+        .await
+        .expect("place commits");
+    scope.commit().await;
+
+    // T2 P4 (2026-08-27): extend the R6 cross-surface proof to `remove` —
+    // both surfaces must build the identical (target, payload) shape for
+    // it too, not just `place`.
+    let remove_args = serde_json::json!({ "entity-id": subject.0.to_string() });
+    let (remove_op_target, remove_op_payload, remove_op_edge) =
+        canonical_event_shape("kyc_ubo.assert.subject.remove", subject, &remove_args)
+            .expect("op-layer canonical_event_shape call for remove");
+    assert!(remove_op_edge.is_none(), "remove never mints an edge");
+
+    let mut conn2 = pool.acquire().await.unwrap();
+    let mut workbook2 = open_workbook(&mut conn2, subject).await.unwrap();
+    drop(conn2);
+    let remove_staged = workbook2
+        .stage(
+            &format!(
+                r#"(kyc_ubo.assert.subject.remove :subject-id "{subject}" :entity-id "{subject}")"#,
+                subject = subject.0
+            ),
+            &principal,
+            AuthorityRef("analyst.remove".into()),
+            as_of,
+        )
+        .expect("workbook-layer stage for remove");
+
+    assert_eq!(
+        remove_staged.event.target, remove_op_target,
+        "R6 VIOLATION: op layer and workbook layer built different TargetBinding for \
+         remove from the same declared :entity-id — a second constructor exists"
+    );
+    assert_eq!(
+        remove_staged.event.payload, remove_op_payload,
+        "R6 VIOLATION: op layer and workbook layer built different payload for remove \
+         from the same declared :entity-id — a second constructor exists"
     );
 
     cleanup(&pool, subject).await;

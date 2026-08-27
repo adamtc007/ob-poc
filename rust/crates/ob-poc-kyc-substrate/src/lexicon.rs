@@ -136,6 +136,20 @@ pub enum Precondition {
     /// `KycError::GeometryRefused`, distinct from `PreconditionFailed`
     /// (TS.5 §5 `geometry_refusal_is_distinguishable_from_stud_refusal`).
     TypeGeometryPermits,
+
+    // ── EOP-VS-UBO-GAME-001 T2 — `place` never carries update semantics ─────
+    /// §8 Q1 (RULED 2026-08-27): correcting a block's type is `remove` then
+    /// `place`, never a superseding placement — `place` must refuse an
+    /// entity that is CURRENTLY on the board (registered and not withdrawn).
+    /// An entity that has never been registered, or was registered and has
+    /// since been `remove`d (withdrawn), passes: first-time placement and
+    /// re-placement after removal are both legal. Reads `target.entity_id`
+    /// — vacuous when the probe carries none, same convention as
+    /// `EntityRegistered`/`MembershipActive`/`PriorTypeAsserted` above; the
+    /// placement generator now probes `place` with a real entity_id for
+    /// every board-enumerable candidate (T1's P4 deferral, closed for the
+    /// re-placeable population — `placement.rs`).
+    NotCurrentlyPlaced,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -311,28 +325,20 @@ pub fn assembly_lexicon() -> LexiconManifest {
 
     let entries = vec![
         // ── Phase 1 — substrate verbs ────────────────────────────────────────
+        // `kyc_ubo.assert.subject.register`/`.type` RETIRED (EOP-VS-UBO-GAME-001
+        // T2, §3.2) — merged into `place`. Their fold arms remain, historical
+        // replay only (R5); `NotAlreadyRegistered` (register's old
+        // precondition) stays a real `Precondition` variant so its own
+        // `check_preconditions` arm keeps compiling for the enum's
+        // exhaustiveness, but no lexicon entry attaches it any more.
         LexiconEntry::build(
-            "kyc_ubo.assert.subject.register",
-            "Bring a subject into KYC scope, recording the basis for obligation",
+            "kyc_ubo.assert.subject.place",
+            "Put a group member on the board, in this slot, as this type — merges \
+             register + assert-type (§3.2); place never carries update semantics, \
+             a currently-placed entity must be `remove`d first (§8 Q1)",
             Taxonomy::Subject,
-            smallvec![FoldId::ObligationGraph],
-            // T6 row 9 CLOSED (2026-08-17, corrects EOP-DD-KYCUBO-KIT-T6
-            // §5, see its §6 amendment): the ratified bare
-            // `NotAlreadyRegistered` (`!state.registered`) would have
-            // blocked every multi-person determination — `register`'s real
-            // production usage fires MULTIPLE `kyc_ubo.assert.subject.register`
-            // events sharing one subject_root, differentiated by payload
-            // `entity_id` (one call registers the subject entity itself,
-            // one more per natural-person candidate — see
-            // `kyc_m3_remediation.rs`'s real production-shaped fixtures).
-            // §5 rejected a keyed-check amendment on the assumption it
-            // would need a new parameterised `Precondition` variant,
-            // breaking the matrix's niladic-variant property; it doesn't —
-            // `NotAlreadyRegistered` stays a bare unit variant and the
-            // check reads `event.payload`'s `entity_id` against
-            // `ControlState.registered_entity_ids`, the same pattern
-            // `NoDuplicateActiveEdge` already uses (`fold/control.rs`).
-            vec![Precondition::NotAlreadyRegistered],
+            smallvec![FoldId::ControlGraph, FoldId::TypeRegistry],
+            vec![Precondition::NotCurrentlyPlaced],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -578,31 +584,28 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // directly — the substrate's pure fold can no longer see decisions
         // at all, by construction, which is the whole point of the split.
         // ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new moves ──────────────────
+        // `kyc_ubo.assert.subject.type` RETIRED (T2, §3.2) — merged into
+        // `place` above. Fold arm remains, historical replay only (R5).
+        //
+        // `kyc_ubo.assert.subject.type-correction` DISSOLVED (T2, §8 Q1,
+        // 2026-08-27) — no entry survives it here. §8 Q1 RULED: correcting
+        // a type is `remove` then `place`, two ordinary moves, never a
+        // superseding placement or a computed cascade. UNLIKE `type`/
+        // `member-withdrawal` above, this verb had 0 real committed events
+        // (confirmed by DB query before deletion), so it does NOT keep a
+        // historical-replay-only fold arm — it is a full K-G7 deletion:
+        // verb, op, fold arm, precondition attachment, and the cascade
+        // function (`edges_invalidated_by_correction`) all removed in the
+        // same diff. Reintroduction path: none named — the two-move
+        // pattern replaces this capability entirely, not a future verb.
+        // `kyc_ubo.assert.subject.member-withdrawal` RETIRED (T2, §3.2) —
+        // renamed `remove`, identical shape and preconditions. Fold arm
+        // remains, historical replay only (R5).
         LexiconEntry::build(
-            "kyc_ubo.assert.subject.type",
-            "Assert this entity is of this type (TS.1 move 2) — always Alleged; \
-             supersedes any prior type assertion (last-wins)",
-            Taxonomy::Subject,
-            smallvec![FoldId::TypeRegistry],
-            vec![Precondition::EntityRegistered],
-            AuthoritySpec::analyst(),
-            vec![],
-        ),
-        LexiconEntry::build(
-            "kyc_ubo.assert.subject.type-correction",
-            "Correct a wrongly-asserted type (TS.1 move 7) — triggers the §4 cascade: \
-             affected linkages demote and flag for re-assertion, determination marked \
-             stale; never silently deletes",
-            Taxonomy::Subject,
-            smallvec![FoldId::TypeRegistry],
-            vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],
-            AuthoritySpec::senior_analyst(),
-            vec![],
-        ),
-        LexiconEntry::build(
-            "kyc_ubo.assert.subject.member-withdrawal",
-            "This entity is not, or is no longer, a group member (TS.1 move 6) — \
-             flags membership, never deletes (TS.1 §2c basket-of-references)",
+            "kyc_ubo.assert.subject.remove",
+            "Take a group member off the board — withdraws the placement, never the \
+             entity (§2, absorbs member-withdrawal); the entity remains a group member \
+             and can be placed again",
             Taxonomy::Subject,
             smallvec![FoldId::TypeRegistry],
             vec![Precondition::EntityRegistered, Precondition::MembershipActive],

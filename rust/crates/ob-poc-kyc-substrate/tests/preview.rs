@@ -27,15 +27,16 @@ fn t() -> chrono::DateTime<chrono::Utc> {
 
 /// T6.2 (2026-08-12): `assert-control` now carries `SubjectRegistered`
 /// (matrix row 1) — every candidate chain below that starts with
-/// assert-control needs a preceding register.
+/// assert-control needs a preceding placement. T2 (EOP-VS-UBO-GAME-001
+/// §3.2) merged register + assert-type into `place`, entity-scoped target.
 fn register_event(subj: SubjectId) -> IntentEvent {
     IntentEvent::new(
         subj,
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
-        TargetBinding::for_subject(subj),
-        serde_json::json!({ "entity_id": subj.0 }),
+        TargetBinding { entity_id: Some(EntityId(subj.0)), ..TargetBinding::for_subject(subj) },
+        serde_json::json!({ "entity_id": subj.0, "entity_type": "private_limited_company" }),
         t(),
     )
 }

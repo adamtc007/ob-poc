@@ -13,7 +13,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectRegister, UboEdgeAssertControl};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeAssertControl};
 use ob_poc_kyc_store::PgKycProjector;
 use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
@@ -111,12 +111,12 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     // key (B3), so reusing one `ctx` across register+assert-control would
     // dedupe the second call against the first (the same gotcha
     // `kyc_t61_studs.rs::select_strategy_blocked_end_to_end` documents).
-    let register_args = serde_json::json!({ "subject-id": subject.0.to_string() });
+    let register_args = serde_json::json!({ "subject-id": subject.0.to_string(), "entity-type": "private_limited_company" });
 
     // 1. Rollback path: the verb's append participates in the scope's txn.
     {
         let mut scope = TestScope::begin(&pool).await;
-        KycSubjectRegister
+        KycSubjectPlace
             .execute(&register_args, &mut VerbExecutionContext::default(), &mut scope)
             .await
             .expect("register executes");
@@ -138,7 +138,7 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     // 2. Commit path: event lands in the stream with the right verb + as_of.
     let outcome = {
         let mut scope = TestScope::begin(&pool).await;
-        KycSubjectRegister
+        KycSubjectPlace
             .execute(&register_args, &mut VerbExecutionContext::default(), &mut scope)
             .await
             .expect("register executes");

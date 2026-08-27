@@ -36,7 +36,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionOutcome};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectAssertType, KycSubjectRegister};
+use ob_poc::domain_ops::kyc_stream_ops::KycSubjectPlace;
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideApprove};
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
@@ -104,17 +104,16 @@ async fn refused_approval_leaves_its_justifying_run_persisted() {
     // A board with exactly one entity, alleged (not Proved) type — the
     // `ProvenTypeCheck` comes back Unevaluable for it, so the run's work
     // list is non-empty and `DecideApprove` must refuse (K-23).
-    run_ok(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }), &pool).await;
-    let entity = Uuid::new_v4();
     run_ok(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
+    let entity = Uuid::new_v4();
     run_ok(
-        &KycSubjectAssertType,
-        serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "entity-type": "private_limited_company" }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;

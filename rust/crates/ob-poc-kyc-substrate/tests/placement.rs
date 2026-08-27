@@ -151,11 +151,16 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
         // never admits them against (`is_type_registry_move`,
         // `placement.rs`). Their real oracle/set equivalence is covered by
         // `ts1_assembly_board.rs`'s dedicated entity-scoped test instead.
+        //
+        // T2 (2026-08-27, §8 Q1): `register`+`type` MERGED into `place`
+        // (still entity-scoped, still excluded here under its new name);
+        // `member-withdrawal` renamed `remove` (same); `type-correction`
+        // DISSOLVED — no lexicon entry remains for this loop to visit, so
+        // its own exclusion-list entry is deleted, not left as dead cover.
         if matches!(
             fqn,
-            "kyc_ubo.assert.subject.type"
-                | "kyc_ubo.assert.subject.type-correction"
-                | "kyc_ubo.assert.subject.member-withdrawal"
+            "kyc_ubo.assert.subject.place"
+                | "kyc_ubo.assert.subject.remove"
                 | "kyc_ubo.assert.subject.enquiry"
         ) {
             continue;

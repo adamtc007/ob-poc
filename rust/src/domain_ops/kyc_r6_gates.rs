@@ -17,12 +17,17 @@
 //! separate, already-covered concern — `cargo x registry-graph`); this gate
 //! is purely "does op X's/the workbook's source text call the one function."
 
-/// The 15 assembly-tier (board-buildable) verb FQNs `canonical_event_shape`
+/// The 13 assembly-tier (board-buildable) verb FQNs `canonical_event_shape`
 /// covers. Excludes `kyc_ubo.decide.determination.freeze` (§3.2 — computes a
 /// verdict from live state, not declared args) and the three
 /// `kyc_ubo.decide.{subject.approve,subject.reject,obligation.waiver}`
 /// verdicts (TS.6 P2 — never build an `IntentEvent` at all, live in
 /// `ob-poc-kyc-decide`, not `kyc_stream_ops.rs`).
+///
+/// T2 (EOP-VS-UBO-GAME-001, 2026-08-27, §8 Q1): `register`+`type` MERGED
+/// into `place` (15→14, one FQN for two); `member-withdrawal` renamed
+/// `remove` (no count change); `type-correction` DISSOLVED (14→13, no
+/// replacement FQN — see `lexicon.rs`'s retirement comment).
 const ASSEMBLY_VERB_FQNS: &[&str] = &[
     "kyc_ubo.assert.edge.control",
     "kyc_ubo.assert.edge.economic-interest",
@@ -30,11 +35,9 @@ const ASSEMBLY_VERB_FQNS: &[&str] = &[
     "kyc_ubo.assert.edge.verification",
     "kyc_ubo.assert.edge.supersession",
     "kyc_ubo.assert.edge.reconciliation",
-    "kyc_ubo.assert.subject.register",
+    "kyc_ubo.assert.subject.place",
     "kyc_ubo.assert.subject.structure-class",
-    "kyc_ubo.assert.subject.type",
-    "kyc_ubo.assert.subject.type-correction",
-    "kyc_ubo.assert.subject.member-withdrawal",
+    "kyc_ubo.assert.subject.remove",
     "kyc_ubo.assert.subject.enquiry",
     "kyc_ubo.assert.entity.identity",
     "kyc_ubo.assert.entity.screening",

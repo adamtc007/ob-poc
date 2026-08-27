@@ -14,7 +14,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectAssertType, KycSubjectRegister, UboEdgeAssertControl};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeAssertControl};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -51,28 +51,18 @@ impl TransactionScope for Scope {
     }
 }
 
-async fn register(scope: &mut Scope, subject: Uuid, entity: Uuid) {
+/// T2 (EOP-VS-UBO-GAME-001, §3.2) merged register + assert-type into
+/// `place` — one call, both membership and type.
+async fn place(scope: &mut Scope, subject: Uuid, entity: Uuid, wire: &str) {
     let mut ctx = VerbExecutionContext::default();
-    KycSubjectRegister
-        .execute(
-            &serde_json::json!({ "subject-id": subject, "entity-id": entity }),
-            &mut ctx,
-            scope,
-        )
-        .await
-        .unwrap_or_else(|e| panic!("register failed: {e}"));
-}
-
-async fn assert_type(scope: &mut Scope, subject: Uuid, entity: Uuid, wire: &str) {
-    let mut ctx = VerbExecutionContext::default();
-    KycSubjectAssertType
+    KycSubjectPlace
         .execute(
             &serde_json::json!({ "subject-id": subject, "entity-id": entity, "entity-type": wire }),
             &mut ctx,
             scope,
         )
         .await
-        .unwrap_or_else(|e| panic!("assert-type failed: {e}"));
+        .unwrap_or_else(|e| panic!("place failed: {e}"));
 }
 
 async fn assert_control(
@@ -117,10 +107,8 @@ async fn illegal_source_type_is_refused_at_the_op() {
     let fund_entity = Uuid::new_v4();
 
     let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject, natural_person).await;
-    register(&mut scope, subject, fund_entity).await;
-    assert_type(&mut scope, subject, natural_person, "natural_person").await;
-    assert_type(&mut scope, subject, fund_entity, "oeic_icvc").await;
+    place(&mut scope, subject, natural_person, "natural_person").await;
+    place(&mut scope, subject, fund_entity, "oeic_icvc").await;
 
     let result = assert_control(&mut scope, subject, natural_person, fund_entity, "management_mandate").await;
     scope.rollback().await;
@@ -162,10 +150,8 @@ async fn every_geometry_rule_is_reachable_from_the_write_path() {
         let source = Uuid::new_v4();
         let target = Uuid::new_v4();
         let mut scope = Scope::begin(&pool).await;
-        register(&mut scope, subject, source).await;
-        register(&mut scope, subject, target).await;
-        assert_type(&mut scope, subject, source, illegal_source_wire).await;
-        assert_type(&mut scope, subject, target, legal_target_wire).await;
+        place(&mut scope, subject, source, illegal_source_wire).await;
+        place(&mut scope, subject, target, legal_target_wire).await;
 
         let result = assert_control(&mut scope, subject, source, target, kind).await;
         scope.rollback().await;
@@ -208,9 +194,11 @@ async fn untyped_endpoint_admits_at_the_op() {
     let b = Uuid::new_v4();
 
     let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject, a).await;
-    register(&mut scope, subject, b).await;
-    // Deliberately NO assert_type for either endpoint.
+    // Deliberately never `place`d — an entity `place` has never touched has
+    // no type record at all, the purest form of "untyped". `place`s the
+    // SUBJECT only, to satisfy assert-control's own `SubjectRegistered`
+    // precondition (unrelated to what this test is about).
+    place(&mut scope, subject, subject, "private_limited_company").await;
     let verdict = assert_control(&mut scope, subject, a, b, "voting_rights").await;
     scope.rollback().await;
 
@@ -232,11 +220,9 @@ async fn alleged_type_admits_at_the_op() {
     let corp = Uuid::new_v4();
 
     let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject, person).await;
-    register(&mut scope, subject, corp).await;
-    // `assert_type` records an ALLEGED type — nothing here proves it.
-    assert_type(&mut scope, subject, person, "natural_person").await;
-    assert_type(&mut scope, subject, corp, "private_limited_company").await;
+    // `place` records an ALLEGED type — nothing here proves it.
+    place(&mut scope, subject, person, "natural_person").await;
+    place(&mut scope, subject, corp, "private_limited_company").await;
     let verdict = assert_control(&mut scope, subject, person, corp, "voting_rights").await;
     scope.rollback().await;
 

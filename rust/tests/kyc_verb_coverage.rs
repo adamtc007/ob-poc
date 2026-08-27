@@ -27,7 +27,7 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationUpdateIdentity, KycObligationUpdateRisk, KycObligationUpdateScreening,
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence, UboEdgeReconcileConflict,
     UboEdgeSupersede, UboEdgeVerify,
 };
@@ -181,8 +181,8 @@ async fn coverage_ubo_edge_assert_economic_interest() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -207,8 +207,8 @@ async fn coverage_ubo_edge_attach_evidence() {
     let subject = SubjectId(Uuid::new_v4());
     let edge = Uuid::new_v4();
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -232,8 +232,8 @@ async fn coverage_ubo_edge_verify() {
     let subject = SubjectId(Uuid::new_v4());
     let edge = Uuid::new_v4();
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -266,8 +266,8 @@ async fn coverage_ubo_edge_supersede() {
     let subject = SubjectId(Uuid::new_v4());
     let edge = Uuid::new_v4();
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -298,8 +298,8 @@ async fn coverage_ubo_edge_reconcile_conflict() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -337,8 +337,8 @@ async fn coverage_ubo_determination_freeze() {
     let subject = SubjectId(Uuid::new_v4());
     let owner = Uuid::new_v4();
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -362,9 +362,9 @@ async fn coverage_ubo_determination_freeze() {
     // With no manual override left, freeze needs a REAL candidate: a natural
     // person holding ≥ the 25% default threshold directly in the subject.
     run(
-        &KycSubjectRegister,
+        &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "entity-id": owner, "is_natural_person": true,
+            "subject-id": subject.0, "entity-id": owner, "is_natural_person": true, "entity-type": "natural_person",
         }),
         &pool,
     )
@@ -397,8 +397,8 @@ async fn coverage_kyc_subject_classify_structure() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -431,8 +431,8 @@ async fn coverage_kyc_obligation_update_identity() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;
@@ -457,8 +457,8 @@ async fn coverage_kyc_obligation_update_screening() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;
@@ -483,8 +483,8 @@ async fn coverage_kyc_obligation_update_risk() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;
@@ -511,8 +511,8 @@ async fn coverage_kyc_decide_obligation_waiver() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -537,8 +537,8 @@ async fn coverage_kyc_person_reject() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;
@@ -596,8 +596,8 @@ async fn decide_cites_a_run() {
     ] {
         if register_first {
             run(
-                &KycSubjectRegister,
-                serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
+                &KycSubjectPlace,
+                serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }),
                 &pool,
             )
             .await;

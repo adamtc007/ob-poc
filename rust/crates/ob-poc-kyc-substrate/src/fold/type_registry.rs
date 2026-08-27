@@ -238,44 +238,11 @@ fn string_list_from_payload(v: &serde_json::Value, field: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Compute which of an entity's touching edges the geometry matrix no
-/// longer permits once its type becomes `corrected_type` (TS.1 §4
-/// cascade). `touching_edges` is `(edge_id, pipe, other_end_type,
-/// this_entity_is_source)` — reduced by the caller from `ControlState`
-/// (this module doesn't depend on `fold::control`, to avoid a fold-to-fold
-/// coupling; the caller, which already holds both folds at the write
-/// path, does the reduction — mirrors how `kyc_ubo.assert.edge.nominee-piercing`'s
-/// op-layer, not the fold, resolves its own cross-references). Pure.
-pub fn edges_invalidated_by_correction(
-    corrected_type: EntityType,
-    touching_edges: &[(EdgeId, crate::geometry::Pipe, EntityType, bool)],
-) -> Vec<EdgeId> {
-    touching_edges
-        .iter()
-        .filter_map(|(edge_id, pipe, other_end_type, this_is_source)| {
-            let permitted = if *this_is_source {
-                crate::geometry::check_type_geometry(
-                    crate::geometry::LinkageSource::Entity(corrected_type),
-                    *pipe,
-                    *other_end_type,
-                )
-                .is_ok()
-            } else {
-                crate::geometry::check_type_geometry(
-                    crate::geometry::LinkageSource::Entity(*other_end_type),
-                    *pipe,
-                    corrected_type,
-                )
-                .is_ok()
-            };
-            if permitted {
-                None
-            } else {
-                Some(*edge_id)
-            }
-        })
-        .collect()
-}
+// `edges_invalidated_by_correction` (the TS.1 §4 correct-type cascade)
+// DELETED — EOP-VS-UBO-GAME-001 T2 (2026-08-27, §8 Q1) DISSOLVED
+// `kyc_ubo.assert.subject.type-correction`, this function's sole caller
+// (`KycSubjectCorrectType`, also deleted). Correcting a type is now `remove`
+// then `place`, two ordinary moves — there is no computed cascade to run.
 
 /// Apply one type-registry event. Total-dispatch (unrecognised verbs are a
 /// no-op — same discipline as `fold::control::apply_one_control_event`).
@@ -285,6 +252,45 @@ pub(crate) fn apply_one_type_registry_event(
 ) -> TypeRegistryState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
+        // §3.2: `place` absorbs register + assert-type. Writes the SAME
+        // TypeRegistry axis `assert-type` used to; `fold::control::
+        // apply_one_control_event`'s `place` arm writes the ControlGraph
+        // axis (membership) independently, from the same event (T6.1(a)).
+        // Always Alleged (CTN-2f, unchanged from `type`'s own discipline).
+        // Un-withdraws on re-placement: §2 — "the entity is untouched and
+        // remains available to be placed again" after `remove`; without
+        // clearing `withdrawn_members` here, a re-placed entity would stay
+        // flagged withdrawn forever, contradicting that.
+        "kyc_ubo.assert.subject.place" => {
+            if let (Some(eid), Some(entity_type)) =
+                (entity_id(p, "entity_id"), entity_type_from_payload(p))
+            {
+                state.types.insert(
+                    eid,
+                    EntityTypeRecord {
+                        entity_type,
+                        proof: TypeProofStatus::Alleged,
+                        originating_event_id: event.id,
+                        proof_event_id: None,
+                    },
+                );
+                state.withdrawn_members.remove(&eid);
+            }
+        }
+
+        // §3.2: `remove` absorbs member-withdrawal. Flags the placement
+        // withdrawn; never touches `ControlState.registered_entity_ids`
+        // (§2 — remove withdraws a placement, never an entity).
+        "kyc_ubo.assert.subject.remove" => {
+            if let Some(eid) = entity_id(p, "entity_id") {
+                state.withdrawn_members.insert(eid, event.id);
+            }
+        }
+
+        // Historical only (EOP-VS-UBO-GAME-001 T2 retired the verb; the arm
+        // stays so any pre-existing stream with real `type` events still
+        // folds correctly — R5). No new event of this kind can be produced
+        // going forward.
         "kyc_ubo.assert.subject.type" => {
             // CTN-2f: status is computed, never asserted (`no_move_sets_status`,
             // TS.1 §6). Every `assert-type` starts `Alleged` — there is no
@@ -322,46 +328,21 @@ pub(crate) fn apply_one_type_registry_event(
                 }
             }
         }
-        "kyc_ubo.assert.subject.type-correction" => {
-            if let (Some(eid), Some(corrected_type)) =
-                (entity_id(p, "entity_id"), entity_type_from_payload(p))
-            {
-                let previous_type = state.types.get(&eid).map(|r| r.entity_type);
-                let invalidated_edges: Vec<EdgeId> = p
-                    .get("invalidated_edge_ids")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str())
-                            .filter_map(|s| uuid::Uuid::parse_str(s).ok())
-                            .map(EdgeId)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                state.types.insert(
-                    eid,
-                    EntityTypeRecord {
-                        entity_type: corrected_type,
-                        proof: TypeProofStatus::Alleged,
-                        originating_event_id: event.id,
-                        proof_event_id: None,
-                    },
-                );
-                for e in &invalidated_edges {
-                    state.flagged_edges.insert(*e);
-                }
-                if !invalidated_edges.is_empty() {
-                    state.determination_stale = true;
-                }
-                state.corrections.push(TypeCorrectionRecord {
-                    entity: eid,
-                    previous_type,
-                    corrected_type,
-                    invalidated_edges,
-                    event_id: event.id,
-                });
-            }
-        }
+        // `kyc_ubo.assert.subject.type-correction` DISSOLVED (T2, §8 Q1,
+        // 2026-08-27) — no match arm survives it here. UNLIKE the other
+        // T2-retired verbs, this one had 0 real committed events (confirmed
+        // by DB query before deletion), so there is no historical stream
+        // this arm needs to keep folding correctly — full K-G7 deletion,
+        // not an R5 historical-replay-only retirement. A historical event
+        // still bearing this verb_fqn falls through to no arm at all and
+        // contributes nothing to the fold (same "falls through as a no-op,
+        // not a crash" discipline `geometry_triple_for_event`'s retired
+        // `nominee-piercing` special case documents).
+        // Historical only (EOP-VS-UBO-GAME-001 T2 retired the verb in favor
+        // of `remove`, above — identical arm, kept so any pre-existing
+        // stream with real `member-withdrawal` events still folds
+        // correctly — R5). No new event of this kind can be produced
+        // going forward.
         "kyc_ubo.assert.subject.member-withdrawal" => {
             if let Some(eid) = entity_id(p, "entity_id") {
                 state.withdrawn_members.insert(eid, event.id);

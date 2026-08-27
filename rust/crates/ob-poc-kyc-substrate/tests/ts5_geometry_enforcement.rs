@@ -67,22 +67,6 @@ fn assert_control_event(subject: SubjectId, from: EntityId, to: EntityId, kind: 
     )
 }
 
-fn correct_type_event(subject: SubjectId, entity: EntityId, wire: &str, invalidated: &[EdgeId]) -> IntentEvent {
-    IntentEvent::new(
-        subject,
-        "kyc_ubo.assert.subject.type-correction",
-        Principal::test_analyst(),
-        AuthorityRef("test".into()),
-        TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
-        serde_json::json!({
-            "entity_id": entity.0.to_string(),
-            "entity_type": wire,
-            "invalidated_edge_ids": invalidated.iter().map(|e| e.0.to_string()).collect::<Vec<_>>(),
-        }),
-        as_of(),
-    )
-}
-
 /// TS.1 §2, the target side: a voting-share linkage into a discretionary
 /// trust is not a move — the trust's target row (§2) admits only 8/9/10
 /// (trustee/reserved/beneficiary), never 1 (voting shares). Source is a
@@ -315,37 +299,15 @@ fn geometry_refusal_is_distinguishable_from_stud_refusal() {
     assert!(!matches!(stud_verdict, Err(KycError::GeometryRefused { .. })));
 }
 
-/// TS.5 regression guard: R1/R2 add a NEW `TypeGeometryPermits` call site;
-/// they must not disturb the EXISTING `correct-type` cascade
-/// (`edges_invalidated_by_correction`), which stays the sole place
-/// `check_type_geometry` runs post-hoc rather than at assertion time.
-#[test]
-fn type_correction_still_cascades() {
-    let subject = subject();
-    let corp = EntityId(Uuid::new_v4());
-    let person = EntityId(Uuid::new_v4());
-    let reg1 = register_event(subject, corp);
-    let reg2 = register_event(subject, person);
-    let t1 = assert_type_event(subject, corp, "private_limited_company");
-    let t2 = assert_type_event(subject, person, "natural_person");
-    // BoardAppointment is legal into a PrivateLimitedCompany from a person.
-    let board_edge = assert_control_event(subject, person, corp, "board_appointment");
-    let control = fold_control(&[&reg1, &reg2, &t1, &t2, &board_edge]);
-    let edge_id = *control.edges.keys().next().expect("edge landed");
-
-    let touching = [(edge_id, ob_poc_kyc_substrate::pipe_of(&control.edges[&edge_id].kind, Some(ob_poc_kyc_substrate::EntityType::PrivateLimitedCompany)).pipe.unwrap(), ob_poc_kyc_substrate::EntityType::PrivateLimitedCompany, true)];
-    // Correcting `corp` to a Sicav: BoardAppointment is not in a Sicav's
-    // target row (§2) — the edge must be invalidated.
-    let invalidated = ob_poc_kyc_substrate::edges_invalidated_by_correction(
-        ob_poc_kyc_substrate::EntityType::Sicav,
-        &touching,
-    );
-    assert_eq!(invalidated, vec![edge_id], "correct-type cascade regressed");
-
-    let correction = correct_type_event(subject, corp, "sicav", &invalidated);
-    let type_registry2 = fold_type_registry(&[&reg1, &reg2, &t1, &t2, &correction]);
-    assert!(type_registry2.determination_stale, "correction must mark the determination stale");
-}
+// `type_correction_still_cascades` (the `correct-type` cascade regression
+// guard for `edges_invalidated_by_correction`) REMOVED — EOP-VS-UBO-GAME-001
+// T2 (2026-08-27, §8 Q1) DISSOLVED `kyc_ubo.assert.subject.type-correction`:
+// correcting a type is `remove` then `place`, two ordinary moves, never a
+// computed cascade. `edges_invalidated_by_correction` and its sole caller
+// were deleted in the same diff (0 real committed `type-correction` events
+// existed, confirmed by DB query — full K-G7 deletion, not a fold-arm-kept
+// retirement). See `tests/kyc_t2_place_remove.rs`'s
+// `type_correction_is_remove_then_place` for the replacement behavior.
 
 // ── TS.5 R2, closed 2026-08-22 ──────────────────────────────────────────────
 //

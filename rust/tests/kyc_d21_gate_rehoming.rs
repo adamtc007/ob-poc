@@ -45,7 +45,7 @@ use uuid::Uuid;
 
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectAssertType, KycSubjectClassifyStructure, KycSubjectRegister, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboEdgeAssertControl,
 };
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideObligationWaive, DecideReject};
 use ob_poc_kyc_read::PgKycEventReader;
@@ -173,19 +173,18 @@ async fn cited_run_id(pool: &PgPool, subject: SubjectId, verb_fqn: &str) -> Uuid
 }
 
 async fn build_alleged_board(pool: &PgPool, subject: SubjectId) -> (Uuid, Uuid) {
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }), pool).await;
+    run(
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        pool,
+    )
+    .await;
     let co = Uuid::new_v4();
     let p1 = Uuid::new_v4();
     for (e, t, natural) in [(co, "private_limited_company", false), (p1, "natural_person", true)] {
         run(
-            &KycSubjectRegister,
-            serde_json::json!({ "subject-id": subject.0, "entity-id": e, "is_natural_person": natural }),
-            pool,
-        )
-        .await;
-        run(
-            &KycSubjectAssertType,
-            serde_json::json!({ "subject-id": subject.0, "entity-id": e, "entity-type": t }),
+            &KycSubjectPlace,
+            serde_json::json!({ "subject-id": subject.0, "entity-id": e, "is_natural_person": natural, "entity-type": t }),
             pool,
         )
         .await;
@@ -246,7 +245,7 @@ async fn checks_run_at_any_board_state_through_production() {
 async fn in_scope_set_is_computed_not_stored_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }), &pool).await;
     run(
         &DecideObligationWaive,
         serde_json::json!({ "subject-id": subject.0, "check-id": "board.every-entity-has-a-proven-type", "reason": "gate probe" }),
@@ -282,7 +281,7 @@ async fn in_scope_set_is_computed_not_stored_through_production() {
 async fn staleness_is_hash_comparison_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }), &pool).await;
 
     run(
         &DecideObligationWaive,
@@ -321,7 +320,7 @@ async fn staleness_is_hash_comparison_through_production() {
 async fn run_pins_are_complete_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
     run(
         &DecideObligationWaive,
         serde_json::json!({ "subject-id": subject.0, "check-id": "board.every-entity-has-a-proven-type", "reason": "pins probe" }),
@@ -346,7 +345,7 @@ async fn run_pins_are_complete_through_production() {
 async fn runs_are_append_only_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
 
     run(
         &DecideObligationWaive,

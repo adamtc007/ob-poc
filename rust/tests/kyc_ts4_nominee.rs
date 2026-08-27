@@ -47,7 +47,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister,
+    KycSubjectClassifyStructure, KycSubjectPlace,
     UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeReconcileConflict,
     UboEdgeSupersede,
 };
@@ -161,16 +161,16 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 /// Register subject + natural persons, then classify with `structure_class`.
 async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], class: &str) {
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         pool,
     )
     .await;
     for p in persons {
         run(
-            &KycSubjectRegister,
+            &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true,
+                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
             }),
             pool,
         )

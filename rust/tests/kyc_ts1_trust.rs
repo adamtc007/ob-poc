@@ -27,7 +27,7 @@ use uuid::Uuid;
 use chrono::{TimeZone, Utc};
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationFreeze, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
     UboEdgeReconcileConflict,
 };
 use ob_poc_kyc_substrate::{
@@ -214,8 +214,8 @@ async fn b_settlor_and_trustee_coexist_but_second_trustee_is_blocked() {
     let from = Uuid::new_v4();
 
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -272,8 +272,8 @@ async fn c_normalizer_rejects_unknown_and_absent_kind_listing_wire_values() {
     let subject = SubjectId(Uuid::new_v4());
 
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -369,16 +369,16 @@ async fn setup_trust_subject(
     persons: &[Uuid],
 ) {
     run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "discretionary_trust" }),
         pool,
     )
     .await;
     for p in persons {
         run(
-            &KycSubjectRegister,
+            &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true,
+                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
             }),
             pool,
         )

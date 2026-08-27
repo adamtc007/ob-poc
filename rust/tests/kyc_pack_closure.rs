@@ -221,7 +221,7 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_19() {
+fn verb_universe_is_exactly_17() {
     // TS.6 P1/P2: kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject
     // and moved to a new `decide:` domain block in the SAME YAML file
     // (dsl-kyc-obligation.yaml) — a rename+relocation, not a retirement, so
@@ -231,11 +231,18 @@ fn verb_universe_is_exactly_19() {
     // D2.0 §5 (2026-08-22): `creation`/`satisfaction` DISSOLVED (21→19).
     // `waiver` renamed+relocated to `kyc_ubo.decide.obligation.waiver` in
     // the same YAML file — a relocation, not a count change.
+    //
+    // T2 (2026-08-27, EOP-VS-UBO-GAME-001 §8 Q1): `register` + `type` MERGED
+    // into `place` (one verb absorbs two declarations, 19→18, P1);
+    // `member-withdrawal` renamed `remove` — a rename, not a count change
+    // (P2). `type-correction` DISSOLVED (18→17, P3) — no replacement.
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        19,
-        "dsl.kyc verb count drifted from the post-D2.0 19 (21 post-TS.6-§5, \
+        17,
+        "dsl.kyc verb count drifted from the post-T2 17 (18 post-P1/P2, \
+         minus type-correction DISSOLVED) (19 post-D2.0, minus \
+         register+type MERGED into place) (21 post-TS.6-§5, \
          minus creation/satisfaction DISSOLVED) (25 post-D1, \
          minus the retired select-strategy, compute-fold, and pierce-nominee \
          verb declarations) — update the T0.3 audit and every other pinned \
@@ -249,12 +256,13 @@ fn verb_universe_is_exactly_19() {
 fn assembly_pack_is_exactly_known() {
     // D2.0 §5 (2026-08-22): the 16 `assembly_lexicon()` entries — `creation`/
     // `satisfaction` DISSOLVED, `waiver` MOVED to `evaluation_lexicon()`.
+    // T2 (2026-08-27, §8 Q1): `register` + `type` MERGED into `place`
+    // (16→15, P1); `member-withdrawal` renamed `remove` (P2).
+    // `type-correction` DISSOLVED (15→14, P3) — no replacement entry.
     let expected: BTreeSet<String> = [
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         "kyc_ubo.assert.subject.structure-class",
-        "kyc_ubo.assert.subject.type",
-        "kyc_ubo.assert.subject.type-correction",
-        "kyc_ubo.assert.subject.member-withdrawal",
+        "kyc_ubo.assert.subject.remove",
         "kyc_ubo.assert.subject.enquiry",
         "kyc_ubo.assert.edge.control",
         "kyc_ubo.assert.edge.economic-interest",
@@ -436,6 +444,45 @@ fn retired_verbs_are_gone() {
     }
 }
 
+/// T2 (EOP-VS-UBO-GAME-001, 2026-08-27, §8 Q1, P3) — K-G7 grep-proof for
+/// `kyc_ubo.assert.subject.type-correction`'s DISSOLUTION, mirroring
+/// `retired_verbs_are_gone`'s pattern but scoped to this tranche's own
+/// retirement rather than TS.6's. This one had 0 real committed events
+/// (confirmed by DB query before deletion) — a full deletion, not a
+/// fold-arm-kept historical retirement, so it must be gone from every
+/// declaring surface with no exceptions (unlike `register`/`type`/
+/// `member-withdrawal`, whose fold arms deliberately remain for replay).
+/// The search-index half of this K-G7 proof is the generic orphan detector
+/// `retired_verbs_are_gone_from_the_search_index` below (left-joins
+/// `verb_pattern_embeddings` against `dsl_verbs`) — no bespoke FQN list
+/// needed there, since a stale `type-correction` embedding row will have no
+/// matching `dsl_verbs` row once `cargo x verbs compile` runs.
+#[test]
+fn type_correction_is_gone() {
+    assert!(
+        !DSL_KYC_YAML.contains("type-correction:"),
+        "retired verb declaration type-correction: still present in dsl-kyc.yaml"
+    );
+    assert!(
+        !KYC_STREAM_OPS_SRC.contains("struct KycSubjectCorrectType"),
+        "retired op struct KycSubjectCorrectType still present in kyc_stream_ops.rs"
+    );
+    assert!(
+        !LEXICON_SRC.contains("\"kyc_ubo.assert.subject.type-correction\""),
+        "retired LexiconEntry kyc_ubo.assert.subject.type-correction still present in lexicon.rs"
+    );
+    assert!(
+        !TYPE_REGISTRY_FOLD_SRC.contains("\"kyc_ubo.assert.subject.type-correction\" =>"),
+        "retired fold match arm for kyc_ubo.assert.subject.type-correction still present \
+         in fold/type_registry.rs"
+    );
+    assert!(
+        !TYPE_REGISTRY_FOLD_SRC.contains("fn edges_invalidated_by_correction"),
+        "retired cascade function edges_invalidated_by_correction still present in \
+         fold/type_registry.rs"
+    );
+}
+
 // ── K-G3: unmapped move ─────────────────────────────────────────────────────
 
 #[test]
@@ -508,14 +555,19 @@ fn every_declared_verb_has_a_registered_op() {
     // D2.0 §5 (2026-08-22): `KycObligationCreate`/`KycObligationSatisfy`
     // DISSOLVED (23→21). `KycObligationWaive` MOVED to `ob-poc-kyc-decide`
     // as `DecideObligationWaive` — still counted once, so no further change.
+    //
+    // T2 (2026-08-27, §8 Q1): `KycSubjectRegister` + `KycSubjectAssertType`
+    // MERGED into one `KycSubjectPlace` op (21→20, P1). `KycSubjectWithdrawMember`
+    // renamed `KycSubjectRemove` — still counted once, no further change (P2).
+    // `KycSubjectCorrectType` DELETED (20→19, P3) — no op survives it.
     let declared = kyc_stream_ops_declared_universe();
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        21,
+        19,
         "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
          ops co-hosted in kyc_stream_ops.rs, and kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject/ \
-         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 21: {registered:#?}"
+         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 19: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -825,9 +877,15 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // event's `entity_id` (`ControlState.registered_entity_ids`), so it no
     // longer conflicts with this verb's real multi-call-per-stream usage
     // (one call per natural-person candidate under one subject_root).
+    //
+    // T2 (2026-08-27, §8 Q1): `register` MERGED into `place`, which carries
+    // `NotCurrentlyPlaced` instead of `NotAlreadyRegistered` — place never
+    // carries update semantics, so the guard is "not currently placed", not
+    // "never before registered" (an already-withdrawn entity CAN be placed
+    // again).
     expected.insert(
-        "kyc_ubo.assert.subject.register".to_string(),
-        vec![Precondition::NotAlreadyRegistered],
+        "kyc_ubo.assert.subject.place".to_string(),
+        vec![Precondition::NotCurrentlyPlaced],
     );
     expected.insert(
         "kyc_ubo.assert.subject.structure-class".to_string(),
@@ -862,21 +920,22 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // PriorTypeAsserted — tree-cleanup follow-up tranche, EOP-STATE-
     // KYCUBO-D1 §4/§7); record-enquiry carries none (row 8: "group exists"
     // is true by construction).
-    expected.insert("kyc_ubo.assert.subject.type".to_string(), vec![Precondition::EntityRegistered]);
+    //
+    // T2 (2026-08-27, §8 Q1): standalone `type` MERGED into `place` (above);
+    // `member-withdrawal` renamed `remove`, precondition pair unchanged.
+    // `type-correction` DISSOLVED (P3) — no entry survives it here.
     expected.insert(
-        "kyc_ubo.assert.subject.type-correction".to_string(),
-        vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],
-    );
-    expected.insert(
-        "kyc_ubo.assert.subject.member-withdrawal".to_string(),
+        "kyc_ubo.assert.subject.remove".to_string(),
         vec![Precondition::EntityRegistered, Precondition::MembershipActive],
     );
     expected.insert("kyc_ubo.assert.subject.enquiry".to_string(), vec![]);
 
     assert_eq!(
         actual.len(),
-        16,
-        "assembly_lexicon() entry count drifted from the post-D2.0 16 \
+        14,
+        "assembly_lexicon() entry count drifted from the post-T2 14 \
+         (15 post-P1/P2, minus type-correction DISSOLVED) (16 post-D2.0, \
+         minus register+type MERGED into place) \
          lexicon-covered verbs (19 post-TS.6-P1, minus creation/satisfaction \
          DISSOLVED and waiver MOVED to evaluation_lexicon(), D2.0 §5) \
          (25 post-D1, minus the retired select-strategy, \
@@ -885,14 +944,15 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of TS.6 P1/P2 (2026-08-22, select-strategy, \
-         compute-fold, and pierce-nominee's own entry all retired; kyc.person.approve/.reject \
-         moved out to evaluation_lexicon() as kyc_ubo.decide.subject.approve/.reject), every one of the 16 \
-         remaining dsl.kyc verbs with a stud carries it (verify, freeze, the 5 edge-family \
-         verbs, apply-smo-fallback, register, classify-structure, and the 6 obligation \
-         verbs — piercing's precondition pair now reaches the stream via assert-control's \
-         and supersede's own entries); any other change is either matrix progress (update \
-         the T0.3 audit) or a regression"
+        "K-G5 precondition map changed — as of T2 (2026-08-27, §8 Q1: register+type \
+         MERGED into place carrying NotCurrentlyPlaced, member-withdrawal renamed \
+         remove, type-correction DISSOLVED), every one of the 14 remaining dsl.kyc \
+         verbs with a stud carries it \
+         (verify, freeze, the 5 edge-family verbs, apply-smo-fallback, place, \
+         classify-structure, and the 6 obligation verbs — piercing's precondition \
+         pair now reaches the stream via assert-control's and supersede's own \
+         entries); any other change is either matrix progress (update the T0.3 \
+         audit) or a regression"
     );
 
     let classes = structure_class_valid_values();
@@ -1914,25 +1974,22 @@ fn op_layer_only_studs_are_exactly_known() {
     // studs are lexicon/Precondition-declared, no longer op-layer-only.
     let lexicon = assembly_lexicon();
     let withdraw_entry = lexicon
-        .get("kyc_ubo.assert.subject.member-withdrawal")
-        .expect("kyc_ubo.assert.subject.member-withdrawal must be in assembly_lexicon()");
+        .get("kyc_ubo.assert.subject.remove")
+        .expect("kyc_ubo.assert.subject.remove must be in assembly_lexicon()");
     assert_eq!(
         withdraw_entry.preconditions,
         vec![Precondition::EntityRegistered, Precondition::MembershipActive],
-        "withdraw-member must declare the promoted MembershipActive precondition \
-         alongside EntityRegistered — if this reverts to just EntityRegistered, \
-         the stud silently went back to being op-layer-only"
+        "remove (T2, formerly member-withdrawal) must declare the promoted \
+         MembershipActive precondition alongside EntityRegistered — if this \
+         reverts to just EntityRegistered, the stud silently went back to \
+         being op-layer-only"
     );
-    let correct_entry = lexicon
-        .get("kyc_ubo.assert.subject.type-correction")
-        .expect("kyc_ubo.assert.subject.type-correction must be in assembly_lexicon()");
-    assert_eq!(
-        correct_entry.preconditions,
-        vec![Precondition::EntityRegistered, Precondition::PriorTypeAsserted],
-        "correct-type must declare the promoted PriorTypeAsserted precondition \
-         alongside EntityRegistered — if this reverts to just EntityRegistered, \
-         the stud silently went back to being op-layer-only"
-    );
+    // `correct_entry` (`kyc_ubo.assert.subject.type-correction`'s promoted
+    // PriorTypeAsserted stud) REMOVED — EOP-VS-UBO-GAME-001 T2 (§8 Q1,
+    // 2026-08-27, P3) DISSOLVED the verb; no lexicon entry survives it to
+    // assert against. `Precondition::PriorTypeAsserted` itself survives —
+    // it is also declared by `kyc_ubo.assert.edge.evidence`'s entity-scoped
+    // half (see `precondition_and_strategy_coverage_is_exactly_known`).
 
     // (b) The checker's own signature now DOES accept TypeRegistryState —
     // the structural precondition for both promotions above.
@@ -1954,13 +2011,24 @@ fn op_layer_only_studs_are_exactly_known() {
 
 /// Structural companion to `op_layer_only_studs_are_exactly_known`: pins
 /// that NO hand-rolled `TypeRegistryState` precondition logic for
-/// withdraw-member/correct-type remains in the op layer
+/// place/remove/correct-type remains in the op layer
 /// (`src/domain_ops/kyc_stream_ops.rs`) or the board preview
 /// (`crates/ob-poc-kyc-substrate/src/placement.rs`) — both now consult the
 /// single `check_preconditions`/`check_control_preconditions` checker only.
 /// Source-scanned, not semantic: if either of these markers reappears
 /// verbatim, the duplication this whole tooth family exists to prevent has
 /// silently come back.
+///
+/// T2 (2026-08-27, §8 Q1) widened this tooth: `place_and_remove_candidates`
+/// (formerly `type_registry_candidates`, renamed when `register`+`type`
+/// merged into `place` and `member-withdrawal` renamed `remove`) used to
+/// hand-roll an `is_withdrawn` gate to decide which candidates to enumerate
+/// for both `place` and `remove` — a duplicate of the `NotCurrentlyPlaced`/
+/// `MembershipActive` precondition arms `check_control_preconditions`
+/// already enforces on every probed candidate. Removed: `place` now always
+/// offers the subject's own entity as a candidate (the checker refuses it
+/// if already placed), and `remove` now always offers every registered
+/// entity (the checker refuses it if already withdrawn).
 #[test]
 fn no_stud_is_duplicated() {
     let op_markers = [
@@ -1971,42 +2039,45 @@ fn no_stud_is_duplicated() {
         assert!(
             !KYC_STREAM_OPS_SRC.contains(marker),
             "{label}: found the deleted hand-rolled check {marker:?} — the \
-             withdraw-member/correct-type stud duplication has come back; both \
+             place/remove stud duplication has come back; both \
              must be enforced solely by check_preconditions inside stream_append"
         );
     }
 
-    // Scoped to the withdraw-member/correct-type blocks specifically —
-    // `attach-evidence`'s type-scoped half (a legitimate, DIFFERENT,
-    // never-duplicated positional check) uses the same
-    // `type_registry.is_withdrawn`/`type_registry.type_of` calls in its own
-    // right and must not false-positive this tooth.
+    // Scoped to the place/remove blocks specifically — `attach-evidence`'s
+    // type-scoped half (a legitimate, DIFFERENT, never-duplicated
+    // positional check) uses the same `type_registry.is_withdrawn`/
+    // `type_registry.type_of` calls in its own right and must not
+    // false-positive this tooth. `correct-type`'s own block (T2 P3,
+    // 2026-08-27, §8 Q1) DISSOLVED — the verb it belonged to no longer
+    // exists, so there is nothing left between `remove`'s block and
+    // `attach-evidence` for a third block to bound.
     let placement_src = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/crates/ob-poc-kyc-substrate/src/placement.rs"
     ))
     .expect("read placement.rs");
-    let withdraw_block_start = placement_src
-        .find("if let Some(entry) = withdraw_member_entry {")
-        .expect("withdraw_member_entry block must exist in placement.rs");
-    let correct_block_start = placement_src
-        .find("if let Some(entry) = correct_type_entry {")
-        .expect("correct_type_entry block must exist in placement.rs");
+    let place_block_start = placement_src
+        .find("if let Some(entry) = place_entry {")
+        .expect("place_entry block must exist in placement.rs");
+    let remove_block_start = placement_src
+        .find("if let Some(entry) = remove_entry {")
+        .expect("remove_entry block must exist in placement.rs");
     let attach_evidence_start = placement_src
         .find("// attach-evidence, type-scoped half")
         .expect("attach-evidence type-scoped comment must exist in placement.rs");
-    let withdraw_block = &placement_src[withdraw_block_start..correct_block_start];
-    let correct_block = &placement_src[correct_block_start..attach_evidence_start];
+    let place_block = &placement_src[place_block_start..remove_block_start];
+    let remove_block = &placement_src[remove_block_start..attach_evidence_start];
     assert!(
-        !withdraw_block.contains("is_withdrawn"),
-        "placement.rs::type_registry_candidates (withdraw-member block): found a \
+        !place_block.contains("is_withdrawn"),
+        "placement.rs::place_and_remove_candidates (place block): found a \
          hand-rolled is_withdrawn check — the board-preview side of the stud \
          duplication has come back; it must consult check_control_preconditions only"
     );
     assert!(
-        !correct_block.contains("type_of(entity)"),
-        "placement.rs::type_registry_candidates (correct-type block): found a \
-         hand-rolled type_of check — the board-preview side of the stud \
+        !remove_block.contains("is_withdrawn"),
+        "placement.rs::place_and_remove_candidates (remove block): found a \
+         hand-rolled is_withdrawn check — the board-preview side of the stud \
          duplication has come back; it must consult check_control_preconditions only"
     );
 }
@@ -2412,8 +2483,12 @@ async fn no_legacy_fqns_remain_in_the_search_index() {
     // D2.0 §5 (2026-08-22): creation/satisfaction DISSOLVED (21→19) — gone
     // from the index entirely, not renamed. waiver's new FQN is still
     // counted once.
+    // T2 (2026-08-27, §8 Q1): register+type MERGED into place (19→18, P1) —
+    // gone from the index entirely, not renamed (member-withdrawal→remove
+    // IS a rename, still counted once, P2). type-correction DISSOLVED
+    // (18→17, P3) — gone from the index entirely, no replacement.
     assert_eq!(
-        indexed, 19,
-        "the 19 surviving renamed verbs must be discoverable under the new scheme"
+        indexed, 17,
+        "the 17 surviving renamed verbs must be discoverable under the new scheme"
     );
 }

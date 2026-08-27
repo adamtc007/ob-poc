@@ -440,11 +440,15 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // dressed as a verb; `freeze` already independently declares the same
     // precondition pair it existed to demonstrate.
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
-    registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
+    // T2 (EOP-VS-UBO-GAME-001, §3.2): register + assert-type retired,
+    // merged into place.
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectPlace));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
-    registry.register(Arc::new(kyc_stream_ops::KycSubjectAssertType));
-    registry.register(Arc::new(kyc_stream_ops::KycSubjectCorrectType));
-    registry.register(Arc::new(kyc_stream_ops::KycSubjectWithdrawMember));
+    // T2 (EOP-VS-UBO-GAME-001, §8 Q1): type-correction DISSOLVED (2026-08-27)
+    // — no op survives it here, not left unregistered (0 real committed
+    // events, full K-G7 deletion; see kyc_stream_ops.rs's retirement comment).
+    // T2 (EOP-VS-UBO-GAME-001, §3.2): member-withdrawal retired, renamed remove.
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectRemove));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectRecordEnquiry));
     // W3: role-basis recording — KycRoleAssign/KycRoleWithdraw retired
     // 2026-08-12 (T0.3 K-G7 fold-blind write; see kyc_stream_ops.rs).
