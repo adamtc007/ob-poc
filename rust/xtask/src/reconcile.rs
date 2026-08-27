@@ -58,14 +58,14 @@ pub(crate) async fn run(action: ReconcileAction) -> Result<()> {
     }
 }
 
-fn load_catalogue() -> Result<VerbsConfig> {
+pub(crate) fn load_catalogue() -> Result<VerbsConfig> {
     let loader = ConfigLoader::from_env();
     loader
         .load_verbs()
         .context("catalogue load failed (pre-DB; pure YAML)")
 }
 
-fn collect_macro_fqns() -> HashSet<String> {
+pub(crate) fn collect_macro_fqns() -> HashSet<String> {
     // Macros live at config/verb_schemas/macros/*.yaml with their FQN as
     // the top-level key (kind: macro).
     let mut out = HashSet::new();
@@ -403,6 +403,19 @@ async fn hygiene_report() -> Result<()> {
     let coverage_gaps = verb_domain_coverage_findings(&cfg, &refs_by_dag, &packs);
     print_limited(&coverage_gaps, 200);
 
+    // The coverage-gap check above is a no-op for any verb whose FQN
+    // matches zero packs' owned_verb_prefixes — `verb_domain_coverage_findings`
+    // just `continue`s past it (see that fn's doc comment). That silently
+    // hid every kyc_ubo.* verb: `owned_verb_prefixes` on ob-poc.kyc lists
+    // three-segment prefixes (`kyc.`, `ubo.`, `decide.`, `assert.`) while
+    // the live verbs are four-segment (`kyc_ubo.assert.edge.control`), and
+    // `"kyc_ubo…".starts_with("kyc.")` is false — the underscore, not a
+    // dot, follows `kyc`. This was reported nowhere; this section closes
+    // that specific blindness by naming every verb with zero matches.
+    println!("\nVerbs unclaimed by any domain pack's owned_verb_prefixes:");
+    let unclaimed = unclaimed_verb_findings(&cfg, &packs);
+    print_limited(&unclaimed, 200);
+
     println!("\nDomain packs with no owned_verb_prefixes or no owned_dags declared:");
     let mut ownerless_packs: Vec<_> = packs
         .iter()
@@ -450,6 +463,7 @@ async fn hygiene_report() -> Result<()> {
     println!("  DAG refs missing runtime:     {}", missing_runtime.len());
     println!("  plugin YAML missing runtime:  {}", plugin_missing.len());
     println!("  verb/DAG coverage gaps:       {}", coverage_gaps.len());
+    println!("  verbs unclaimed by any pack:  {}", unclaimed.len());
     println!("  packs w/ incomplete ownership: {}", ownerless_packs.len());
     println!(
         "  deal substate closure gaps:   {}",
@@ -1030,13 +1044,13 @@ fn collect_dag_verb_refs() -> Result<HashSet<String>> {
 /// elsewhere (the CBU verb-surface re-grounding used exactly this field) —
 /// deliberately not a new, parallel ownership concept.
 #[derive(Debug, Clone, Default)]
-struct DomainPackOwnership {
-    pack_id: String,
-    owned_verb_prefixes: Vec<String>,
-    owned_dags: Vec<String>,
+pub(crate) struct DomainPackOwnership {
+    pub(crate) pack_id: String,
+    pub(crate) owned_verb_prefixes: Vec<String>,
+    pub(crate) owned_dags: Vec<String>,
 }
 
-fn load_domain_pack_ownership() -> Result<Vec<DomainPackOwnership>> {
+pub(crate) fn load_domain_pack_ownership() -> Result<Vec<DomainPackOwnership>> {
     let dir = PathBuf::from("config/sem_os_seeds/domain_packs");
     let mut out = Vec::new();
     if !dir.exists() {
@@ -1088,8 +1102,8 @@ fn load_domain_pack_ownership() -> Result<Vec<DomainPackOwnership>> {
 /// be represented somewhere in one of that pack's `owned_dags` — as a real
 /// `via:` transition, an `overall_lifecycle` progression verb, or a
 /// `dsl_verb_reconciliation` declaration. A verb matching zero packs'
-/// prefixes is out of scope for this specific check (unclaimed-prefix is a
-/// softer, separate finding, reported alongside but not counted here).
+/// prefixes is out of scope for this specific check — that is a different,
+/// softer finding, now reported separately by `unclaimed_verb_findings`.
 fn verb_domain_coverage_findings(
     cfg: &VerbsConfig,
     refs_by_dag: &BTreeMap<String, HashSet<String>>,
@@ -1119,6 +1133,40 @@ fn verb_domain_coverage_findings(
                         pack.pack_id, pack.owned_dags
                     ));
                 }
+            }
+        }
+    }
+
+    findings.sort();
+    findings
+}
+
+/// The other half of `verb_domain_coverage_findings`'s scope, promised by
+/// that function's own doc comment ("unclaimed-prefix is a softer, separate
+/// finding, reported alongside but not counted here") but never
+/// implemented — `grep -n 'unclaimed' xtask/src/reconcile.rs` found only
+/// that sentence before this function existed. Every declared verb whose
+/// FQN matches ZERO packs' `owned_verb_prefixes` is invisible to the
+/// coverage-gap check above (it `continue`s straight past a non-match) and
+/// therefore invisible to `hygiene-report` entirely. This was not a
+/// theoretical gap: it hid all 19 `kyc_ubo.*` verbs, whose owning pack
+/// (`ob-poc.kyc`) declares three-segment prefixes (`kyc.`, `ubo.`,
+/// `decide.`, `assert.`) against four-segment verb FQNs —
+/// `"kyc_ubo.assert.edge.control".starts_with("kyc.")` is `false` (an
+/// underscore, not a dot, follows `kyc`), so every kyc_ubo.* verb matches
+/// zero prefixes and was silently out of scope for every ownership check
+/// this tool runs.
+fn unclaimed_verb_findings(cfg: &VerbsConfig, packs: &[DomainPackOwnership]) -> Vec<String> {
+    let mut findings = Vec::new();
+
+    for (domain, dblock) in &cfg.domains {
+        for verb in dblock.verbs.keys() {
+            let fqn = format!("{domain}.{verb}");
+            let claimed = packs
+                .iter()
+                .any(|pack| pack.owned_verb_prefixes.iter().any(|p| fqn.starts_with(p.as_str())));
+            if !claimed {
+                findings.push(fqn);
             }
         }
     }

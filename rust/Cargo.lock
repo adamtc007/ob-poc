@@ -8907,6 +8907,7 @@ dependencies = [
  "ob-poc-boundary",
  "ob-poc-entity-linking",
  "ob-poc-eval-fixtures",
+ "ob-poc-kyc-substrate",
  "ob-poc-types",
  "playbook-core",
  "proc-macro2",

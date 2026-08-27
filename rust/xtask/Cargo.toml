@@ -35,6 +35,10 @@ sem_os_ontology.workspace = true
 sem_os_policy.workspace = true
 sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }
+# kyc-alignment view (read-only): needs the real lexicon + board enumerator,
+# not a text scan of the source — a hand-written regex over lexicon.rs
+# missed 2 of 19 verbs (verification/freeze) during scoping for this tool.
+ob-poc-kyc-substrate = { path = "../crates/ob-poc-kyc-substrate" }
 dsl-core.workspace = true
 dag-to-bpmn = { path = "../crates/dag-to-bpmn" }
 playbook-core = { path = "../crates/playbook-core" }

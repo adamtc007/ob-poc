@@ -30,6 +30,7 @@ mod gleif_load;
 mod gleif_test;
 mod harness;
 mod instrument_harness;
+mod kyc_alignment;
 mod lexicon;
 mod onboarding_harness;
 mod pub_lint;
@@ -414,6 +415,12 @@ enum Command {
     /// SemOsVerbOp registry / YAML completeness diff (dead-code +
     /// dual-routing static sweep, see xtask/src/registry_graph.rs).
     RegistryGraph,
+
+    /// KYC/UBO vocabulary alignment view (read-only join of yaml/lexicon/
+    /// macro/ops/pack/domain-pack-prefix/board-enumerable/dsl_verbs/
+    /// embeddings/centroids for every kyc_ubo.* verb — see
+    /// xtask/src/kyc_alignment.rs). Needs DATABASE_URL.
+    KycAlignment,
 
     /// Compile one dag_taxonomies slot's state machine into a bpmn-lite
     /// DSL workflow template (see crates/dag-to-bpmn).
@@ -1581,6 +1588,10 @@ fn main() -> Result<()> {
             Ok(())
         }
         Command::RegistryGraph => registry_graph::run(),
+        Command::KycAlignment => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(kyc_alignment::run())
+        }
         Command::DagToBpmn {
             dag_file,
             slot_id,
