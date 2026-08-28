@@ -9,13 +9,15 @@
 //!   separate `classify` call, pre-T4) → resolve: GP chain only, investors
 //!   excluded (economic axis stays economic), all `ControlByOtherMeans`,
 //!   `effective_ownership_pct` None.
-//! - (b) foundation end-to-end: register → classify `foundation` → assert
-//!   `board_appointment` council edges + a stray `voting_rights` edge →
-//!   select `foundation_council_strategy` → resolve: council members only,
-//!   the stray `voting_rights` edge IGNORED (narrower kind filter than the
-//!   full control walk — deliberate, mirrors TrustRoleStrategy's stance:
-//!   if the structure genuinely mixes, classification is wrong and
-//!   reclassify is legal).
+//! - (b) foundation end-to-end: `place` as `foundation` → assert
+//!   `trust_trustee` council edges + a stray `trust_beneficiary` edge →
+//!   freeze dispatches to `foundation_council_strategy` → resolve: council
+//!   members only, the beneficiary edge IGNORED (per-role admission,
+//!   corrected T4-close 2026-08-28 per Adam's Foundation ruling — the
+//!   strategy now walks `TrustRole`-kind edges, the same filter
+//!   `TrustRoleStrategy` uses, since a foundation council governs under
+//!   fiduciary roles, not board seats; a foundation council/founder/
+//!   beneficiary maps onto trustee/settlor/beneficiary 1:1).
 //! - (c) `control_prong_strategy` behavior unchanged after the
 //!   shared-traversal refactor: an explicit differential fixture — the same
 //!   edge set resolves identically pre/post (plus the existing m4/w7 suites).
@@ -345,49 +347,45 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
 
 // ── (b) foundation_council_strategy end-to-end ──────────────────────────────
 //
-// Council members asserted as `board_appointment`; a stray `voting_rights`
+// Council members asserted as `trust_trustee`; a stray `trust_beneficiary`
 // edge on the Foundation subject must be IGNORED by this strategy (narrower
-// kind filter — §2.3: a foundation has no owners by construction; if the
-// structure genuinely mixes, classification is wrong and reclassify is
+// per-role admission — §2.3: a foundation has no owners by construction; if
+// the structure genuinely mixes, classification is wrong and reclassify is
 // legal).
 //
-// DEFERRED (EOP-DD-UBO-DISPATCH-001 T4-close, 2026-08-28) — #[ignore]d, not
-// fixed. Making entity-type the sole dispatch key (T4) exposed a genuine
-// disagreement between two ratified documents that was invisible before,
-// because geometry (keyed on entity-type) and strategy (keyed on the
-// separate, now-retired `structure-class`) never had to agree:
-// `foundation_council_strategy` (TS.2 §2.3) walks ONLY `BoardAppointment`/
-// `DominantInfluence` edges, but `Foundation`'s TS.1 geometry
-// (`geometry.rs` target_permits) admits only `TrusteePowers`/
-// `ReservedPowers`/`BeneficiaryEntitlement` — it categorises Foundation as
-// trust-shaped, not council-shaped. Neither edge kind the strategy needs
-// can ever be asserted onto a real `Foundation`-typed entity through the
-// governed append path; this test cannot pass without amending one of the
-// two ratified documents, which is not this tranche's call (STANDING
-// RULE). WHAT: this test, geometrically unrunnable as written. WHY: TS.1
-// §2/§2a (Foundation's target_permits) and TS.2 §2.3
-// (`FoundationCouncilStrategy`'s edge-kind filter) disagree on what kind of
-// structure a Foundation is. WHO: whoever owns TS.1/TS.2's reconciliation —
-// Adam, or a future tranche scoped to it. WHEN: before
-// `foundation_council_strategy` can ever resolve a real candidate for a
-// real Foundation-typed subject through the live governed system, not just
-// in a hand-built `ControlState` fixture.
-#[ignore = "TS.1 geometry (Foundation target_permits) and TS.2 strategy \
-            (FoundationCouncilStrategy's BoardAppointment/DominantInfluence \
-            filter) disagree — no edge kind the strategy needs can be \
-            asserted onto a real Foundation-typed entity; see EOP-STATE-KYCUBO-D1 §5"]
+// UN-DEFERRED (EOP-DD-UBO-DISPATCH-001 Foundation ruling, Adam 2026-08-28,
+// recorded in EOP-STATE-KYCUBO-D1 §5p/§5q). The T4-close tranche found
+// `foundation_council_strategy` walking `BoardAppointment`/
+// `DominantInfluence` while `Foundation`'s TS.1 geometry admits only
+// `TrusteePowers`/`ReservedPowers`/`BeneficiaryEntitlement` — neither edge
+// kind the strategy needed could ever be asserted onto a real Foundation
+// through the governed path, so this test could only ever pass on a
+// hand-built fixture. Adam ruled: the GEOMETRY is right, the STRATEGY is
+// wrong — a foundation council governs under the charter the way trustees
+// govern under a deed (5AMLD treats foundations as trust-like);
+// `BoardAppointment` is a company mechanism, never the right fit.
+// `FoundationCouncilStrategy` now walks `TrustRole`-kind edges (the SAME
+// filter `TrustRoleStrategy` uses, `determination.rs`), so this fixture
+// asserts through the REAL governed path — `trust_trustee` for council
+// members (maps to `Pipe::TrusteePowers`, TS.1-permitted for Foundation)
+// and `trust_beneficiary` for the excluded stray edge (maps to
+// `Pipe::BeneficiaryEntitlement`, also TS.1-permitted, but never a
+// candidate under `TrustRoleStrategy::edge_qualifies`'s per-role rule,
+// reused directly by `FoundationCouncilStrategy`) — rather than a
+// hand-built `ControlState`. A test that only passed on a fixture is what
+// hid the geometry/strategy disagreement for as long as it did.
 #[tokio::test]
-async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_rights() {
+async fn b_foundation_council_strategy_resolves_council_and_ignores_beneficiary() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     let council_a = Uuid::new_v4();
     let council_b = Uuid::new_v4();
-    let stray_voter = Uuid::new_v4();
+    let stray_beneficiary = Uuid::new_v4();
 
     setup_subject(
         &pool,
         subject,
-        &[council_a, council_b, stray_voter],
+        &[council_a, council_b, stray_beneficiary],
         "foundation",
     )
     .await;
@@ -397,7 +395,7 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
             &UboEdgeConnect,
             serde_json::json!({
                 "subject-id": subject.0, "from_entity_id": member, "to_entity_id": subject.0,
-                "kind": "board_appointment",
+                "kind": "trust_trustee",
             }),
             &pool,
         )
@@ -406,8 +404,8 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
     run(
         &UboEdgeConnect,
         serde_json::json!({
-            "subject-id": subject.0, "from_entity_id": stray_voter, "to_entity_id": subject.0,
-            "kind": "voting_rights",
+            "subject-id": subject.0, "from_entity_id": stray_beneficiary, "to_entity_id": subject.0,
+            "kind": "trust_beneficiary",
         }),
         &pool,
     )
@@ -427,13 +425,14 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
     for (member, name) in [(council_a, "council member A"), (council_b, "council member B")] {
         assert!(
             person_ids.contains(&member.to_string()),
-            "{name} (board_appointment) must be a control candidate (§2.3)"
+            "{name} (trust_trustee) must be a control candidate (§2.3)"
         );
     }
     assert!(
-        !person_ids.contains(&stray_voter.to_string()),
-        "a stray voting_rights edge on a Foundation subject must be IGNORED by \
-         foundation_council_strategy (deliberate kind-filter, §2.3)"
+        !person_ids.contains(&stray_beneficiary.to_string()),
+        "a beneficiary edge on a Foundation subject must be IGNORED by \
+         foundation_council_strategy (per-role admission: beneficiary is \
+         never a candidate, §2.3)"
     );
     for c in &candidates {
         assert_eq!(

@@ -429,7 +429,24 @@ fn umbrella_with_sub_funds_is_now_a_determination_subject() {
 
 /// §2 Q3, RULED: `CharityNotForProfit` -> `trust_role_strategy`, not
 /// `foundation_council_strategy` (the bucket an analyst might reach for by
-/// analogy, given a charity's council-shaped governance).
+/// analogy, given a charity's council-shaped governance) — the DISPATCH
+/// TABLE assignment still matters (it is what `freeze` records as the
+/// basis, K-1/K-35 auditability), even though both strategies now RESOLVE
+/// the same candidate for this edge shape.
+///
+/// EOP-DD-UBO-DISPATCH-001 Foundation ruling (T4-close, 2026-08-28):
+/// `foundation_council_strategy`'s edge-kind filter was corrected from
+/// `BoardAppointment`/`DominantInfluence` (geometrically impossible onto a
+/// real `Foundation`) to `TrustRole`-kind edges — the same filter
+/// `trust_role_strategy` uses. The two strategies are now behaviorally
+/// identical (§5q "merge candidate" observation, deferred to the next
+/// strategy review, not implemented here) — this test's second half used
+/// to prove "the choice matters" by showing `foundation_council_strategy`
+/// couldn't see a `TrustRole` edge at all; that property no longer holds,
+/// so the test is rewritten to prove what's still true: the DISPATCH still
+/// resolves to `trust_role_strategy` by name (the recorded basis on a real
+/// freeze), even though `foundation_council_strategy` would now reach the
+/// identical answer if it were (wrongly) dispatched to instead.
 #[test]
 fn charity_dispatches_to_trust_role_not_foundation_council() {
     assert_eq!(
@@ -449,12 +466,17 @@ fn charity_dispatches_to_trust_role_not_foundation_council() {
     assert_eq!(trust_role_candidates.len(), 1, "trust_role must resolve the charity's trustee: {trust_role_candidates:#?}");
     assert_eq!(trust_role_candidates[0].person_id, trustee);
 
-    // foundation_council_strategy traverses BoardAppointment/DominantInfluence
-    // only — a bare TrustRole(Trustee) edge is invisible to it.
+    // foundation_council_strategy now resolves the SAME candidate for this
+    // edge shape (post-Foundation-ruling correction) — no longer proof
+    // that "the choice matters" behaviorally, only that the DISPATCH TABLE
+    // entry (checked above) is what determines the recorded basis.
     let foundation_candidates =
         strategy_for("foundation_council_strategy").resolve(&state, charity, &natural_persons, 25.0);
-    assert!(
-        foundation_candidates.is_empty(),
-        "foundation_council_strategy must not see a TrustRole edge — proves the choice matters: {foundation_candidates:#?}"
+    assert_eq!(
+        format!("{foundation_candidates:?}"),
+        format!("{trust_role_candidates:?}"),
+        "foundation_council_strategy and trust_role_strategy are now behaviorally \
+         identical (same TrustRole-kind filter, same per-role admission) — a real \
+         fact of the Foundation ruling, not a bug; got: {foundation_candidates:#?}"
     );
 }

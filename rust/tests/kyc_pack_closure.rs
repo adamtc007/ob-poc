@@ -1632,9 +1632,16 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         "trust_role_strategy",
         ["trust_settlor", "trust_trustee", "trust_protector"].into_iter().collect(),
     );
+    // EOP-DD-UBO-DISPATCH-001 Foundation ruling (T4-close, 2026-08-28): was
+    // ["board_appointment", "dominant_influence"] — TS.1 geometry never
+    // permitted either kind onto a real Foundation, so the filter was
+    // corrected to TrustRole-kind edges (`reconciled_trust_edges` +
+    // `TrustRoleStrategy::edge_qualifies`, reused directly) — the exact
+    // set `trust_role_strategy` admits, `trust_beneficiary` excluded by
+    // the same per-role rule (never a candidate) both here.
     expected.insert(
         "foundation_council_strategy",
-        ["board_appointment", "dominant_influence"].into_iter().collect(),
+        ["trust_settlor", "trust_trustee", "trust_protector"].into_iter().collect(),
     );
     expected.insert(
         "cooperative_member_strategy",

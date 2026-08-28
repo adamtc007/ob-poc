@@ -724,17 +724,47 @@ impl DeterminationStrategy for FundControlStrategy {
 
 /// Resolves natural persons controlling a Foundation-classified subject —
 /// a foundation has NO owners by construction, so control sits with the
-/// council/board (EOP-DD-KYCUBO-KIT-TS0 §2.3, ratified 2026-08-12).
+/// council, not shareholding (EOP-DD-KYCUBO-KIT-TS0 §2.3, ratified
+/// 2026-08-12; edge-kind filter CORRECTED by
+/// EOP-DD-UBO-DISPATCH-001's Foundation ruling, T4-close, 2026-08-28 —
+/// see below).
 ///
-/// Traverses ONLY active reconciled `EdgeKind::BoardAppointment` +
-/// `EdgeKind::DominantInfluence` edges — narrower than the full control
-/// walk. A stray `voting_rights` (or any other control-kind) edge on a
-/// Foundation subject is IGNORED by this strategy — deliberate, mirroring
-/// `TrustRoleStrategy`'s kind-filtering stance: if the structure genuinely
-/// mixes, classification is wrong, and reclassification is legal (matrix
-/// row 10). Every candidate is `Prong::ControlByOtherMeans`;
-/// `effective_ownership_pct` is always `None`; `threshold_pct` is accepted
-/// for signature parity but unused.
+/// **Foundation ruling (Adam, 2026-08-28, recorded in
+/// `docs/eop/EOP-STATE-KYCUBO-D1_State-of-Play.md` §5p/§5q):** the T4-close
+/// tranche found `FoundationCouncilStrategy` walking
+/// `BoardAppointment`/`DominantInfluence` while `Foundation`'s TS.1
+/// `target_permits` admits only `TrusteePowers`/`ReservedPowers`/
+/// `BeneficiaryEntitlement` — no edge the strategy needed could ever be
+/// asserted onto a real Foundation through the governed path. Ruled: the
+/// GEOMETRY was right, the STRATEGY was wrong. A foundation has a founder,
+/// a council, and beneficiaries — fiduciary roles under a constitution,
+/// not board seats; a council governs the way trustees govern under a
+/// deed, which is why 5AMLD treats foundations as trust-like.
+/// `BoardAppointment` is a company mechanism and was never the right fit.
+///
+/// Traverses ONLY active reconciled `EdgeKind::TrustRole(_)` edges (via
+/// `reconciled_trust_edges`, the SAME extractor `TrustRoleStrategy` uses)
+/// — narrower than the full control walk, and now geometry-reachable: the
+/// wire vocabulary has no Foundation-specific role names, so a council
+/// member is asserted the same way a trustee is (`kind: "trust_trustee"`
+/// etc.) — the pipe, not the label, is what TS.1 actually gates on. Per-role
+/// admissibility is IDENTICAL to `TrustRoleStrategy`'s ruling
+/// (`TrustRoleStrategy::edge_qualifies`, reused directly rather than
+/// duplicated): trustee/protector-equivalent roles always qualify,
+/// settlor/founder-equivalent qualifies unless the edge proves
+/// irrevocability, beneficiary NEVER qualifies (a quantified beneficiary
+/// interest belongs on the economic axis). Every candidate is
+/// `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always
+/// `None`; `threshold_pct` is accepted for signature parity but unused.
+///
+/// **Merge candidate, reported not implemented (§5q):** after this fix,
+/// `FoundationCouncilStrategy` and `TrustRoleStrategy` walk the same edge
+/// kinds under the same admissibility rule and differ only in `name()` and
+/// this doc comment — the two are, in fact, identical in behavior. Adam
+/// has deferred collapsing them to the next strategy review rather than
+/// amend the `EntityType → DeterminationStrategy` dispatch table (§2,
+/// ratified days before this fix) as a side effect of a geometry
+/// correction; kept as two distinct structs/dispatch targets here.
 ///
 /// **Scope (TS.2 v1):** same natural-person chain resolution and the same
 /// v1 boundary as the other control-axis strategies — an intermediate legal
@@ -754,13 +784,16 @@ impl DeterminationStrategy for FoundationCouncilStrategy {
         natural_persons: &BTreeSet<PersonId>,
         _threshold_pct: f64,
     ) -> Vec<ProngCandidate> {
-        use crate::fold::control::EdgeKind;
-
-        // Council-kind edges only (§2.3): board_appointment + dominant_influence.
-        let edges = reconciled_control_edges(state);
+        // TrustRole-kind edges only (§2.3, corrected T4-close 2026-08-28):
+        // TrusteePowers/ReservedPowers/BeneficiaryEntitlement — the exact
+        // set TS.1 permits onto a Foundation. `edge_qualifies` is
+        // `TrustRoleStrategy`'s own per-role admissibility rule, reused
+        // directly: the two strategies are the same rule under two names
+        // (see doc comment above).
+        let edges = reconciled_trust_edges(state);
         let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
         for e in &edges {
-            if matches!(e.kind, EdgeKind::BoardAppointment | EdgeKind::DominantInfluence) {
+            if TrustRoleStrategy::edge_qualifies(&e.role, e.trust_revocable) {
                 adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
             }
         }
