@@ -1,33 +1,34 @@
 //! TS.3 gate tests — EOP-DD-KYCUBO-KIT-TS0 §2.4 (`state_owned_strategy`) +
 //! §2.5 (`cooperative_member_strategy`), ratified 2026-08-12 ACCEPT ALL.
 //!
-//! RED-first against the post-TS.2 tree:
-//! - (a) state_owned end-to-end through the REAL ops: register → classify
-//!   `state_owned` → assert a control edge from the rare genuine
-//!   natural-person controller → select `state_owned_strategy` (proves the
-//!   `StructureClassSupported` widening at the real append path — pre-TS.3
-//!   StateOwned is fail-closed and select-strategy REJECTS) → resolve: the
-//!   controller chain, `ControlByOtherMeans`, `effective_ownership_pct` None.
+//! RED-first against the post-TS.2 tree (T4-close, 2026-08-28: entity-type
+//! is the dispatch key now; `structure-class` is retired):
+//! - (a) state_owned end-to-end through the REAL ops: `place` as
+//!   `government_dept_statutory_corporation` → assert a control edge from
+//!   the rare genuine natural-person controller → freeze dispatches to
+//!   `state_owned_strategy` → resolve: the controller chain,
+//!   `ControlByOtherMeans`, `effective_ownership_pct` None.
 //! - (b) state_owned zero-candidate: no natural-person control chain crosses
 //!   → empty Vec — the COMMON case for this class (§2.4: the controller is a
 //!   state organ; the existing `apply-smo-fallback` path supplies the
 //!   determination; the strategy legitimizes the SMO route, it does not
 //!   build new SMO machinery).
-//! - (c) cooperative end-to-end: register → classify `cooperative` → assert
-//!   a `board_appointment` (office) edge → select
+//! - (c) cooperative end-to-end: `place` as `cooperative_mutual` → assert
+//!   a `board_appointment` (office) edge → freeze dispatches to
 //!   `cooperative_member_strategy` → resolve: the office holder as
 //!   `ControlByOtherMeans` (§2.5: control arises from OFFICE, never from
 //!   membership per se — one-member-one-vote).
 //! - (d) cooperative kind-filter: traverses `voting_rights` +
-//!   `board_appointment` + `dominant_influence` ONLY — a `gp_statutory`
-//!   edge does NOT produce a candidate; a `voting_rights` one does
-//!   (anomalous concentrated voting arrangement, §2.5).
-//! - (e) select-strategy ADMITS nominee (TS.4 fixture flip: Nominee joined
-//!   the implemented set via NomineePierceStrategy — the old "still blocks"
-//!   assertion inverted; the guard set is now total).
-//! - (f) freeze's unknown-strategy arm still errors (TS.4 fixture fix: the
-//!   exemplar moved to a never-will-exist string), message lists all 8
-//!   implemented strategy names.
+//!   `board_appointment` + `dominant_influence` + `membership_rights`
+//!   ONLY — a `gp_statutory` edge does NOT produce a candidate; a
+//!   `membership_rights` one does (anomalous concentrated arrangement,
+//!   §2.5/TS.3 §3).
+//! - (e) a real, supported EntityType (`llp`) with zero candidate-producing
+//!   edges is admitted past `EntityTypeSupportsStrategy` — K-5 (empty
+//!   determination) is what refuses, not the type gate (T4-close rewrite of
+//!   the old `select-strategy ADMITS nominee` proof — `structure-class`
+//!   admitting a Nominee-classified subject no longer exists as a concept).
+//! - (f) freeze's unknown-strategy arm — RETIRED (TS.6 P2), comment-only.
 //!
 //! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
 //! (`render_value` omits nulls at every depth), so the final determination
@@ -46,7 +47,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace,
+    KycSubjectPlace,
     UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_seam::append_in_scope;
@@ -203,11 +204,25 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
     }
 }
 
-/// Register subject + natural persons, then classify with `structure_class`.
+/// Register subject + natural persons with a real dispatchable EntityType.
+///
+/// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): `class` used to be the
+/// separately-asserted `structure-class`, decoupled from `place`'s
+/// `entity-type` — hardcoded `private_limited_company` here regardless of
+/// `class`. `structure-class` is retired; entity-type is now the SOLE
+/// dispatch key. `state_owned`→`government_dept_statutory_corporation`
+/// (`state_owned_strategy`), `cooperative`→`cooperative_mutual`
+/// (`cooperative_member_strategy`) — direct §2 matches for this file's
+/// (a)/(b)/(c)/(d) scenarios.
 async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], class: &str) {
+    let entity_type = match class {
+        "state_owned" => "government_dept_statutory_corporation",
+        "cooperative" => "cooperative_mutual",
+        other => other,
+    };
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": entity_type }),
         pool,
     )
     .await;
@@ -221,12 +236,6 @@ async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], clas
         )
         .await;
     }
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": class }),
-        pool,
-    )
-    .await;
 }
 
 /// Drive the REAL freeze op, assert the recorded strategy name on the
@@ -274,17 +283,22 @@ async fn resolve_via_strategy(
     let mut reg = FoldRegistry::new();
     reg.register(assembly_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
     let control = fold_control_versioned(&refs, &reg).expect("fold ok");
-    assert_eq!(
-        control
-            .structure_class
-            .as_ref()
-            .map(|c| ob_poc_kyc_substrate::strategy_for_structure_class(c)),
-        Some(expected_strategy),
-        "structure_class must derive {expected_strategy} (TS.6 P2: strategy is derived, \
-         not separately asserted)"
-    );
     let subject_entity =
-        ob_poc_kyc_substrate::find_subject_entity(&refs).expect("classify recorded entity");
+        ob_poc_kyc_substrate::find_subject_entity(&refs).expect("subject entity");
+    let type_registry = ob_poc_kyc_substrate::fold_type_registry(&refs);
+    let entity_type = type_registry.type_of(subject_entity).expect("entity type known");
+    // EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): the strategy is DERIVED
+    // from the subject's EntityType (`dispatch_for_entity_type`), replacing
+    // `structure_class`/`strategy_for_structure_class` — both retired.
+    assert_eq!(
+        match ob_poc_kyc_substrate::dispatch_for_entity_type(&entity_type) {
+            ob_poc_kyc_substrate::DeterminationDispatch::Strategy(name) => Some(name),
+            ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => None,
+        },
+        Some(expected_strategy),
+        "{entity_type:?} must dispatch to {expected_strategy} (T4: strategy is derived \
+         from entity-type, not separately asserted)"
+    );
     let persons = ob_poc_kyc_substrate::natural_persons_from_events(&refs);
     strategy.resolve(&control, subject_entity, &persons, 25.0)
 }
@@ -293,7 +307,16 @@ async fn resolve_via_strategy(
 //
 // §2.4: the strategy runs the full control traversal (same edge-kind
 // admission as control_prong_strategy) for the rare genuine natural-person
-// controller. Here one exists (dominant_influence), so it resolves.
+// controller. Here one exists (board_appointment), so it resolves.
+//
+// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): was `dominant_influence` —
+// geometrically impossible for `GovernmentDeptStatutoryCorporation` (TS.1
+// target_permits admits `BoardAppointment`/`OfficerAppointment`/
+// `StatutoryAuthority`/`EmploymentDelegatedAuthority`, not
+// `ContractualControl`, `dominant_influence`'s pipe). `board_appointment` is
+// geometry-permitted AND `StateOwnedStrategy` walks every Traverse-admitted
+// control kind generically (no named-kind filter, unlike the fund/co-op
+// strategies) — a strictly more on-model fixture, not a workaround.
 
 #[tokio::test]
 async fn a_state_owned_strategy_resolves_rare_natural_person_controller() {
@@ -307,7 +330,7 @@ async fn a_state_owned_strategy_resolves_rare_natural_person_controller() {
         &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": controller, "to_entity_id": subject.0,
-            "kind": "dominant_influence",
+            "kind": "board_appointment",
         }),
         &pool,
     )
@@ -328,7 +351,7 @@ async fn a_state_owned_strategy_resolves_rare_natural_person_controller() {
     assert_eq!(
         candidates[0].get("person_id").and_then(|v| v.as_str()),
         Some(controller.to_string().as_str()),
-        "the dominant_influence controller must be the candidate (§2.4)"
+        "the board_appointment controller must be the candidate (§2.4)"
     );
     assert_eq!(
         candidates[0].get("prong").and_then(|v| v.as_str()),
@@ -488,18 +511,30 @@ async fn c_cooperative_member_strategy_resolves_office_holder() {
     cleanup(&pool, &[subject]).await;
 }
 
-// ── (d) cooperative kind-filter — 3 admitted kinds ONLY ─────────────────────
+// ── (d) cooperative kind-filter — 4 admitted kinds ONLY ─────────────────────
 //
-// §2.5: traverses voting_rights + board_appointment + dominant_influence
-// ONLY. A gp_statutory edge (a partnership-control kind foreign to the
-// cooperative form) is IGNORED; an anomalous concentrated voting_rights
-// arrangement resolves.
+// §2.5/TS.3 §3: traverses voting_rights + board_appointment +
+// dominant_influence + membership_rights ONLY. A gp_statutory edge (a
+// partnership-control kind foreign to the cooperative form) is IGNORED; an
+// anomalous concentrated membership_rights arrangement resolves.
+//
+// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): the concentrated-holder
+// edge was `voting_rights` — geometrically impossible for a typed
+// `CooperativeMutual` subject (TS.1 target_permits admits
+// `BoardAppointment`/`OfficerAppointment`/`MembershipRights`/
+// `EmploymentDelegatedAuthority`, not `VotingShares`/`NonVotingShares`,
+// `voting_rights`'s pipe — pre-T2 `register` never typed the subject, so
+// this was vacuously `Unevaluable`; post-T2 `place` mandates a type,
+// exposing the mismatch). `membership_rights` is both geometry-permitted
+// AND one of the strategy's own 4 admitted kinds (TS.3's own addition to
+// this strategy, for exactly this "anomalous concentrated" co-op case) —
+// a strictly more on-model fixture, not a workaround.
 
 #[tokio::test]
 async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let concentrated_voter = Uuid::new_v4(); // voting_rights → candidate
+    let concentrated_voter = Uuid::new_v4(); // membership_rights → candidate
     let gp_holder = Uuid::new_v4(); // gp_statutory → NOT a candidate
 
     setup_subject(&pool, subject, &[concentrated_voter, gp_holder], "cooperative").await;
@@ -508,7 +543,7 @@ async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
         &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": concentrated_voter,
-            "to_entity_id": subject.0, "kind": "voting_rights",
+            "to_entity_id": subject.0, "kind": "membership_rights",
         }),
         &pool,
     )
@@ -532,48 +567,46 @@ async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
 
     assert!(
         person_ids.contains(&concentrated_voter),
-        "an anomalous concentrated voting_rights arrangement must resolve (§2.5); \
-         got {candidates:#?}"
+        "an anomalous concentrated membership_rights arrangement must resolve \
+         (§2.5/TS.3 §3); got {candidates:#?}"
     );
     assert!(
         !person_ids.contains(&gp_holder),
         "a gp_statutory edge must be IGNORED by cooperative_member_strategy \
-         (kind filter: voting_rights + board_appointment + dominant_influence \
-         ONLY, §2.5); got {candidates:#?}"
+         (kind filter: voting_rights + board_appointment + dominant_influence + \
+         membership_rights ONLY, §2.5/TS.3 §3); got {candidates:#?}"
     );
     assert_eq!(candidates.len(), 1, "exactly the voter; got {candidates:#?}");
 
     cleanup(&pool, &[subject]).await;
 }
 
-// ── (e) nominee ADMITTED post-TS.4 (the guard set went total) ───────────────
+// ── (e) a real, supported EntityType is admitted past the type gate;
+//        K-5 (empty candidates), not EntityTypeSupportsStrategy, is what
+//        refuses an empty structure ─────────────────────────────────────
 
+// REWRITTEN (EOP-DD-UBO-DISPATCH-001 T4-close, 2026-08-28) — was
+// `e_select_strategy_admits_nominee_after_ts4`, proving `StructureClassSupported`
+// admitted a Nominee-classified subject (TS.4 widened the guard to total,
+// 11/11 classes). That mechanism is gone: `structure-class` is retired, and
+// no `EntityType` dispatches to `nominee_pierce_strategy` any longer (§2 —
+// "where nominee_pierce_strategy went: nowhere, deliberately"; nominees are
+// pierced mid-traversal under whichever strategy the SUBJECT's real type
+// resolves to, not by classifying the subject itself as a nominee). The
+// PROPERTY this test proved still holds and is reasserted here: a subject
+// whose type resolves to a live strategy is admitted PAST
+// `EntityTypeSupportsStrategy` even with zero candidate-producing edges —
+// K-5 (empty determination) is the refusal that fires, not the type gate.
+// `llp` (`control_prong_strategy`, §2) stands in for the old `nominee`
+// fixture value; the fail-closed floor for an UNSUPPORTED type is pinned in
+// `kyc_t4_dispatch.rs::unmapped_type_refuses_freeze_by_name`, not here.
 #[tokio::test]
-async fn e_select_strategy_admits_nominee_after_ts4() {
+async fn e_a_supported_empty_structure_fails_at_k5_not_the_type_gate() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
 
-    // TS.4 fixture flip (was `e_select_strategy_still_blocks_nominee_after_
-    // widening`): Nominee joined the implemented set (NomineePierceStrategy,
-    // K-8 piercing via kyc_ubo.assert.edge.nominee-piercing), so the
-    // `[ReconciledProjection, StructureClassSupported]` pair (formerly also
-    // carried by `compute-fold`, retired TS.6 P2) on a Nominee-classified
-    // subject is now ADMITTED — the old assertion inverted. Probed here via
-    // `apply-smo-fallback`, which declares the identical precondition pair
-    // and (unlike `freeze`) needs no candidate-producing edges — this
-    // fixture has none. The fail-closed floor for unknown/garbage class
-    // strings is pinned in kyc_t61_studs.rs and kyc_pack_closure.rs.
-    setup_subject(&pool, subject, &[], "nominee").await;
+    setup_subject(&pool, subject, &[], "llp").await;
 
-    // StructureClassSupported must ADMIT a Nominee-classified subject
-    // (widened to the total 11-variant set at TS.4). Previously probed via
-    // `apply-smo-fallback`, which declared the identical precondition pair —
-    // retired TS.6 §5 (SMO is PULLED on exhaustion by the traversal, never
-    // asserted). `freeze` is now the only verb carrying that pair, so it is
-    // the probe: it will still error here (K-5 — no candidates and nothing
-    // for the SMO pull to find), but that is a DOWNSTREAM refusal reached
-    // only AFTER the preconditions admitted. The proof is the absence of the
-    // StructureClassSupported refusal text, not success.
     let result = run_fallible(
         &UboDeterminationFreeze,
         serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
@@ -584,10 +617,16 @@ async fn e_select_strategy_admits_nominee_after_ts4() {
         Ok(_) => String::new(),
         Err(e) => e.to_string(),
     };
+    assert!(result.is_err(), "an empty structure with zero candidates must still refuse (K-5)");
     assert!(
-        !msg.contains("has no implemented determination strategy yet"),
-        "StructureClassSupported must ADMIT a Nominee-classified subject \
-         post-TS.4 (widened to the total set); got: {msg}"
+        msg.contains("(K-5)") && msg.contains("determination would be silent"),
+        "the refusal must be K-5 (empty determination), not the EntityTypeSupportsStrategy \
+         type gate — `llp` is a real, live-dispatchable type; got: {msg}"
+    );
+    assert!(
+        !msg.contains("is not a determination subject") && !msg.contains("no entity type known"),
+        "EntityTypeSupportsStrategy must ADMIT a subject whose type resolves to a live \
+         strategy — the type gate must not be what refuses here; got: {msg}"
     );
 
     cleanup(&pool, &[subject]).await;

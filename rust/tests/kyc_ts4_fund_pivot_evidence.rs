@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
+    KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
     UboEdgeConnect,
 };
 use ob_poc_types::TransactionScopeId;
@@ -116,21 +116,22 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     let manco = Uuid::new_v4();
     let alice = Uuid::new_v4();
 
+    // EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): entity-type IS the
+    // dispatch key now (`structure-class` retired) — the subject must be a
+    // real fund type to reach `fund_control_strategy`, not the
+    // `private_limited_company` placeholder this fixture used before
+    // (which would dispatch to `ownership_prong_strategy` instead,
+    // silently invalidating the `assert_eq!(... "fund_control_strategy")`
+    // below).
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": "oeic_icvc" }),
         &pool,
     )
     .await;
     run(
         &KycSubjectPlace,
         serde_json::json!({ "subject-id": subject, "entity-id": alice, "is_natural_person": true, "entity-type": "natural_person" }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject, "structure-class": "investment_fund" }),
         &pool,
     )
     .await;

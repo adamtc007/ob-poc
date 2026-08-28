@@ -27,7 +27,7 @@ use uuid::Uuid;
 use chrono::{TimeZone, Utc};
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeConnect,
+    KycSubjectPlace, UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_substrate::{
     fold_control_versioned, assembly_lexicon, AuthorityRef, EdgeKind, FoldRegistry, IntentEvent,
@@ -362,6 +362,11 @@ async fn freeze_candidates(
         .unwrap_or_default()
 }
 
+// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): the `KycSubjectClassifyStructure`
+// call this helper used to make after `place` is deleted — `structure-class`
+// is retired, and `place`'s own `entity-type: "discretionary_trust"` already
+// drives dispatch to `trust_role_strategy` (§2), so the classify call was
+// pure setup, redundant with the fact `place` already asserted.
 async fn setup_trust_subject(
     pool: &PgPool,
     subject: SubjectId,
@@ -383,12 +388,6 @@ async fn setup_trust_subject(
         )
         .await;
     }
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": "trust" }),
-        pool,
-    )
-    .await;
 }
 
 #[tokio::test]

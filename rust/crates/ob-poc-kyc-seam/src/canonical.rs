@@ -341,22 +341,19 @@ mod tests {
         assert!(canonical_event_shape("kyc_ubo.assert.subject.place", s, &args).is_err());
     }
 
-    #[test]
-    fn structure_class_kebab_renamed_to_snake() {
-        let s = subj();
-        let args = serde_json::json!({ "subject-id": s.0, "structure-class": "private_company" });
-        let (_, payload, _) =
-            canonical_event_shape("kyc_ubo.assert.subject.structure-class", s, &args).unwrap();
-        assert_eq!(payload["structure_class"], "private_company");
-        assert_eq!(payload["entity_id"], s.0.to_string());
-    }
-
-    #[test]
-    fn structure_class_rejects_unknown_wire_value() {
-        let s = subj();
-        let args = serde_json::json!({ "subject-id": s.0, "structure-class": "not_a_real_class" });
-        assert!(canonical_event_shape("kyc_ubo.assert.subject.structure-class", s, &args).is_err());
-    }
+    // `structure_class_kebab_renamed_to_snake` and
+    // `structure_class_rejects_unknown_wire_value` RETIRED
+    // (EOP-DD-UBO-DISPATCH-001 T4-close, 2026-08-28): both drove
+    // `canonical_event_shape("kyc_ubo.assert.subject.structure-class", ...)`
+    // to prove the verb's own kebab→snake payload normalization and its
+    // wire-value validation — the arm they targeted is gone (see the
+    // `RETIRED` comment on the match, above), so the first now fails
+    // outright (`unrecognized verb_fqn`) and the second was passing
+    // VACUOUSLY (an unrecognized FQN is `is_err()` too, but for the wrong
+    // reason — not a real proof of wire-value rejection). Coverage for
+    // "this FQN is no longer recognized" is not lost: it is folded into
+    // `retired_verbs_are_no_longer_recognized`, below, alongside every
+    // other retired verb this file already tracks the same way.
 
     #[test]
     fn remove_entity_id_in_target_and_payload() {
@@ -576,6 +573,7 @@ mod tests {
             "kyc_ubo.assert.subject.type",
             "kyc_ubo.assert.subject.type-correction",
             "kyc_ubo.assert.subject.member-withdrawal",
+            "kyc_ubo.assert.subject.structure-class",
             "kyc_ubo.assert.edge.economic-interest",
             "kyc_ubo.assert.edge.supersession",
             "kyc_ubo.assert.edge.reconciliation",

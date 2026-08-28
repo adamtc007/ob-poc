@@ -39,8 +39,9 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_workbook::KycWorkbook;
 use ob_poc_kyc_substrate::{
-    check_preconditions, assembly_lexicon, ControlState, FoldRegistry, ObligationState,
-    StructureClass, SubjectId, TypeRegistryState, V1FoldImpl,
+    check_preconditions, assembly_lexicon, ControlState, EntityId, EntityType, EntityTypeRecord,
+    EventId, FoldRegistry, ObligationState, StructureClass, SubjectId, TypeProofStatus,
+    TypeRegistryState, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
 
@@ -166,6 +167,33 @@ fn precondition_blocks_illegal_placement() {
     );
 }
 
+/// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): `freeze`'s admit-side
+/// precondition is `EntityTypeSupportsStrategy` now, reading
+/// `TypeRegistryState` (`EntityId(subject_root.0)`), not
+/// `StructureClassSupported` reading `ControlState.structure_class` — an
+/// empty `TypeRegistryState::default()` fails closed regardless of what
+/// `structure_class` says, since nothing reads that field for dispatch any
+/// longer (R5-historical only). This fixture was passing
+/// `TypeRegistryState::default()` and only setting `structure_class`,
+/// which silently broke this test at T4 (empty always blocks) even though
+/// it compiles and the sibling `precondition_blocks_illegal_placement`
+/// test still passes coincidentally (empty-blocks-empty on both the old
+/// and new mechanism). Fixed the fixture, not the precondition: register a
+/// real, live-dispatchable `EntityType` for the probed subject.
+fn type_registry_with(subject: SubjectId, entity_type: EntityType) -> TypeRegistryState {
+    let mut registry = TypeRegistryState::default();
+    registry.types.insert(
+        EntityId(subject.0),
+        EntityTypeRecord {
+            entity_type,
+            proof: TypeProofStatus::Alleged,
+            originating_event_id: EventId(Uuid::new_v4()),
+            proof_event_id: None,
+        },
+    );
+    registry
+}
+
 #[test]
 fn precondition_admits_legal_placement() {
     let lexicon = assembly_lexicon();
@@ -174,17 +202,18 @@ fn precondition_admits_legal_placement() {
 
     // PrivateCompany is in the pinned implemented-strategy set.
     let pc_state = control_with_class_strategized(StructureClass::PrivateCompany);
+    let type_registry = type_registry_with(subject, EntityType::PrivateLimitedCompany);
     let freeze_entry = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
     assert!(
         check_preconditions(
             freeze_entry,
             &pc_state,
             &empty_obligation,
-            &TypeRegistryState::default(),
+            &type_registry,
             &probe(subject, "kyc_ubo.decide.determination.freeze"),
         )
         .is_ok(),
-        "freeze must be admitted for a PrivateCompany-classified subject with reconcile \
+        "freeze must be admitted for a PrivateLimitedCompany-typed subject with reconcile \
          satisfied"
     );
 }

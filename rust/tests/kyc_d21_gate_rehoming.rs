@@ -45,7 +45,7 @@ use uuid::Uuid;
 
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboEdgeConnect,
+    KycSubjectPlace, UboEdgeConnect,
 };
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideObligationWaive, DecideReject};
 use ob_poc_kyc_read::PgKycEventReader;
@@ -292,10 +292,14 @@ async fn staleness_is_hash_comparison_through_production() {
     let run1_id = cited_run_id(&pool, subject, "kyc_ubo.decide.obligation.waiver").await;
     let (run1_hash, ..) = load_run(&pool, run1_id).await;
 
-    // Mutate the board.
+    // Mutate the board. EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28):
+    // `structure-class` retired — this test only needs SOME real board
+    // mutation between the two hash reads, the specific verb was never
+    // load-bearing (the property under test is hash comparison, not
+    // classification); a second `place` call is an equally real mutation.
     run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": "trust" }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "entity-id": Uuid::new_v4(), "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;
@@ -356,9 +360,11 @@ async fn runs_are_append_only_through_production() {
     let run1_id = cited_run_id(&pool, subject, "kyc_ubo.decide.obligation.waiver").await;
     let run1_before = load_run(&pool, run1_id).await;
 
+    // EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): same "any real board
+    // mutation" substitution as staleness_is_hash_comparison_through_production above.
     run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": "trust" }),
+        &KycSubjectPlace,
+        serde_json::json!({ "subject-id": subject.0, "entity-id": Uuid::new_v4(), "is_natural_person": true, "entity-type": "natural_person" }),
         &pool,
     )
     .await;

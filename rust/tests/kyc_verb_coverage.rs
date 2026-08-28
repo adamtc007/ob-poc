@@ -27,7 +27,7 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationUpdateIdentity, KycObligationUpdateRisk, KycObligationUpdateScreening,
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
+    KycSubjectPlace, KycSubjectRecordEnquiry, UboDeterminationFreeze, UboEdgeAttachEvidence,
     UboEdgeConnect, UboEdgeDisconnect, UboEdgeVerify,
 };
 // kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject TS.6 P2 — moved
@@ -346,17 +346,13 @@ async fn coverage_ubo_determination_freeze() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     let owner = Uuid::new_v4();
+    // EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): `place`'s own
+    // entity-type already drives dispatch (`ownership_prong_strategy` for
+    // `private_limited_company`) — the separate `structure-class` call was
+    // pure setup, redundant with what `place` already asserted.
     run(
         &KycSubjectPlace,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({
-            "subject-id": subject.0, "structure-class": "private_company",
-        }),
         &pool,
     )
     .await;
@@ -396,8 +392,19 @@ async fn coverage_ubo_determination_freeze() {
 
 // ── Subject taxonomy (kyc.subject.*) ─────────────────────────────────────────
 
+// `coverage_kyc_subject_classify_structure` REWRITTEN (EOP-DD-UBO-DISPATCH-001
+// T4-close, 2026-08-28) — `kyc_ubo.assert.subject.structure-class` is
+// retired; a coverage row proving a deleted verb's event gets recorded has
+// no mechanism left to guard ("a proof cannot outlive the mechanism it
+// guards," the same reasoning `kyc_t63_studs.rs` row 10 was superseded
+// under). `place`'s own event coverage already lives in
+// `kyc_t2_place_remove.rs::place_records_entity_and_type_in_one_move`, so
+// rather than duplicate it here, this row is repurposed onto `enquiry` —
+// the one other subject-taxonomy verb this file never covered — keeping
+// the row's original job (prove a subject-taxonomy verb's event is real)
+// against a verb that still exists.
 #[tokio::test]
-async fn coverage_kyc_subject_classify_structure() {
+async fn coverage_kyc_subject_enquiry() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
@@ -407,14 +414,16 @@ async fn coverage_kyc_subject_classify_structure() {
     )
     .await;
     run(
-        &KycSubjectClassifyStructure,
+        &KycSubjectRecordEnquiry,
         serde_json::json!({
-            "subject-id": subject.0, "structure-class": "private_company",
+            "subject-id": subject.0,
+            "sources-consulted": ["GLEIF"],
+            "searches-run": ["company registry search"],
         }),
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.subject.structure-class").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.subject.enquiry").await;
     cleanup(&pool, &[subject]).await;
 }
 

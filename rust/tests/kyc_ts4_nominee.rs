@@ -3,14 +3,16 @@
 //! the LAST TS tranche — the only class needing a NEW verb, exercised with
 //! full kit citizenship (the K-G7 reintroduction discipline).
 //!
-//! RED-first against the post-TS.3 tree:
-//! - (a) pierce end-to-end through the REAL ops: register → classify
-//!   `nominee` → assert a nominee edge → pierce with the disclosed
-//!   nominator → the fold shows BOTH effects of the ONE governed event: the
-//!   target nominee edge Superseded with `superseded_by` = the pierce
-//!   event, and a NEW edge from the nominator with the underlying kind and
-//!   `pierced_from` provenance (K-13 supersede-never-contradict; K-35
-//!   traceability).
+//! RED-first against the post-TS.3 tree (T4-close, 2026-08-28: entity-type
+//! is the dispatch key now; `structure-class` is retired, and no
+//! `EntityType` dispatches to `nominee_pierce_strategy` — §2 "nowhere,
+//! deliberately"):
+//! - (a) pierce end-to-end through the REAL ops: `place` as `llc_us` →
+//!   assert a nominee edge → pierce with the disclosed nominator → the
+//!   fold shows BOTH effects of the ONE governed event: the target nominee
+//!   edge Superseded with `superseded_by` = the pierce event, and a NEW
+//!   edge from the nominator with the underlying kind and `pierced_from`
+//!   provenance (K-13 supersede-never-contradict; K-35 traceability).
 //! - (b) pierce REFUSES a non-nominee target edge (no precondition
 //!   primitive expresses "edge is of kind X" — the check is op-layer,
 //!   fail-closed, per the §2.6 checklist note).
@@ -20,18 +22,19 @@
 //! - (c) pierce REFUSES an inactive (superseded) target (EdgeActive stud,
 //!   matrix row 3/4 vocabulary, enforced at the real append path) and a
 //!   non-existent target edge.
-//! - (d) freeze with `nominee_pierce_strategy` HARD-ERRORS while an
-//!   unpierced nominee edge remains active — `resolve()` cannot signal
-//!   error (trait returns `Vec<ProngCandidate>`), so the fail-closed scan
-//!   lives at the freeze dispatch site (kyc_stream_ops.rs), per §2.6
-//!   "errors if unpierced nominee edges remain active".
-//! - (e) post-pierce the strategy delegates to the control prong and
-//!   resolves the NOMINATOR chain (the underlying structure), never the
-//!   nominee (K-8's whole point).
-//! - (f) freeze's unknown-strategy arm still errors on a never-will-exist
-//!   name, listing all 8 implemented strategies (nominee_pierce_strategy
-//!   included — the TS.3 exemplar `nominee_pierce_strategy` moved to
-//!   `no_such_strategy` in this tranche because the arm is now real).
+//! - (d) freeze HARD-ERRORS while an unpierced nominee edge remains active
+//!   — `resolve()` cannot signal error (trait returns `Vec<ProngCandidate>`),
+//!   so the fail-closed scan lives at the freeze dispatch site
+//!   (kyc_stream_ops.rs), UNCONDITIONALLY, before strategy dispatch (TS.4
+//!   §3 Ruling B — reachable under ANY strategy, not only when the subject
+//!   itself was classified `Nominee`).
+//! - (e) post-pierce, freeze dispatches by the subject's real type
+//!   (`llc_us` → `control_prong_strategy`) and resolves the NOMINATOR chain
+//!   (the underlying structure), never the nominee (K-8's whole point) —
+//!   the delegation `NomineePierceStrategy` used to perform explicitly now
+//!   happens implicitly, because the subject's own type was the real
+//!   determinant all along.
+//! - (f) freeze's unknown-strategy arm — RETIRED (TS.6 P2), comment-only.
 //!
 //! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
 //! (`render_value` omits nulls at every depth), so test (e)'s final
@@ -47,7 +50,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace,
+    KycSubjectPlace,
     UboDeterminationFreeze, UboEdgeConnect, UboEdgeDisconnect,
 };
 use ob_poc_kyc_substrate::{
@@ -157,11 +160,30 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
     }
 }
 
-/// Register subject + natural persons, then classify with `structure_class`.
-async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], class: &str) {
+/// Register subject + natural persons with a real dispatchable EntityType.
+///
+/// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): every fixture in this
+/// file used the class label `"nominee"`, which is retired along with
+/// `structure-class` — no `EntityType` dispatches to `nominee_pierce_strategy`
+/// any longer (§2: "where nominee_pierce_strategy went: nowhere,
+/// deliberately"; `NomineePierceStrategy` is "a thin delegate to the
+/// control-prong traversal" once every nominee edge is pierced). `llc_us`
+/// is a `control_prong_strategy` type (§2) whose TS.1 target_permits
+/// admits `VotingShares` (this file's `nominee`/pierced-from edges are all
+/// `voting_rights`) — `private_limited_company` (the old hardcoded
+/// placeholder, ignoring `class` entirely pre-T4-close) dispatches to
+/// `ownership_prong_strategy` instead, which would silently invalidate
+/// test (e)'s strategy assertion. The nominee/nominator entities
+/// themselves are deliberately left unregistered/registered as before —
+/// `EdgeKind::Nominee`'s pipe (`NomineeHolding`) is absent from every
+/// target's TS.1 permitted-pipe row by ratified design (`geometry.rs`
+/// module doc), so a nominee edge's `from` (the on-paper holder) must stay
+/// type-unregistered for `Unevaluable`/admit — the fixtures already do
+/// this by never placing `nominee`, only `nominator`.
+async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid]) {
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "llc_us" }),
         pool,
     )
     .await;
@@ -175,12 +197,6 @@ async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], clas
         )
         .await;
     }
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject.0, "structure-class": class }),
-        pool,
-    )
-    .await;
 }
 
 /// Fold the subject's REAL DB stream (the same composition the ops use).
@@ -235,7 +251,7 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
     let nominee = Uuid::new_v4(); // the on-paper holder
     let nominator = Uuid::new_v4(); // the disclosed true holder
 
-    setup_subject(&pool, subject, &[nominator], "nominee").await;
+    setup_subject(&pool, subject, &[nominator]).await;
 
     // §8 Q3: connect refuses a caller-supplied edge id — capture the minted one.
     let connect_out = run(
@@ -330,7 +346,7 @@ async fn b_pierce_refuses_non_nominee_target_edge() {
     let holder = Uuid::new_v4();
     let nominator = Uuid::new_v4();
 
-    setup_subject(&pool, subject, &[nominator], "nominee").await;
+    setup_subject(&pool, subject, &[nominator]).await;
     let connect_out = run(
         &UboEdgeConnect,
         serde_json::json!({
@@ -378,7 +394,7 @@ async fn b2_pierce_normalizer_rejects_nominee_and_unknown_kinds() {
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
 
-    setup_subject(&pool, subject, &[nominator], "nominee").await;
+    setup_subject(&pool, subject, &[nominator]).await;
     let connect_out = run(
         &UboEdgeConnect,
         serde_json::json!({
@@ -443,7 +459,7 @@ async fn c_pierce_refuses_superseded_and_missing_targets() {
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
 
-    setup_subject(&pool, subject, &[nominator], "nominee").await;
+    setup_subject(&pool, subject, &[nominator]).await;
     let connect_out = run(
         &UboEdgeConnect,
         serde_json::json!({
@@ -510,7 +526,7 @@ async fn d_freeze_hard_errors_while_unpierced_nominee_edge_active() {
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
 
-    setup_subject(&pool, subject, &[nominator], "nominee").await;
+    setup_subject(&pool, subject, &[nominator]).await;
     let connect_out = run(
         &UboEdgeConnect,
         serde_json::json!({
@@ -523,14 +539,10 @@ async fn d_freeze_hard_errors_while_unpierced_nominee_edge_active() {
     let nominee_edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
         .expect("edge_id must be a valid UUID");
 
-    // The gate widening proven at the REAL op (StructureClassSupported
-    // widened at TS.4). Previously probed via `apply-smo-fallback`, which
-    // shared the identical StructureClassSupported precondition — retired
-    // TS.6 §5 (SMO is pulled on exhaustion, never asserted). No separate
-    // probe is needed: the `freeze` call below must PASS the precondition
-    // to reach its K-8 unpierced-nominee guard at all, so the "unpierced"
-    // error asserted there is itself the proof that StructureClassSupported
-    // admitted a Nominee-classified subject.
+    // T4-close: `EntityTypeSupportsStrategy` admits `llc_us`
+    // (`control_prong_strategy`, §2) straight through — the unpierced-nominee
+    // guard is UNCONDITIONAL and runs before strategy dispatch regardless
+    // (TS.4 §3 Ruling B), so it is the ONLY refusal reachable here.
     let result = run_fallible(
         &UboDeterminationFreeze,
         serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
@@ -539,8 +551,9 @@ async fn d_freeze_hard_errors_while_unpierced_nominee_edge_active() {
     .await;
     assert!(
         result.is_err(),
-        "freeze under nominee_pierce_strategy must hard-error while an \
-         unpierced nominee edge remains active (K-8 fail-closed)"
+        "freeze must hard-error while an unpierced nominee edge remains \
+         active (K-8 fail-closed), regardless of which strategy the \
+         subject's type would otherwise dispatch to"
     );
     let msg = result.unwrap_err().to_string();
     assert!(
@@ -560,7 +573,7 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
 
-    setup_subject(&pool, subject, &[nominator], "nominee").await;
+    setup_subject(&pool, subject, &[nominator]).await;
     let connect_out = run(
         &UboEdgeConnect,
         serde_json::json!({
@@ -588,11 +601,16 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
         &pool,
     )
     .await;
-    // `freeze_candidates` succeeding below proves StructureClassSupported
-    // admits this post-pierce Nominee subject (`compute-fold`'s standalone
-    // probe of the identical precondition pair was retired TS.6 P2 as
-    // redundant with this call).
-    let candidates = freeze_candidates(&pool, subject, "nominee_pierce_strategy").await;
+    // EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): no `EntityType`
+    // dispatches to `nominee_pierce_strategy` any longer (§2 — "nowhere,
+    // deliberately"). Post-pierce, `freeze` runs the K-8 unpierced-nominee
+    // guard (finds nothing, the edge above disconnected it) and then
+    // dispatches by the subject's real type (`llc_us` → §2
+    // `control_prong_strategy`) — the SAME delegation
+    // `NomineePierceStrategy` used to perform explicitly ("a thin delegate
+    // to the control-prong traversal") now happens implicitly, because the
+    // subject's own type was the real determinant all along.
+    let candidates = freeze_candidates(&pool, subject, "control_prong_strategy").await;
 
     assert_eq!(
         candidates.len(),

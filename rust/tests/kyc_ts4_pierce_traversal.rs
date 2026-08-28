@@ -22,7 +22,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
+    KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
     UboEdgeConnect, UboEdgeDisconnect,
 };
 use ob_poc_types::TransactionScopeId;
@@ -117,16 +117,24 @@ async fn cleanup(pool: &PgPool, subject: Uuid) {
     .await;
 }
 
+// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): `class` used to be the
+// separately-asserted `structure-class`, decoupled from `place`'s
+// `entity-type` (only geometry cared the two agreed). `structure-class` is
+// retired — entity-type is now the SOLE dispatch key — so every caller's
+// `class` must resolve to the EntityType that actually reaches the
+// strategy each fixture names in its own scenario, not just one geometry
+// happens to tolerate. `investment_fund`/`llp` map to real EntityType wire
+// values that reach `fund_control_strategy`/`control_prong_strategy`
+// respectively (§2); `trust`→`discretionary_trust` (`trust_role_strategy`)
+// and the `private_company` default (`ownership_prong_strategy`) were
+// already correct.
 async fn setup_subject(pool: &PgPool, subject: Uuid, natural_persons: &[Uuid], class: &str) {
-    // Entity-type must actually admit this structure-class's real control
-    // edges through TS.5's TypeGeometryPermits (T2 makes `place`'s type
-    // mandatory, TS.1 §1) — `trust` is the one class in this file whose own
-    // fixture asserts a same-kind-pipe edge (trust_trustee, via the pierce)
-    // between two TYPED endpoints, so it needs a real trust EntityType, not
-    // the private_limited_company default every other class here happens
-    // to get away with (their control edges all originate from an untyped,
-    // never-placed entity, which is geometry-Unevaluable regardless).
-    let entity_type = if class == "trust" { "discretionary_trust" } else { "private_limited_company" };
+    let entity_type = match class {
+        "trust" => "discretionary_trust",
+        "investment_fund" => "oeic_icvc",
+        "llp" => "llp",
+        _ => "private_limited_company",
+    };
     run(
         &KycSubjectPlace,
         serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": entity_type }),
@@ -141,12 +149,6 @@ async fn setup_subject(pool: &PgPool, subject: Uuid, natural_persons: &[Uuid], c
         )
         .await;
     }
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({ "subject-id": subject, "structure-class": class }),
-        pool,
-    )
-    .await;
 }
 
 /// `kyc_ubo.assert.edge.nominee-piercing` RETIRED (TS.6 P2, K-G7) — folded into a macro

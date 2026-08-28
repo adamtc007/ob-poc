@@ -1,7 +1,8 @@
 //! T6.3 gate tests — EOP-PLAN-KYCUBO-KIT-001 §T6.3 (determination family,
 //! closes the ratified EOP-DD-KYCUBO-KIT-T6 matrix rows 6 (remainder), 7,
-//! 10; row 8 is the unchanged 8a freeze guard, already gated in
-//! `kyc_t61_studs.rs`. Row 9 was HALTED during execution — see below.).
+//! 10 (SUPERSEDED, T4-close — see below); row 8 is the unchanged 8a freeze
+//! guard, already gated in `kyc_t61_studs.rs`. Row 9 was HALTED during
+//! execution — see below.).
 //!
 //! Eight gates (block/admit per stud), each driven through the REAL governed
 //! append path (live DB) — the real `SemOsVerbOp::execute()` for the verb
@@ -26,15 +27,16 @@
 //!   geometry-free pending a matrix amendment to a KEYED
 //!   (subject_root, entity_id) check. `phase1_lexicon()`'s entry for this
 //!   verb is unchanged from pre-T6.3.
-//! - row 10 (`kyc_ubo.assert.subject.structure-class`): `SubjectRegistered` — block
-//!   classify-structure on an unregistered subject.
+//! - row 10 (`kyc_ubo.assert.subject.structure-class`): SUPERSEDED
+//!   (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) — the verb it gated is
+//!   retired. See the row-10 note below.
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectClassifyStructure, KycSubjectPlace};
+use ob_poc::domain_ops::kyc_stream_ops::KycSubjectPlace;
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -90,16 +92,9 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
         .await;
 }
 
-async fn register(scope: &mut Scope, subject: SubjectId) {
-    KycSubjectPlace
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
-            &mut VerbExecutionContext::default(),
-            scope,
-        )
-        .await
-        .expect("register has no NotAlreadyRegistered violation on a fresh subject");
-}
+// `register` helper removed with the row-10 tests (EOP-DD-UBO-DISPATCH-001
+// T4, 2026-08-28): it existed solely to set up
+// `row10_classify_structure_admits_registered_subject`, below.
 
 // `classify` helper removed with the row-7 tests (TS.6 §5): its only
 // callers were the retired apply-smo-fallback gates.
@@ -169,47 +164,20 @@ async fn row9_register_admits_fresh_subject() {
 // stay legal; asserting it here would pin the wrong behaviour.
 
 // ── row 10 — kyc_ubo.assert.subject.structure-class: SubjectRegistered ─────────────
-
-#[tokio::test]
-async fn row10_classify_structure_blocks_unregistered_subject() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    // Deliberately NOT registered.
-
-    let result = KycSubjectClassifyStructure
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_err(),
-        "classify-structure must be blocked for an unregistered subject: {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-#[tokio::test]
-async fn row10_classify_structure_admits_registered_subject() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject).await;
-
-    let result = KycSubjectClassifyStructure
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_ok(),
-        "classify-structure must be admitted for a registered subject: {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
+//
+// SUPERSEDED (EOP-DD-UBO-DISPATCH-001, T4, 2026-08-28) — ruled by Adam
+// 2026-08-28. `row10_classify_structure_blocks_unregistered_subject` and
+// `row10_classify_structure_admits_registered_subject` proved
+// `kyc_ubo.assert.subject.structure-class`'s `SubjectRegistered` stud was
+// enforced end-to-end at the real append path. T4 retired
+// `kyc_ubo.assert.subject.structure-class` itself (dispatch is now DERIVED
+// from the subject's `EntityType`, asserted once via `place`, never
+// separately classified) — a proof cannot outlive the mechanism it guards.
+// Retired rather than rewritten: row 10's stud (`SubjectRegistered` on a
+// classify-structure call) has no live analogue, unlike M3.3's rewrite
+// elsewhere in this KYC suite, where the underlying PROPERTY (a payload-key
+// round-trip) still had a real mechanism to attach to. See
+// `docs/eop/EOP-STATE-KYCUBO-D1_State-of-Play.md` for the recorded
+// supersession. The ratified `EOP-DD-KYCUBO-KIT-T6` matrix document itself
+// is unamended — this is a note that row 10's mechanism no longer exists,
+// not a change to what the matrix once ratified.

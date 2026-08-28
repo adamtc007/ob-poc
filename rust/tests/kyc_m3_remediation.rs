@@ -13,10 +13,10 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeConnect,
+    KycSubjectPlace, UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_store::PgKycEventStore;
-use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
+use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -120,18 +120,16 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
     let p2 = Uuid::new_v4();
     let p3 = Uuid::new_v4();
 
+    // EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): the `classify-structure`
+    // call this fixture used to make after `place` is deleted —
+    // `structure-class` is retired, and `place`'s own `entity-type:
+    // "private_limited_company"` already drives dispatch to
+    // `ownership_prong_strategy` (§2), so the classify call was pure setup,
+    // redundant with the fact `place` already asserted the dispatch key.
     run(
         &KycSubjectPlace,
         serde_json::json!({
             "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company",
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({
-            "subject-id": subject.0, "structure-class": "private_company",
         }),
         &pool,
     )
@@ -256,10 +254,29 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
 // unmodified against the new gate, would now assert the OPPOSITE of what
 // actually happens (approve succeeds, not fails).
 
-// ── M3.3 — structure_class round-trip (R3 payload-key bug) ────────────────────
+// ── M3.3 — entity-type round-trip through the type-registry fold ───────────
+//
+// REWRITTEN (EOP-DD-UBO-DISPATCH-001 T4-close, 2026-08-28) — was
+// `m3_3_structure_class_round_trips_through_the_fold`, proving R3's fix:
+// `kyc_ubo.assert.subject.structure-class`'s payload key reached
+// `ControlState.structure_class` intact (it had silently stayed `None`
+// before the fix, because the fold read a different key than the verb
+// wrote). That mechanism is gone — `structure-class` is retired, and
+// `ControlState.structure_class` is now a permanently-`None` dead field
+// (nothing can ever set it again); asserting on it would test a retired
+// mechanism, not prove anything live. T4 moved the SAME defect class onto
+// `place`'s `entity-type` argument, since entity-type is now the SOLE key
+// both geometry AND strategy dispatch read (T4 §1) — a `place`/fold
+// payload-key mismatch here would be today's R3: dispatch would silently
+// break, the same way R3's classify call once did. This rewrite proves the
+// live round-trip: `entity-type` asserted through `place` reaches
+// `fold_type_registry` intact, and `dispatch_for_entity_type` resolves the
+// correct strategy from it — the T4 equivalent of what M3.3 always
+// checked, per the `ec2_conflicting_edges_fail_without_reconcile`
+// precedent (rewrite, don't delete, when a rule genuinely changed).
 
 #[tokio::test]
-async fn m3_3_structure_class_round_trips_through_the_fold() {
+async fn m3_3_entity_type_round_trips_through_the_type_registry_fold() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
 
@@ -271,37 +288,33 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
         &pool,
     )
     .await;
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({
-            "subject-id": subject.0, "structure-class": "private_company",
-        }),
-        &pool,
-    )
-    .await;
 
-
-    // `ubo.determination.compute-fold` retired TS.6 P2 (K-G7) — it was a
-    // pure read with no replacement verb, so this fold-correctness check
-    // (not a verb-behavior check) now loads and folds the stream directly,
-    // the same pattern `cbu_role_round_trips_through_the_obligation_fold`
-    // below already uses for the obligation fold.
     let mut conn = pool.acquire().await.expect("acquire connection");
     let events = PgKycEventStore::load_events(&mut conn, subject)
         .await
         .expect("load events");
     let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-    let mut registry = FoldRegistry::new();
-    registry.register(assembly_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
-    let control = ob_poc_kyc_substrate::fold_control_versioned(&refs, &registry)
-        .expect("fold control");
+    let subject_entity =
+        ob_poc_kyc_substrate::find_subject_entity(&refs).expect("subject entity");
+    let type_registry = ob_poc_kyc_substrate::fold_type_registry(&refs);
 
     assert_eq!(
-        control.structure_class,
-        Some(ob_poc_kyc_substrate::StructureClass::PrivateCompany),
-        "classify-structure must set ControlState.structure_class \
-         (was silently None before the R3 payload-key fix); got {:?}",
-        control.structure_class,
+        type_registry.type_of(subject_entity),
+        Some(ob_poc_kyc_substrate::EntityType::PrivateLimitedCompany),
+        "place's entity-type argument must reach fold_type_registry intact \
+         (was silently dropped/mismatched before the R3-class fix this \
+         mechanism replaces); got {:?}",
+        type_registry.type_of(subject_entity),
+    );
+    assert_eq!(
+        match ob_poc_kyc_substrate::dispatch_for_entity_type(
+            &ob_poc_kyc_substrate::EntityType::PrivateLimitedCompany
+        ) {
+            ob_poc_kyc_substrate::DeterminationDispatch::Strategy(name) => Some(name),
+            ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => None,
+        },
+        Some("ownership_prong_strategy"),
+        "PrivateLimitedCompany must dispatch to ownership_prong_strategy (§2)"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -314,10 +327,25 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
 // `ownership_prong_strategy`. Registered in the same `freeze` dispatch match
 // as `ownership_prong_strategy` (`ob_poc::domain_ops::kyc_stream_ops`).
 //
-// Fixture: an LP fund (subject) whose GP-statutory control edge points to a
-// natural person P1 directly. `kyc_ubo.assert.edge.connect` with `kind:
-// gp_statutory` — the same merged verb `ownership_prong_strategy` fixtures
-// use with `kind: economic_interest`, just the control counterpart.
+// Fixture: a limited partnership (subject) whose GP-statutory control edge
+// points to a natural person P1 directly. `kyc_ubo.assert.edge.connect` with
+// `kind: gp_statutory` — the same merged verb `ownership_prong_strategy`
+// fixtures use with `kind: economic_interest`, just the control counterpart.
+//
+// EOP-DD-UBO-DISPATCH-001 T4-close (2026-08-28): subject entity-type was
+// `lp_fund` — under the OLD singular `StructureClass::LimitedPartnershipFund`
+// bucket this dispatched to `control_prong_strategy` (this test's own
+// name), but T4 §2 SPLIT that bucket: `EntityType::LpFund` now dispatches
+// to `fund_control_strategy` (`kyc_t4_dispatch.rs::
+// lp_fund_dispatches_to_fund_control_not_control_prong`), while
+// `EntityType::LimitedPartnership` is the type that still dispatches to
+// `control_prong_strategy` (§2). Keeping `lp_fund` here would silently
+// re-target this test at `fund_control_strategy`'s pivot/evidence
+// machinery (TS.4 §2 Ruling 2f) instead of proving what its name and
+// assertions (`prong: ControlByOtherMeans`, no pivot) actually claim —
+// `limited_partnership` is the entity-type that keeps this test's original
+// intent intact. `LimitedPartnership`'s TS.1 target_permits admits
+// `GpDesignation` (`gp_statutory`'s pipe), same as before.
 
 #[tokio::test]
 async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
@@ -328,7 +356,7 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
     run(
         &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false, "entity-type": "lp_fund",
+            "subject-id": subject.0, "is_natural_person": false, "entity-type": "limited_partnership",
         }),
         &pool,
     )
@@ -337,14 +365,6 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
         &KycSubjectPlace,
         serde_json::json!({
             "subject-id": subject.0, "entity-id": p1, "is_natural_person": true, "entity-type": "natural_person",
-        }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycSubjectClassifyStructure,
-        serde_json::json!({
-            "subject-id": subject.0, "structure-class": "lp_fund",
         }),
         &pool,
     )
