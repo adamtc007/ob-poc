@@ -216,16 +216,26 @@ pub fn canonical_event_shape(
         // into `connect` above) — no live arm here.
 
         "kyc_ubo.assert.edge.evidence" => {
+            // EOP-DD-UBO-PROOF-001 §1/§2 (T5, 2026-08-28): "a proof is a
+            // kind, a source, and a date." All three ride in the payload
+            // (fold::control::proof_record_from_payload's contract) —
+            // `kind` is one of the seven ratified `ProofKind` wire values,
+            // `source` free text (§6 Q3: "structure when a check needs to
+            // read it"), `date` when the proof was obtained.
+            let kind = required_string_arg(verb_fqn, args, "kind")?;
+            let source = required_string_arg(verb_fqn, args, "source")?;
+            let date = required_string_arg(verb_fqn, args, "date")?;
+            let proof_payload = serde_json::json!({ "kind": kind, "source": source, "date": date });
             let edge = uuid_arg(args, "edge-id").map(EdgeId);
             let entity = uuid_arg(args, "entity-id").map(EntityId);
             match (edge, entity) {
                 (Some(edge), None) => {
                     let target = TargetBinding::for_edge(subject, edge);
-                    Ok((target, serde_json::json!({}), Some(edge)))
+                    Ok((target, proof_payload, Some(edge)))
                 }
                 (None, Some(entity)) => {
                     let target = TargetBinding { entity_id: Some(entity), ..subj_target };
-                    Ok((target, serde_json::json!({}), None))
+                    Ok((target, proof_payload, None))
                 }
                 (Some(_), Some(_)) => bail!(
                     "{verb_fqn}: supply exactly one of edge-id (evidences an edge) or entity-id \
@@ -235,10 +245,20 @@ pub fn canonical_event_shape(
             }
         }
 
-        "kyc_ubo.assert.edge.verification" => {
-            let edge = EdgeId(required_uuid_arg(verb_fqn, args, "edge-id")?);
-            let target = TargetBinding::for_edge(subject, edge);
-            Ok((target, serde_json::json!({}), Some(edge)))
+        // `kyc_ubo.assert.edge.verification` RETIRED (EOP-DD-UBO-PROOF-001
+        // §3/§4, T5, 2026-08-28) — "the board collects facts; the policy
+        // rules on adequacy," so there is no ratchet left to move an edge
+        // into. K-G7: 0 real committed events under this FQN.
+
+        // Move 5 (§3.1's move table: "that proof no longer stands — group,
+        // citation", T5): the citation alone identifies the proof —
+        // neither an edge nor an entity target is needed, `retract`'s own
+        // fold arms (both `fold::control` and `fold::type_registry`) scan
+        // whichever axis actually holds it.
+        "kyc_ubo.assert.edge.retract" => {
+            let citation = required_uuid_arg(verb_fqn, args, "citation-id")?;
+            let payload = serde_json::json!({ "citation_id": citation.to_string() });
+            Ok((subj_target, payload, None))
         }
 
         // EOP-VS-UBO-GAME-001 T3, §3.2: `disconnect` absorbs supersession —
@@ -462,54 +482,103 @@ mod tests {
         assert_eq!(payload["kind"], "economic_interest");
     }
 
+    /// EOP-DD-UBO-PROOF-001 §1/§2 (T5): the three proof fields every
+    /// `evidence` call must carry, regardless of edge- or entity-scoping.
+    fn proof_args() -> serde_json::Value {
+        serde_json::json!({ "kind": "filed-document", "source": "test fixture", "date": "2026-08-28" })
+    }
+
+    fn merge(mut base: serde_json::Value, extra: serde_json::Value) -> serde_json::Value {
+        base.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        base
+    }
+
     #[test]
     fn evidence_edge_scoped() {
         let s = subj();
         let edge = Uuid::new_v4();
-        let args = serde_json::json!({ "subject-id": s.0, "edge-id": edge });
-        let (target, _, returned_edge) =
+        let args = merge(proof_args(), serde_json::json!({ "subject-id": s.0, "edge-id": edge }));
+        let (target, payload, returned_edge) =
             canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).unwrap();
         assert_eq!(target.edge_id, Some(EdgeId(edge)));
         assert_eq!(returned_edge, Some(EdgeId(edge)));
+        assert_eq!(payload["kind"], "filed-document");
+        assert_eq!(payload["source"], "test fixture");
+        assert_eq!(payload["date"], "2026-08-28");
     }
 
     #[test]
     fn evidence_entity_scoped() {
         let s = subj();
         let entity = Uuid::new_v4();
-        let args = serde_json::json!({ "subject-id": s.0, "entity-id": entity });
-        let (target, _, returned_edge) =
+        let args = merge(proof_args(), serde_json::json!({ "subject-id": s.0, "entity-id": entity }));
+        let (target, payload, returned_edge) =
             canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).unwrap();
         assert_eq!(target.entity_id, Some(EntityId(entity)));
         assert!(returned_edge.is_none());
+        assert_eq!(payload["kind"], "filed-document");
     }
 
     #[test]
     fn evidence_rejects_both_edge_and_entity() {
         let s = subj();
-        let args = serde_json::json!({
-            "subject-id": s.0, "edge-id": Uuid::new_v4(), "entity-id": Uuid::new_v4()
-        });
+        let args = merge(
+            proof_args(),
+            serde_json::json!({
+                "subject-id": s.0, "edge-id": Uuid::new_v4(), "entity-id": Uuid::new_v4()
+            }),
+        );
         assert!(canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).is_err());
     }
 
     #[test]
     fn evidence_rejects_neither_edge_nor_entity() {
         let s = subj();
-        let args = serde_json::json!({ "subject-id": s.0 });
+        let args = merge(proof_args(), serde_json::json!({ "subject-id": s.0 }));
         assert!(canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).is_err());
     }
 
     #[test]
-    fn verification_and_disconnect_target_the_edge() {
+    fn evidence_rejects_missing_proof_kind() {
+        let s = subj();
+        let edge = Uuid::new_v4();
+        let args = serde_json::json!({
+            "subject-id": s.0, "edge-id": edge, "source": "test fixture", "date": "2026-08-28"
+        });
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.evidence", s, &args).is_err());
+    }
+
+    /// `kyc_ubo.assert.edge.verification` RETIRED (EOP-DD-UBO-PROOF-001
+    /// §3/§4, T5, 2026-08-28) alongside its sub-test here — no ratchet
+    /// left to target the edge with (K-G7: 0 real committed events).
+    #[test]
+    fn disconnect_targets_the_edge() {
         let s = subj();
         let edge = Uuid::new_v4();
         let args = serde_json::json!({ "subject-id": s.0, "edge-id": edge });
-        for fqn in ["kyc_ubo.assert.edge.verification", "kyc_ubo.assert.edge.disconnect"] {
-            let (target, _, returned_edge) = canonical_event_shape(fqn, s, &args).unwrap();
-            assert_eq!(target.edge_id, Some(EdgeId(edge)), "{fqn}");
-            assert_eq!(returned_edge, Some(EdgeId(edge)), "{fqn}");
-        }
+        let (target, _, returned_edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.disconnect", s, &args).unwrap();
+        assert_eq!(target.edge_id, Some(EdgeId(edge)));
+        assert_eq!(returned_edge, Some(EdgeId(edge)));
+    }
+
+    #[test]
+    fn retract_targets_the_subject_with_a_citation_payload() {
+        let s = subj();
+        let citation = Uuid::new_v4();
+        let args = serde_json::json!({ "subject-id": s.0, "citation-id": citation });
+        let (target, payload, returned_edge) =
+            canonical_event_shape("kyc_ubo.assert.edge.retract", s, &args).unwrap();
+        assert_eq!(target.entity_id, None);
+        assert!(returned_edge.is_none());
+        assert_eq!(payload["citation_id"], citation.to_string());
+    }
+
+    #[test]
+    fn retract_rejects_missing_citation() {
+        let s = subj();
+        let args = serde_json::json!({ "subject-id": s.0 });
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.retract", s, &args).is_err());
     }
 
     /// EOP-VS-UBO-GAME-001 T3, §3.3: reconciliation is retired, not merged —
@@ -577,6 +646,7 @@ mod tests {
             "kyc_ubo.assert.edge.economic-interest",
             "kyc_ubo.assert.edge.supersession",
             "kyc_ubo.assert.edge.reconciliation",
+            "kyc_ubo.assert.edge.verification",
         ] {
             assert!(canonical_event_shape(fqn, s, &args).is_err(), "{fqn} must no longer be recognized");
         }

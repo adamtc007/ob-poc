@@ -74,19 +74,126 @@ pub enum TrustRoleKind {
     Beneficiary,
 }
 
+// ── Proof kinds (EOP-DD-UBO-PROOF-001 §2, RATIFIED 2026-08-28) ─────────────────
+
+/// A proof is a **kind, a source, and a date** (§1) — not a document with a
+/// type attached. Seven kinds, exhaustive: adding one is a compile error
+/// until ruled (D3's compile-time-guarantee pattern, matching
+/// `DeterminationDispatch`'s exhaustive match over `EntityType`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ProofKind {
+    /// A companies registry, GLEIF, a regulator's register — a lookup, not
+    /// necessarily a document.
+    RegistryExtract,
+    /// Articles, trust deed, partnership agreement, foundation charter —
+    /// what the vehicle *is* and how it is governed.
+    ConstitutionalDocument,
+    /// The register itself, or a certified extract — who holds what.
+    ShareRegister,
+    /// Board minute, appointment filing, statutory return — an act
+    /// recorded with an authority.
+    FiledDocument,
+    /// Management agreement, nominee declaration, mandate — a relationship
+    /// created by agreement.
+    Contract,
+    /// Passport, national identity document — natural persons.
+    IdentityDocument,
+    /// Certification by a regulated third party, or by the client —
+    /// someone stands behind a fact.
+    Attestation,
+}
+
+/// Wire strings for `ProofKind`, in declaration order — the op-layer
+/// normalizer's `valid_values` source (CLAUDE.md: "Selector-arg
+/// `valid_values` is mandatory, always the wire string").
+pub const PROOF_KIND_WIRE_VALUES: &[&str] = &[
+    "registry-extract",
+    "constitutional-document",
+    "share-register",
+    "filed-document",
+    "contract",
+    "identity-document",
+    "attestation",
+];
+
+/// Wire-string → `ProofKind`, total over `PROOF_KIND_WIRE_VALUES`. Fail-closed
+/// on anything else (`None`) — same discipline as `entity_type_from_wire`,
+/// never a silent best-effort guess (D2 corrective tranche precedent).
+pub fn proof_kind_from_wire(wire: &str) -> Option<ProofKind> {
+    match wire {
+        "registry-extract" => Some(ProofKind::RegistryExtract),
+        "constitutional-document" => Some(ProofKind::ConstitutionalDocument),
+        "share-register" => Some(ProofKind::ShareRegister),
+        "filed-document" => Some(ProofKind::FiledDocument),
+        "contract" => Some(ProofKind::Contract),
+        "identity-document" => Some(ProofKind::IdentityDocument),
+        "attestation" => Some(ProofKind::Attestation),
+        _ => None,
+    }
+}
+
+/// One proof logged against an assertion (§1): a kind, a source (free text
+/// today — §6 Q3: "structure when a check needs to read it"), and a date
+/// (when it was obtained — distinct from the citing event's own
+/// `committed_at`; an analyst may log today evidence of a lookup performed
+/// last week, or a document dated months ago). Keyed in its owning
+/// collection by `event_id` — the citing event IS the citation `retract`
+/// targets (§3.1's move table: "`retract` | that proof no longer stands |
+/// group, citation").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProofRecord {
+    pub kind: ProofKind,
+    pub source: String,
+    pub date: String,
+    pub event_id: EventId,
+}
+
+/// Build a `ProofRecord` from an `evidence` event's payload, keyed by the
+/// event's own id (§3.1's move table: the citing event IS the citation).
+/// `None` if `kind` is absent or unrecognized — tolerant of the 5 real
+/// pre-T5 `evidence` events (P0c census), whose payloads predate this
+/// concept entirely (`{"doc_id": ...}` or `{}`); replaying them logs no
+/// proof, which is honest (they logged nothing a proof kind could name),
+/// never fabricated (K-35). `source`/`date` default to empty string when
+/// absent — a proof with a known kind but an unrecorded source/date is
+/// still a fact worth keeping, unlike a proof with no kind at all.
+pub(crate) fn proof_record_from_payload(
+    p: &serde_json::Value,
+    event_id: EventId,
+) -> Option<ProofRecord> {
+    let kind = p.get("kind")?.as_str().and_then(proof_kind_from_wire)?;
+    let source = p
+        .get("source")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+    let date = p
+        .get("date")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+    Some(ProofRecord {
+        kind,
+        source,
+        date,
+        event_id,
+    })
+}
+
 // ── Edge epistemic status ─────────────────────────────────────────────────────
 
 /// Derived by the fold from the sequence of events touching an edge.
 /// **Not stored; not settable.** (K-11, Q5 — §4.1 design invariant.)
+///
+/// EOP-DD-UBO-PROOF-001 §4 (T5, 2026-08-28): `Evidenced`/`Verified` are
+/// GONE — "the board collects facts; the policy rules on adequacy." What an
+/// edge has instead is its `proofs` set (below); status now distinguishes
+/// only whether the edge is on the board at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EdgeStatus {
-    /// `assert-control` or `assert-economic-interest` event seen.
+    /// `connect` event seen; the edge is on the board.
     Asserted,
-    /// `attach-evidence` event seen; evidence cited.
-    Evidenced,
-    /// `verify` event seen (precondition: evidence was cited first).
-    Verified,
-    /// `supersede` event seen (never removed — K-13).
+    /// `disconnect` event seen (never removed — K-13).
     Superseded,
 }
 
@@ -94,8 +201,6 @@ impl std::fmt::Display for EdgeStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EdgeStatus::Asserted => write!(f, "Asserted"),
-            EdgeStatus::Evidenced => write!(f, "Evidenced"),
-            EdgeStatus::Verified => write!(f, "Verified"),
             EdgeStatus::Superseded => write!(f, "Superseded"),
         }
     }
@@ -114,10 +219,15 @@ pub struct EdgeState {
     pub to: EntityId,
     /// Percentage (only meaningful for economic-interest edges).
     pub percentage: Option<f64>,
-    /// Derived status — fold output only (K-11).
+    /// Derived status — fold output only (K-11). On-board vs. superseded
+    /// ONLY (EOP-DD-UBO-PROOF-001 §4, T5) — proof status lives in `proofs`.
     pub status: EdgeStatus,
-    /// Event that cited evidence (if any).
-    pub evidence_event_id: Option<EventId>,
+    /// The proofs logged against this edge (EOP-DD-UBO-PROOF-001 §1/§4),
+    /// keyed by the citing `evidence` event's id — the "citation"
+    /// `retract` removes by (§3.1's move table: "group, citation"). An
+    /// empty map is a fact ("nothing logged"), not a status.
+    #[serde(default)]
+    pub proofs: BTreeMap<EventId, ProofRecord>,
     /// The original assertion event (K-35 traceability).
     pub originating_event_id: EventId,
     /// Whether the trust IS revocable (meaningful on
@@ -153,8 +263,12 @@ impl EdgeState {
         self.status != EdgeStatus::Superseded
     }
 
-    pub fn is_verified(&self) -> bool {
-        self.status == EdgeStatus::Verified
+    /// EOP-DD-UBO-PROOF-001 §4 (T5): existence, not adequacy — "at least
+    /// one proof has been logged," the same fact TS.2 Ruling 2f gates
+    /// `freeze` on (a fund pivot must rest on an established mandate; K-1
+    /// makes the basis mandatory). Never asks WHICH kind, or how many.
+    pub fn has_proof(&self) -> bool {
+        !self.proofs.is_empty()
     }
 
     /// EOP-DD-UBO-DISPATCH-001 §3a (T4, 2026-08-28): `Containment` carries
@@ -275,6 +389,16 @@ fn edge_id_from_payload(payload: &serde_json::Value) -> Option<EdgeId> {
 
 fn edge_id_from_target(event: &IntentEvent) -> Option<EdgeId> {
     event.target.edge_id
+}
+
+/// Parse the `EventId` of the proof `retract` targets (§3.1's move table:
+/// "group, citation" — the citation IS the id of the `evidence` event that
+/// logged it).
+pub(crate) fn citation_event_id_from_payload(p: &serde_json::Value) -> Option<EventId> {
+    p.get("citation_id")?
+        .as_str()
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .map(EventId)
 }
 
 fn entity_id(v: &serde_json::Value, field: &str) -> Option<EntityId> {
@@ -561,7 +685,7 @@ pub(crate) fn apply_one_control_event(
                         to,
                         percentage: opt_f64(p, "percentage"),
                         status: EdgeStatus::Asserted,
-                        evidence_event_id: None,
+                        proofs: BTreeMap::new(),
                         originating_event_id: event.id,
                         trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
                         superseded_by: None,
@@ -597,7 +721,7 @@ pub(crate) fn apply_one_control_event(
                         to,
                         percentage: opt_f64(p, "percentage"),
                         status: EdgeStatus::Asserted,
-                        evidence_event_id: None,
+                        proofs: BTreeMap::new(),
                         originating_event_id: event.id,
                         // TS.1 §2.1: revocability proof for settlor edges
                         // (see the field's polarity doc on `EdgeState`).
@@ -613,23 +737,45 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
+        // Move 4 (TS.1 §3, redefined EOP-DD-UBO-PROOF-001 §1/§4, T5): logs
+        // one proof — kind, source, date — against an edge. No ratchet: the
+        // old status-ladder rung this replaces is gone from `EdgeStatus`
+        // itself; an edge can accumulate any number of proofs regardless of
+        // status (`Precondition::EdgeActive` already refuses this at the op
+        // layer for a superseded edge — nothing to re-check here).
         "kyc_ubo.assert.edge.evidence" => {
             if let Some(eid) = edge_id_from_target(event) {
                 if let Some(edge) = state.edges.get_mut(&eid) {
-                    if edge.status == EdgeStatus::Asserted {
-                        edge.status = EdgeStatus::Evidenced;
-                        edge.evidence_event_id = Some(event.id);
+                    if let Some(proof) = proof_record_from_payload(p, event.id) {
+                        edge.proofs.insert(event.id, proof);
                     }
                 }
             }
         }
 
-        "kyc_ubo.assert.edge.verification" => {
-            if let Some(eid) = edge_id_from_target(event) {
-                if let Some(edge) = state.edges.get_mut(&eid) {
-                    if edge.status == EdgeStatus::Evidenced {
-                        edge.status = EdgeStatus::Verified;
-                    }
+        // `kyc_ubo.assert.edge.verification` RETIRED (EOP-DD-UBO-PROOF-001
+        // §3/§4, T5, 2026-08-28): "the board collects facts; the policy
+        // rules on adequacy" — there is no ratchet from evidenced to
+        // verified to compute, because there is no `Verified` state left to
+        // ratchet into. P0c census: 0 real committed events under this FQN
+        // — K-G7 full deletion (unlike `evidence`, which has 5 real events
+        // and keeps the arm above, extended rather than replaced). A
+        // historical event still bearing this verb_fqn falls through to the
+        // catch-all `_ => {}`, a no-op — there is nothing to replay.
+
+        // Move 5 (§3.1's move table: "that proof no longer stands — group,
+        // citation", EOP-DD-UBO-PROOF-001 §4, T5): removes one proof by the
+        // event id that logged it. The set shrinks; nothing else happens —
+        // there is no status to demote. Scans every edge because the
+        // citation alone (not an edge/entity target) identifies the proof;
+        // `fold::type_registry`'s mirrored arm does the same over entity
+        // type records, from the same event, independently (T6.1(a)
+        // discipline). At most one of the two axes will actually hold the
+        // key — removing from the other is a harmless no-op.
+        "kyc_ubo.assert.edge.retract" => {
+            if let Some(citation) = citation_event_id_from_payload(p) {
+                for edge in state.edges.values_mut() {
+                    edge.proofs.remove(&citation);
                 }
             }
         }
@@ -830,18 +976,6 @@ pub fn check_preconditions(
 ) -> Result<(), KycError> {
     for pre in &lexicon_entry.preconditions {
         match pre {
-            Precondition::EvidenceCited => {
-                let eid = event.target.edge_id.ok_or_else(|| {
-                    KycError::MissingTarget("edge_id required for EvidenceCited".into())
-                })?;
-                match control.edges.get(&eid) {
-                    Some(e) if e.status == EdgeStatus::Evidenced => {} // ok
-                    Some(e) => {
-                        return Err(KycError::VerifyWithoutEvidence(eid, e.status.to_string()));
-                    }
-                    None => return Err(KycError::EdgeNotFound(eid)),
-                }
-            }
             Precondition::SubjectRegistered => {
                 if !control.registered {
                     return Err(KycError::PreconditionFailed {
@@ -1146,8 +1280,6 @@ pub struct ReconciledEconomicEdge {
     pub from: EntityId,
     pub to: EntityId,
     pub percentage: f64,
-    /// The event that verified this edge (K-35 traceability on the candidate).
-    pub verified_by: Option<EventId>,
     /// The event that originally asserted this edge (deterministic; never random).
     pub originating_event_id: EventId,
 }
@@ -1173,11 +1305,6 @@ pub fn reconciled_economic_edges(state: &ControlState) -> Vec<ReconciledEconomic
                 from: e.from,
                 to: e.to,
                 percentage: pct,
-                verified_by: if e.is_verified() {
-                    e.evidence_event_id
-                } else {
-                    None
-                },
                 originating_event_id: e.originating_event_id,
             })
         })
@@ -1194,8 +1321,6 @@ pub struct ReconciledControlEdge {
     pub from: EntityId,
     pub to: EntityId,
     pub kind: EdgeKind,
-    /// The event that verified this edge (K-35 traceability on the candidate).
-    pub verified_by: Option<EventId>,
     /// The event that originally asserted this edge (deterministic; never random).
     pub originating_event_id: EventId,
 }
@@ -1275,7 +1400,7 @@ pub fn control_admission(kind: &EdgeKind) -> ControlAdmission {
 /// Extract the reconciled (active) control edges from the control state —
 /// the `Traverse`-classified edges (`control_admission`), active. Used by
 /// `ControlProngStrategy` (M4) and its delegates/siblings. Nothing here
-/// gates on `EdgeStatus::Verified` — a merely-`Asserted` edge still
+/// gates on citation status — a bare-`Asserted`, uncited edge still
 /// traverses (TS.3 §2a: a determination runs at any board state; what
 /// changes is not whether it is produced but how well it is known).
 pub fn reconciled_control_edges(state: &ControlState) -> Vec<ReconciledControlEdge> {
@@ -1288,11 +1413,6 @@ pub fn reconciled_control_edges(state: &ControlState) -> Vec<ReconciledControlEd
             from: e.from,
             to: e.to,
             kind: e.kind.clone(),
-            verified_by: if e.is_verified() {
-                e.evidence_event_id
-            } else {
-                None
-            },
             originating_event_id: e.originating_event_id,
         })
         .collect()
@@ -1317,11 +1437,6 @@ pub fn edges_of_kind_into(
             from: e.from,
             to: e.to,
             kind: e.kind.clone(),
-            verified_by: if e.is_verified() {
-                e.evidence_event_id
-            } else {
-                None
-            },
             originating_event_id: e.originating_event_id,
         })
         .collect()
@@ -1353,11 +1468,6 @@ pub fn governing_mandate_edges_into(
             from: e.from,
             to: e.to,
             kind: e.kind.clone(),
-            verified_by: if e.is_verified() {
-                e.evidence_event_id
-            } else {
-                None
-            },
             originating_event_id: e.originating_event_id,
         })
         .collect()
@@ -1394,8 +1504,6 @@ pub struct ReconciledTrustEdge {
     /// Revocability proof carried on the edge (settlor edges only — see the
     /// polarity doc on `EdgeState::trust_revocable`).
     pub trust_revocable: Option<bool>,
-    /// The event that verified this edge (K-35 traceability on the candidate).
-    pub verified_by: Option<EventId>,
     /// The event that originally asserted this edge (deterministic; never random).
     pub originating_event_id: EventId,
 }
@@ -1418,11 +1526,6 @@ pub fn reconciled_trust_edges(state: &ControlState) -> Vec<ReconciledTrustEdge> 
                 to: e.to,
                 role: role.clone(),
                 trust_revocable: e.trust_revocable,
-                verified_by: if e.is_verified() {
-                    e.evidence_event_id
-                } else {
-                    None
-                },
                 originating_event_id: e.originating_event_id,
             }),
             _ => None,

@@ -31,8 +31,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{Deserialize, Serialize};
-
 use crate::event::IntentEvent;
 use crate::geometry::EntityType;
 use crate::types::{EdgeId, EntityId, EventId};
@@ -98,29 +96,32 @@ pub fn entity_type_from_wire(s: &str) -> Option<EntityType> {
     })
 }
 
-// ── Type-proof status (TS.0 §2 P2) ──────────────────────────────────────────
+// ── Type proofs (EOP-DD-UBO-PROOF-001 §1/§4, T5, 2026-08-28) ────────────────
 
-/// TS.0 §2's P2 exit status: "type proved, or still alleged."
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TypeProofStatus {
-    Alleged,
-    Proved,
-}
-
+/// TS.0 §2's P2 exit status ("type proved, or still alleged") was a
+/// two-state STATUS — retired by EOP-DD-UBO-PROOF-001 §4: "the board
+/// collects facts; the policy rules on adequacy." What replaces it is
+/// `EntityTypeRecord::proofs` — the citation set itself, below.
 #[derive(Debug, Clone)]
 pub struct EntityTypeRecord {
     pub entity_type: EntityType,
-    pub proof: TypeProofStatus,
-    /// The event that last ASSERTED this type (`assert-type` or
-    /// `type-correction`) — stays pinned to that event even after a later
-    /// `attach-evidence` flips `proof` to `Proved`; it does not become "the
-    /// event that proved it."
+    /// The event that last ASSERTED this type (`place`/historical
+    /// `assert-type`/`type-correction`) — K-35 traceability, independent
+    /// of whatever proofs have or haven't been logged since.
     pub originating_event_id: EventId,
-    /// The event that flipped `proof` to `Proved` (`attach-evidence`,
-    /// type-scoped target) — `None` while `proof` is still `Alleged`. This,
-    /// not `originating_event_id`, is the fact a `Proved` conclusion rests
-    /// on (D2.0 §4: "findings citing the facts relied on").
-    pub proof_event_id: Option<EventId>,
+    /// The proofs logged against this entity's type assertion
+    /// (EOP-DD-UBO-PROOF-001 §1), keyed by the citing `evidence` event's
+    /// id — the same shape and the same citation-by-event-id discipline as
+    /// `fold::control::EdgeState::proofs`. Empty is a fact ("nothing
+    /// logged"), not a status.
+    pub proofs: BTreeMap<EventId, crate::fold::control::ProofRecord>,
+}
+
+impl EntityTypeRecord {
+    /// EOP-DD-UBO-PROOF-001 §4: existence, not adequacy.
+    pub fn has_proof(&self) -> bool {
+        !self.proofs.is_empty()
+    }
 }
 
 /// One `correct-type` cascade record (TS.1 §4). Accumulates — corrections
@@ -193,32 +194,36 @@ impl TypeRegistryState {
         self.withdrawn_members.get(&entity).copied()
     }
 
-    /// `entity`'s type-proof status — `None` if no type has been asserted
-    /// at all (a different, "unresolved" state from `Alleged`; see
-    /// `PipeClassification`'s doc). Used by TS.3 §2a's provisionality
-    /// propagation: a traversal decision resting on an `Alleged` type is
-    /// itself provisional, distinctly from an alleged EDGE
-    /// (`determination::compute_assurance`).
-    pub fn proof_of(&self, entity: EntityId) -> Option<TypeProofStatus> {
-        self.types.get(&entity).map(|r| r.proof)
+    /// Whether `entity` has AT LEAST ONE proof logged against its type
+    /// assertion (EOP-DD-UBO-PROOF-001 §4, T5: existence, not adequacy).
+    /// `false` both when no type has been asserted at all and when one has
+    /// but nothing has been logged against it — callers that must
+    /// distinguish those two cases check `type_of(entity).is_some()`
+    /// alongside this.
+    pub fn has_proof(&self, entity: EntityId) -> bool {
+        self.types.get(&entity).is_some_and(|r| r.has_proof())
     }
 
     /// The real `EventId` of the event that produced `entity`'s current
-    /// type-proof record (whichever of `assert-type`/`attach-evidence` set
-    /// it last) — `None` if no type has been asserted at all. This is the
-    /// fact a check citing a type-proof conclusion must cite (D2.0 §4:
-    /// "findings citing the facts relied on").
+    /// type-proof record (whichever of `assert-type`/`place` set it last)
+    /// — `None` if no type has been asserted at all. This is the fact a
+    /// check citing a type-proof conclusion must cite (D2.0 §4: "findings
+    /// citing the facts relied on").
     pub fn originating_event_id_of(&self, entity: EntityId) -> Option<EventId> {
         self.types.get(&entity).map(|r| r.originating_event_id)
     }
 
-    /// The real `EventId` of the event that PROVED `entity`'s type —
-    /// `None` when the entity has no type record, or its type is still
-    /// `Alleged`. Distinct from `originating_event_id_of`, which names the
-    /// assertion, not the proof. This is the fact a `Proved` conclusion
-    /// rests on (D2.0 §4).
-    pub fn proof_event_id_of(&self, entity: EntityId) -> Option<EventId> {
-        self.types.get(&entity).and_then(|r| r.proof_event_id)
+    /// The citation set for `entity`'s type — the `EventId`s of every
+    /// `evidence` event logged against it (EOP-DD-UBO-PROOF-001 §4, T5).
+    /// Empty (not `None`) when the entity has no type record or has one
+    /// with nothing logged against it — a citation LIST has no "absent"
+    /// state distinct from "empty", unlike the single `EventId` the old
+    /// `proof_event_id_of` returned.
+    pub fn proof_event_ids_of(&self, entity: EntityId) -> Vec<EventId> {
+        self.types
+            .get(&entity)
+            .map(|r| r.proofs.keys().copied().collect())
+            .unwrap_or_default()
     }
 }
 
@@ -271,9 +276,8 @@ pub(crate) fn apply_one_type_registry_event(
                     eid,
                     EntityTypeRecord {
                         entity_type,
-                        proof: TypeProofStatus::Alleged,
                         originating_event_id: event.id,
-                        proof_event_id: None,
+                        proofs: BTreeMap::new(),
                     },
                 );
                 state.withdrawn_members.remove(&eid);
@@ -309,24 +313,29 @@ pub(crate) fn apply_one_type_registry_event(
                     eid,
                     EntityTypeRecord {
                         entity_type,
-                        proof: TypeProofStatus::Alleged,
                         originating_event_id: event.id,
-                        proof_event_id: None,
+                        proofs: BTreeMap::new(),
                     },
                 );
             }
         }
-        // Move 4 (TS.1 §3): "this document/source evidences a TYPE OR A
-        // LINKAGE" — one verb, two possible targets. Edge-scoped evidencing
-        // (`target.edge_id` set) is handled entirely by `fold::control`,
-        // unchanged. This arm handles ONLY the type-scoped case: a target
-        // naming `entity_id` with no `edge_id` evidences that entity's
-        // current type assertion, deriving `Proved` — never set directly.
+        // Move 4 (TS.1 §3, redefined EOP-DD-UBO-PROOF-001 §1/§4, T5): "this
+        // document/source evidences a TYPE OR A LINKAGE" — one verb, two
+        // possible targets. Edge-scoped evidencing (`target.edge_id` set)
+        // is handled entirely by `fold::control`, unchanged. This arm
+        // handles ONLY the type-scoped case: a target naming `entity_id`
+        // with no `edge_id` logs one proof — kind, source, date — against
+        // that entity's current type assertion. No ratchet: the old
+        // two-state status this replaces is gone; the record just
+        // accumulates proofs (T5's `proof_record_from_payload` — `None` for the
+        // pre-T5-shaped historical payloads, same tolerance as
+        // `fold::control`'s mirrored arm).
         "kyc_ubo.assert.edge.evidence" if event.target.edge_id.is_none() => {
             if let Some(eid) = event.target.entity_id {
                 if let Some(record) = state.types.get_mut(&eid) {
-                    record.proof = TypeProofStatus::Proved;
-                    record.proof_event_id = Some(event.id);
+                    if let Some(proof) = crate::fold::control::proof_record_from_payload(p, event.id) {
+                        record.proofs.insert(event.id, proof);
+                    }
                 }
             }
         }
@@ -348,6 +357,18 @@ pub(crate) fn apply_one_type_registry_event(
         "kyc_ubo.assert.subject.member-withdrawal" => {
             if let Some(eid) = entity_id(p, "entity_id") {
                 state.withdrawn_members.insert(eid, event.id);
+            }
+        }
+        // Move 5 (EOP-DD-UBO-PROOF-001 §4, T5) — the TypeRegistry-axis half
+        // of `retract`'s mirrored fold; `fold::control`'s arm does the same
+        // over edge proofs, from the same event (T6.1(a)). At most one axis
+        // actually holds the citation; removing from the other is a
+        // harmless no-op.
+        "kyc_ubo.assert.edge.retract" => {
+            if let Some(citation) = crate::fold::control::citation_event_id_from_payload(p) {
+                for record in state.types.values_mut() {
+                    record.proofs.remove(&citation);
+                }
             }
         }
         "kyc_ubo.assert.subject.enquiry" => {

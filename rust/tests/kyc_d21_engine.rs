@@ -349,10 +349,11 @@ async fn unevaluable_is_not_fail_through_production() {
 /// open: the Unevaluable -> Pass flip, now that Item 3a
 /// (2026-08-24 corrective tranche) wired a dispatchable Proved path —
 /// `kyc_ubo.assert.edge.evidence` called with `entity-id` (no `edge-id`)
-/// evidences an entity's asserted type instead of an edge, moving its proof
-/// Alleged -> Proved (`fold::type_registry`'s sole Proved-producing arm).
-/// Re-runs the SAME subject through Unevaluable(FactAbsent) ->
-/// Unevaluable(AllegedType) -> Pass, closing the property's other direction
+/// evidences an entity's asserted type instead of an edge, logging a real
+/// cited proof against it (EOP-DD-UBO-PROOF-001 §4, T5 — was "Alleged ->
+/// Proved", now "uncited -> cited", `fold::type_registry`'s citation-set
+/// arm). Re-runs the SAME subject through Unevaluable(FactAbsent) ->
+/// Unevaluable(UncitedType) -> Pass, closing the property's other direction
 /// (`unevaluable_is_not_fail_through_production` closed the -> Fail side).
 #[tokio::test]
 async fn unevaluable_flips_to_pass_through_production() {
@@ -385,7 +386,15 @@ async fn unevaluable_flips_to_pass_through_production() {
     // The fact that resolves it: real evidence attached to the ENTITY (not
     // an edge) — the dispatchable-Proved path Item 3a wired.
     use ob_poc::domain_ops::kyc_stream_ops::UboEdgeAttachEvidence;
-    run(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": subject.0, "entity-id": subject.0 }), &pool).await;
+    run(
+        &UboEdgeAttachEvidence,
+        serde_json::json!({
+            "subject-id": subject.0, "entity-id": subject.0,
+            "kind": "identity-document", "source": "test fixture", "date": "2026-08-28",
+        }),
+        &pool,
+    )
+    .await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 3: proved, flips to pass" }), &pool).await;
     let findings3 = findings_for(&pool, subject).await;
     assert_eq!(findings3[0]["verdict"], serde_json::json!("Pass"), "a proven type must flip Unevaluable -> Pass: {findings3}");

@@ -49,8 +49,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use ob_poc_kyc_substrate::{
     check_control_preconditions, ControlProngStrategy, ControlState, DeterminationDispatch,
     DeterminationStrategy, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId, EntityType,
-    EntityTypeRecord, EventId, FundControlStrategy, LexiconEntry, PersonId, Prong, TargetBinding,
-    TrustRoleKind, TrustRoleStrategy, TypeProofStatus, TypeRegistryState, ALL_ENTITY_TYPES,
+    EntityTypeRecord, EventId, FundControlStrategy, LexiconEntry, PersonId, ProofKind,
+    ProofRecord, Prong, TargetBinding, TrustRoleKind, TrustRoleStrategy, TypeRegistryState,
+    ALL_ENTITY_TYPES,
 };
 
 // ── Fixture builders (mirrors kyc_ts3_control_admission.rs) ────────────────
@@ -70,7 +71,7 @@ fn edge(id_tag: u128, kind: EdgeKind, from: EntityId, to: EntityId, orig_tag: u1
         to,
         percentage: None,
         status: EdgeStatus::Asserted,
-        evidence_event_id: None,
+        proofs: BTreeMap::new(),
         originating_event_id: evid(orig_tag),
         trust_revocable: None,
         superseded_by: None,
@@ -79,12 +80,18 @@ fn edge(id_tag: u128, kind: EdgeKind, from: EntityId, to: EntityId, orig_tag: u1
 }
 
 fn type_record(entity_type: EntityType, orig_tag: u128) -> EntityTypeRecord {
-    EntityTypeRecord {
-        entity_type,
-        proof: TypeProofStatus::Proved,
-        originating_event_id: evid(orig_tag),
-        proof_event_id: Some(evid(orig_tag)),
-    }
+    let citing = evid(orig_tag);
+    let mut proofs = BTreeMap::new();
+    proofs.insert(
+        citing,
+        ProofRecord {
+            kind: ProofKind::FiledDocument,
+            source: "test fixture".to_string(),
+            date: "2026-08-28".to_string(),
+            event_id: citing,
+        },
+    );
+    EntityTypeRecord { entity_type, originating_event_id: citing, proofs }
 }
 
 fn registry_with(subject: EntityId, t: EntityType) -> TypeRegistryState {

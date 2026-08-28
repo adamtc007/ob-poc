@@ -39,9 +39,10 @@ pub enum KycError {
     #[error("determination not present; no candidates resolved and no SMO fallback applied (K-5)")]
     DeterminationNotReady,
 
-    #[error("edge {0:?} has status {1}; cannot verify without prior evidence")]
-    VerifyWithoutEvidence(EdgeId, String),
-
+    // `VerifyWithoutEvidence` RETIRED (EOP-DD-UBO-PROOF-001 §3/§4, T5,
+    // 2026-08-28) alongside `Precondition::EvidenceCited`, its sole
+    // producer — `kyc_ubo.assert.edge.verification`, the only reader of
+    // that precondition, is itself deleted (K-G7: 0 real committed events).
     #[error("economic edges sum to {sum:.2}% for subject {subject:?} before reconciliation; run reconcile-conflict")]
     UnreconciledConflict { subject: SubjectId, sum: f64 },
 

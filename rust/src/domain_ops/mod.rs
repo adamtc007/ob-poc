@@ -427,9 +427,13 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // `UboEdgeAssertEconomicInterest` MERGED into `UboEdgeConnect` (§3.2);
     // `UboEdgeSupersede` renamed `UboEdgeDisconnect` (§3.1); `UboEdgeReconcile
     // Conflict` RETIRED outright (§3.3, K-G7 — no successor registered).
+    // EOP-DD-UBO-PROOF-001 (T5, 2026-08-28): `UboEdgeVerify` RETIRED
+    // (K-G7, 0 real committed events) — "the board collects facts; the
+    // policy rules on adequacy," no ratchet left to move an edge into.
+    // `UboEdgeRetract` ADDED — withdraws a previously logged proof.
     registry.register(Arc::new(kyc_stream_ops::UboEdgeConnect));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeAttachEvidence));
-    registry.register(Arc::new(kyc_stream_ops::UboEdgeVerify));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeRetract));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeDisconnect));
     // `UboEdgePierceNominee` retired TS.6 P2 (K-G7) — folded into the
     // `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/macros/ubo.yaml)

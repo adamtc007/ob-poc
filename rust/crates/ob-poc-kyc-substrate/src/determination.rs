@@ -90,11 +90,15 @@ pub struct RecordedPivot {
     pub basis_edge_kind: EdgeKind,
     /// The edge asserting the mandate/GP relationship into the pivot.
     pub mandate_edge_id: EdgeId,
-    /// TS.2 Ruling 2f / CTN-2e: whether contract evidence has been attached
-    /// to the mandate edge (`EdgeStatus::Evidenced` or beyond, i.e. NOT
-    /// bare `Asserted`). `false` means this candidate computes but the
-    /// determination may not freeze while it is the only path to a person
-    /// — "record freely, conclude carefully".
+    /// TS.2 Ruling 2f / CTN-2e (redefined EOP-DD-UBO-PROOF-001 §4, T5):
+    /// whether at least one proof has been logged against the mandate edge
+    /// (`EdgeState::has_proof`). This is an EXISTENCE check, not an
+    /// adequacy one — Adam's ruling on 2f: a fund pivot rests on a
+    /// governing mandate, and with no contract the BASIS is unestablished,
+    /// which K-1 makes mandatory; it is not a judgment about whether the
+    /// logged proof is good enough. `false` means this candidate computes
+    /// but the determination may not freeze while it is the only path to a
+    /// person — "record freely, conclude carefully".
     pub mandate_evidenced: bool,
 }
 
@@ -601,7 +605,7 @@ pub fn fund_pivot_resolve(
         let mandate_evidenced = state
             .edges
             .get(&pivot_edge.id)
-            .map(|e| e.status != crate::fold::control::EdgeStatus::Asserted)
+            .map(crate::fold::control::EdgeState::has_proof)
             .unwrap_or(false);
         let recorded_pivot = RecordedPivot {
             pivot_entity,
@@ -1225,31 +1229,40 @@ pub fn pull_smo_on_exhaustion(
 
 /// TS.3 §2a: WHY a determination is provisional — three distinct
 /// remediation tasks, never collapsed into one flag.
+///
+/// EOP-DD-UBO-PROOF-001 §4 (T5, 2026-08-28): the two proof-existence
+/// variants are renamed `Uncited*` (from `Alleged*`) and now key off
+/// `EdgeState::has_proof`/`TypeRegistryState::has_proof` — "citations
+/// replace status," not a renamed ratchet. The three decision-based
+/// reasons (`AdmissionOnAllegedType`, `PiercedOnAllegedDeclaration`,
+/// `GeometryUnevaluable`) are untouched in shape: they report a TRAVERSAL
+/// DECISION resting on unproven ground, which is orthogonal to what a
+/// proof's status used to mean, and stay driven by the same existence
+/// check, mechanically rewired below.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ProvisionalityReason {
-    /// A control-kind edge touching the determination is not yet
-    /// `EdgeStatus::Verified`.
-    AllegedEdge { entity: EntityId, edge_kind_label: String },
-    /// A participant entity's own type assertion
-    /// (`TypeRegistryState::proof_of`) is `TypeProofStatus::Alleged`, not
-    /// yet `Proved`.
-    AllegedType { entity: EntityId },
+    /// A control-kind edge touching the determination has no proof logged
+    /// against it (`EdgeState::has_proof` is `false`).
+    UncitedEdge { entity: EntityId, edge_kind_label: String },
+    /// A participant entity has a type assertion but no proof logged
+    /// against it (`TypeRegistryState::has_proof` is `false`).
+    UncitedType { entity: EntityId },
     /// An admission/stop decision (`control_admission`) was taken while the
-    /// entity that decision turned on carries only an alleged type — the
-    /// narrow case §2a calls out by name: a `Stop` at a believed-but-
+    /// entity that decision turned on carries an asserted-but-uncited type
+    /// — the narrow case §2a calls out by name: a `Stop` at a believed-but-
     /// unproven state body.
     AdmissionOnAllegedType { entity: EntityId, edge_kind_label: String },
     /// TS.4 §3 Q2: a pierce substituted `underlying_holder` on the basis of
-    /// a nominee declaration (the replacement edge) that is not yet
-    /// `EdgeStatus::Verified` — the substitution is a traversal decision
-    /// taken on unproven ground, exactly as `AdmissionOnAllegedType` is for
-    /// a `Stop` (§2a's own reasoning, extended to piercing).
+    /// an uncited nominee declaration (the replacement edge) — the
+    /// substitution is a traversal decision taken on unproven ground,
+    /// exactly as `AdmissionOnAllegedType` is for a `Stop` (§2a's own
+    /// reasoning, extended to piercing).
     PiercedOnAllegedDeclaration { underlying_holder: EntityId },
     /// TS.5 R6: at assertion time, the type geometry could not be evaluated
     /// for this edge — either endpoint carried no type assertion at all
-    /// (`TypeRegistryState::proof_of` returns `None`, a different,
-    /// "unresolved" state from `Alleged`), or the edge's `Pipe`
-    /// classification itself did not resolve (`pipe_of` returned
+    /// (`TypeRegistryState::type_of` returns `None` — a different,
+    /// "unresolved" state from "asserted but uncited"), or the edge's
+    /// `Pipe` classification itself did not resolve (`pipe_of` returned
     /// `provisional: true` — e.g. an `EconomicInterest` edge into a target
     /// type outside TS.2 §3's three ratified buckets). The assertion was
     /// admitted anyway (CTN-2e: record freely, conclude carefully) — this
@@ -1257,13 +1270,40 @@ pub enum ProvisionalityReason {
     GeometryUnevaluable { entity: EntityId, edge_kind_label: String },
 }
 
-/// The assurance surface for one determination: empty means fully proved
-/// (every implicated edge Verified, every implicated entity's type Proved);
-/// non-empty means provisional, with each reason distinct (§2a: "different
-/// remediation tasks... must not collapse into one flag").
+/// One proof as reported in an assurance profile: kind and date only — no
+/// event id or source (EOP-DD-UBO-PROOF-001 §4, T5: "the profile reports
+/// which proofs exist per assertion — kind and date — not a verdict").
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ProofSummary {
+    pub kind: crate::fold::control::ProofKind,
+    pub date: String,
+}
+
+impl From<&crate::fold::control::ProofRecord> for ProofSummary {
+    fn from(p: &crate::fold::control::ProofRecord) -> Self {
+        ProofSummary { kind: p.kind, date: p.date.clone() }
+    }
+}
+
+/// The assurance surface for one determination. `reasons` empty means
+/// fully cited (every implicated edge and type has at least one proof, and
+/// no traversal decision rested on unproven ground); non-empty means
+/// provisional, with each reason distinct (§2a: "different remediation
+/// tasks... must not collapse into one flag").
+///
+/// `edge_citations`/`type_citations` (T5) are the citation-set channel
+/// itself — every proof logged against every edge/type touched by this
+/// determination, kind and date, regardless of whether that assertion is
+/// cited or not (an empty `Vec` there IS the fact "nothing logged," the
+/// same fact `reasons`'s `Uncited*` variants flag as provisional). This is
+/// reporting, not a verdict: `reasons` says what to worry about,
+/// `*_citations` says what is actually known — the policy layer, not this
+/// struct, rules on whether the known set is adequate (§3's ruling).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeterminationAssurance {
     pub reasons: Vec<ProvisionalityReason>,
+    pub edge_citations: BTreeMap<EdgeId, Vec<ProofSummary>>,
+    pub type_citations: BTreeMap<EntityId, Vec<ProofSummary>>,
 }
 
 impl DeterminationAssurance {
@@ -1276,12 +1316,18 @@ impl DeterminationAssurance {
 /// only the edges. Walks every entity implicated in the final answer —
 /// every candidate's `ownership_chain`, every stop's `stopped_at`/
 /// `authority_entity` — and checks two independent signals:
-/// 1. is any control-kind edge touching an implicated entity pair still
-///    only `Asserted`/`Evidenced` (not yet `Verified`)? → `AllegedEdge`.
-/// 2. is any implicated entity's own type assertion still `Alleged`
-///    (not yet `Proved`)? → `AllegedType`; additionally, for a `Stop`
-///    specifically, `AdmissionOnAllegedType` — the STOP decision itself
-///    rested on believing (not yet proving) that entity is a state body.
+/// 1. is any control-kind edge touching an implicated entity pair uncited
+///    (EOP-DD-UBO-PROOF-001 §4, T5: `EdgeState::has_proof` false)? →
+///    `UncitedEdge`.
+/// 2. is any implicated entity's own type assertion uncited (asserted, but
+///    `TypeRegistryState::has_proof` false)? → `UncitedType`; additionally,
+///    for a `Stop` specifically, `AdmissionOnAllegedType` — the STOP
+///    decision itself rested on believing (not yet citing) that entity is
+///    a state body.
+///
+/// Also builds the T5 citation-set channel (`edge_citations`/
+/// `type_citations`) for every touched edge/entity — the actual proofs
+/// logged, kind and date, not folded into a verdict.
 ///
 /// Deterministic by construction: iterates only `BTreeMap`/`BTreeSet`
 /// collections (Q6, K-16/18/33 — no `HashMap`/`HashSet` in this module).
@@ -1291,8 +1337,6 @@ pub fn compute_assurance(
     control_state: &ControlState,
     type_registry: &crate::fold::type_registry::TypeRegistryState,
 ) -> DeterminationAssurance {
-    use crate::fold::type_registry::TypeProofStatus;
-
     let mut touched: BTreeSet<EntityId> = BTreeSet::new();
     for c in candidates {
         touched.extend(c.ownership_chain.iter().copied());
@@ -1303,15 +1347,19 @@ pub fn compute_assurance(
     }
 
     let mut reasons: BTreeSet<ProvisionalityReason> = BTreeSet::new();
+    let mut edge_citations: BTreeMap<EdgeId, Vec<ProofSummary>> = BTreeMap::new();
+    let mut type_citations: BTreeMap<EntityId, Vec<ProofSummary>> = BTreeMap::new();
 
     for edge in control_state.edges.values() {
         if !edge.is_active() {
             continue;
         }
-        if !matches!(edge.status, crate::fold::control::EdgeStatus::Verified)
-            && (touched.contains(&edge.from) || touched.contains(&edge.to))
-        {
-            reasons.insert(ProvisionalityReason::AllegedEdge {
+        if !(touched.contains(&edge.from) || touched.contains(&edge.to)) {
+            continue;
+        }
+        edge_citations.insert(edge.id, edge.proofs.values().map(ProofSummary::from).collect());
+        if !edge.has_proof() {
+            reasons.insert(ProvisionalityReason::UncitedEdge {
                 entity: edge.to,
                 edge_kind_label: format!("{:?}", edge.kind),
             });
@@ -1319,13 +1367,18 @@ pub fn compute_assurance(
     }
 
     for &entity in &touched {
-        if type_registry.proof_of(entity) == Some(TypeProofStatus::Alleged) {
-            reasons.insert(ProvisionalityReason::AllegedType { entity });
+        if let Some(record) = type_registry.types.get(&entity) {
+            type_citations
+                .insert(entity, record.proofs.values().map(ProofSummary::from).collect());
+            if !record.has_proof() {
+                reasons.insert(ProvisionalityReason::UncitedType { entity });
+            }
         }
     }
 
     for s in stops {
-        if type_registry.proof_of(s.stopped_at) == Some(TypeProofStatus::Alleged) {
+        let stopped_at_typed = type_registry.type_of(s.stopped_at).is_some();
+        if stopped_at_typed && !type_registry.has_proof(s.stopped_at) {
             reasons.insert(ProvisionalityReason::AdmissionOnAllegedType {
                 entity: s.stopped_at,
                 edge_kind_label: "statutory_authority".to_string(),
@@ -1334,10 +1387,11 @@ pub fn compute_assurance(
     }
 
     // TS.5 R6: an edge touching the determination whose geometry could not
-    // be evaluated at assertion time — either endpoint carries no type
-    // assertion at all (`proof_of` returns `None`, distinct from `Alleged`),
-    // or the edge's `Pipe` classification itself did not resolve. Mirrors
-    // `AllegedEdge`'s convention of keying the reason on `edge.to`.
+    // be evaluated at assertion time — either endpoint carried no type
+    // assertion at all (`type_of` returns `None`, distinct from "asserted
+    // but uncited"), or the edge's `Pipe` classification itself did not
+    // resolve. Mirrors `UncitedEdge`'s convention of keying the reason on
+    // `edge.to`.
     for edge in control_state.edges.values() {
         if !edge.is_active() {
             continue;
@@ -1345,8 +1399,8 @@ pub fn compute_assurance(
         if !(touched.contains(&edge.from) || touched.contains(&edge.to)) {
             continue;
         }
-        let from_typed = type_registry.proof_of(edge.from).is_some();
-        let to_typed = type_registry.proof_of(edge.to).is_some();
+        let from_typed = type_registry.type_of(edge.from).is_some();
+        let to_typed = type_registry.type_of(edge.to).is_some();
         let to_type = type_registry.type_of(edge.to);
         let pipe_resolved = crate::geometry::pipe_of(&edge.kind, to_type).pipe.is_some();
         if !from_typed || !to_typed || !pipe_resolved {
@@ -1357,16 +1411,16 @@ pub fn compute_assurance(
         }
     }
 
-    // TS.4 §3 Q2: a pierce followed on the basis of a not-yet-Verified
-    // replacement edge (the disclosed nominator's declaration) is itself a
-    // traversal decision taken on unproven ground.
+    // TS.4 §3 Q2: a pierce followed on the basis of an uncited replacement
+    // edge (the disclosed nominator's declaration) is itself a traversal
+    // decision taken on unproven ground.
     for c in candidates {
         for p in &c.pierces {
-            let replacement_verified = control_state
+            let replacement_cited = control_state
                 .edges
                 .get(&p.replacement_edge_id)
-                .is_some_and(|e| matches!(e.status, crate::fold::control::EdgeStatus::Verified));
-            if !replacement_verified {
+                .is_some_and(crate::fold::control::EdgeState::has_proof);
+            if !replacement_cited {
                 reasons.insert(ProvisionalityReason::PiercedOnAllegedDeclaration {
                     underlying_holder: p.underlying_holder,
                 });
@@ -1374,7 +1428,11 @@ pub fn compute_assurance(
         }
     }
 
-    DeterminationAssurance { reasons: reasons.into_iter().collect() }
+    DeterminationAssurance {
+        reasons: reasons.into_iter().collect(),
+        edge_citations,
+        type_citations,
+    }
 }
 
 // ── Frozen determination (K-18) ───────────────────────────────────────────────

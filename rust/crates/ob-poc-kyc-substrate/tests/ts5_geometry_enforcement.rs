@@ -216,11 +216,12 @@ fn untyped_endpoint_admits_provisionally() {
     );
 }
 
-/// TS.5 R5 — an endpoint typed but only ALLEGED (not yet evidenced) admits,
-/// and the pre-existing `ProvisionalityReason::AllegedType` mechanism
-/// (TS.3) already propagates it — R1 needed no new plumbing for this half.
+/// TS.5 R5 — an endpoint typed but UNCITED (no proof logged) admits, and
+/// the pre-existing `ProvisionalityReason::UncitedType` mechanism (TS.3,
+/// renamed from `AllegedType` by EOP-DD-UBO-PROOF-001 §4, T5) already
+/// propagates it — R1 needed no new plumbing for this half.
 #[test]
-fn alleged_type_admits_provisionally() {
+fn uncited_type_admits_provisionally() {
     let subject = subject();
     let person = EntityId(Uuid::new_v4());
     let corp = EntityId(Uuid::new_v4());
@@ -228,7 +229,7 @@ fn alleged_type_admits_provisionally() {
     let reg2 = register_event(subject, corp);
     let t1 = assert_type_event(subject, person, "natural_person");
     let t2 = assert_type_event(subject, corp, "private_limited_company");
-    // No attach-evidence — both types stay Alleged, never Proved.
+    // No evidence event — both types stay asserted, never cited.
     let control = fold_control(&[&reg1, &reg2, &t1, &t2]);
     let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
     let obligation = ObligationState::default();
@@ -237,7 +238,7 @@ fn alleged_type_admits_provisionally() {
     let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let assert_event = assert_control_event(subject, person, corp, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
-    assert!(verdict.is_ok(), "alleged-typed endpoint must ADMIT: {verdict:?}");
+    assert!(verdict.is_ok(), "uncited-typed endpoint must ADMIT: {verdict:?}");
 
     let candidate = ProngCandidate {
         person_id: PersonId(person.0),
@@ -250,8 +251,8 @@ fn alleged_type_admits_provisionally() {
     };
     let assurance = compute_assurance(&[candidate], &[], &control, &type_registry);
     assert!(
-        assurance.reasons.iter().any(|r| matches!(r, ProvisionalityReason::AllegedType { .. })),
-        "expected AllegedType in {:?}",
+        assurance.reasons.iter().any(|r| matches!(r, ProvisionalityReason::UncitedType { .. })),
+        "expected UncitedType in {:?}",
         assurance.reasons
     );
 }

@@ -165,11 +165,13 @@ dsl_verb_reconciliation:
     # EOP-VS-UBO-GAME-001 T3 (2026-08-27, §3.2/§3.3): control+economic-interest
     # MERGED into connect; supersession renamed disconnect; reconciliation
     # DISSOLVED (no successor FQN).
+    # EOP-DD-UBO-PROOF-001 (T5, 2026-08-28): verification RETIRED (K-G7, no
+    # successor FQN); retract ADDED.
     - kyc_ubo.decide.determination.freeze
     - kyc_ubo.assert.edge.connect
     - kyc_ubo.assert.edge.evidence
     - kyc_ubo.assert.edge.disconnect
-    - kyc_ubo.assert.edge.verification
+    - kyc_ubo.assert.edge.retract
   verify_surface:
     - verify.assert
     - verify.calculate-confidence

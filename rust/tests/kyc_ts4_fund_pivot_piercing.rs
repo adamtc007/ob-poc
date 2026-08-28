@@ -53,7 +53,7 @@ fn edge(id_tag: u128, kind: EdgeKind, from: EntityId, to: EntityId, orig_tag: u1
         to,
         percentage: None,
         status: EdgeStatus::Asserted,
-        evidence_event_id: None,
+        proofs: BTreeMap::new(),
         originating_event_id: evid(orig_tag),
         trust_revocable: None,
         superseded_by: None,
@@ -314,16 +314,16 @@ fn no_im_specific_path_exists() {
 
 #[test]
 fn phase0_mandate_without_evidence_still_freezes_today() {
-    // A ManagementMandate edge with ZERO evidence (status Asserted, no
-    // evidence_event_id) still lets the fund resolve — no evidence stud
-    // exists at all today (Ruling 2f is entirely absent).
+    // A ManagementMandate edge with ZERO proofs (status Asserted, empty
+    // `proofs`) still lets the fund resolve — no evidence stud exists at
+    // all today (Ruling 2f is entirely absent).
     let fund = eid(9);
     let manco = eid(10);
     let alice = PersonId(eid(11).0);
     let mut state = ControlState::default();
-    let mandate = edge(7, EdgeKind::ManagementMandate, manco, fund, 7); // status: Asserted, no evidence
+    let mandate = edge(7, EdgeKind::ManagementMandate, manco, fund, 7); // status: Asserted, no proofs
     let voting = edge(8, EdgeKind::VotingRights, EntityId(alice.0), manco, 8);
-    assert!(mandate.evidence_event_id.is_none(), "fixture sanity: no contract evidence attached");
+    assert!(!mandate.has_proof(), "fixture sanity: no contract evidence attached");
     state.edges.insert(mandate.id, mandate);
     state.edges.insert(voting.id, voting);
     let natural_persons: BTreeSet<PersonId> = [alice].into_iter().collect();

@@ -34,10 +34,12 @@
 /// FQN — see `lexicon.rs`'s retirement comment).
 /// T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `structure-class` RETIRED
 /// (11→10, no replacement FQN — see `lexicon.rs`'s retirement comment).
+/// T5 (EOP-DD-UBO-PROOF-001, 2026-08-28): `verification` RETIRED (K-G7, no
+/// replacement FQN); `retract` ADDED (net zero, 10→10).
 const ASSEMBLY_VERB_FQNS: &[&str] = &[
     "kyc_ubo.assert.edge.connect",
     "kyc_ubo.assert.edge.evidence",
-    "kyc_ubo.assert.edge.verification",
+    "kyc_ubo.assert.edge.retract",
     "kyc_ubo.assert.edge.disconnect",
     "kyc_ubo.assert.subject.place",
     "kyc_ubo.assert.subject.remove",

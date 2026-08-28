@@ -242,15 +242,19 @@ impl SemOsVerbOp for UboEdgeAttachEvidence {
         "kyc_ubo.assert.edge.evidence"
     }
     /// Dual-target (TS.1 §3 row 4, wired 2026-08-24 corrective tranche
-    /// Item 3a): `edge-id` evidences a control/economic edge (Asserted ->
-    /// Evidenced); `entity-id` evidences an entity's asserted type (Alleged
-    /// -> Proved — `fold::type_registry`'s sole Proved-producing arm,
-    /// unreachable from any op before this). Exactly one of the two must be
-    /// present — the board's own placement set (`type_registry_candidates`
-    /// vs. the edge-scoped main loop) never proposes both for the same
-    /// move, and neither shape's lexicon preconditions apply to the other
-    /// (`EdgeExists`/`EdgeActive` vs. `PriorTypeAsserted`/`MembershipActive`,
-    /// each vacuous when their own target field is absent).
+    /// Item 3a): `edge-id` logs a proof against a control/economic edge;
+    /// `entity-id` logs a proof against an entity's asserted type
+    /// (`fold::type_registry`'s citation-set arm). Exactly one of the two
+    /// must be present — the board's own placement set
+    /// (`type_registry_candidates` vs. the edge-scoped main loop) never
+    /// proposes both for the same move, and neither shape's lexicon
+    /// preconditions apply to the other (`EdgeExists`/`EdgeActive` vs.
+    /// `PriorTypeAsserted`/`MembershipActive`, each vacuous when their own
+    /// target field is absent). EOP-DD-UBO-PROOF-001 §1/§4 (T5): no
+    /// ratchet — `evidence` logs a proof (kind, source, date, all in
+    /// `canonical_event_shape`'s payload) unconditionally; the returned
+    /// `event_id` is the proof's own citation id, the fact `retract` later
+    /// targets.
     async fn execute(
         &self,
         args: &serde_json::Value,
@@ -271,18 +275,29 @@ impl SemOsVerbOp for UboEdgeAttachEvidence {
             scope,
         )
         .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({
+            "seq": outcome.seq,
+            "citation_id": outcome.event_id.0,
+        })))
     }
 }
 
-pub struct UboEdgeVerify;
+// `UboEdgeVerify` RETIRED (EOP-DD-UBO-PROOF-001 §3/§4, T5, 2026-08-28)
+// alongside `kyc_ubo.assert.edge.verification` — "the board collects
+// facts; the policy rules on adequacy," so there is no ratchet left to
+// move an edge into (K-G7: 0 real committed events under this FQN).
+
+/// Move 5 (§3.1's move table: "that proof no longer stands — group,
+/// citation", EOP-DD-UBO-PROOF-001 §4, T5): withdraw one previously logged
+/// proof by its citation id. No target — the citation alone identifies
+/// the proof, wherever it lives (`fold::control`/`fold::type_registry`'s
+/// mirrored `retract` arms each scan their own axis).
+pub struct UboEdgeRetract;
 
 #[async_trait]
-impl SemOsVerbOp for UboEdgeVerify {
+impl SemOsVerbOp for UboEdgeRetract {
     fn fqn(&self) -> &str {
-        "kyc_ubo.assert.edge.verification"
+        "kyc_ubo.assert.edge.retract"
     }
     async fn execute(
         &self,
@@ -292,14 +307,14 @@ impl SemOsVerbOp for UboEdgeVerify {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.verification", subject, args)?;
+            canonical_event_shape("kyc_ubo.assert.edge.retract", subject, args)?;
         let outcome = stream_append(
-            "kyc_ubo.assert.edge.verification",
+            "kyc_ubo.assert.edge.retract",
             subject,
             target,
             payload,
-            "analyst.verify",
-            Some("kyc_ubo.assert.edge.verification"),
+            "analyst.retract",
+            Some("kyc_ubo.assert.edge.retract"),
             ctx,
             scope,
         )

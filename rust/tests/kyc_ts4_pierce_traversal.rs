@@ -228,7 +228,10 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         // `kyc_ts4_fund_pivot_evidence.rs`).
         run(
             &UboEdgeAttachEvidence,
-            serde_json::json!({ "subject-id": subject, "edge-id": mandate_edge }),
+            serde_json::json!({
+                "subject-id": subject, "edge-id": mandate_edge,
+                "kind": "contract", "source": "test fixture", "date": "2026-08-28",
+            }),
             &pool,
         )
         .await;
@@ -375,7 +378,10 @@ async fn pierce_is_recorded() {
         connect_capturing_edge_id(&pool, subject, manco, subject, "management_mandate").await;
     run(
         &UboEdgeAttachEvidence,
-        serde_json::json!({ "subject-id": subject, "edge-id": mandate_edge }),
+        serde_json::json!({
+            "subject-id": subject, "edge-id": mandate_edge,
+            "kind": "contract", "source": "test fixture", "date": "2026-08-28",
+        }),
         &pool,
     )
     .await;

@@ -40,7 +40,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_workbook::KycWorkbook;
 use ob_poc_kyc_substrate::{
     check_preconditions, assembly_lexicon, ControlState, EntityId, EntityType, EntityTypeRecord,
-    EventId, FoldRegistry, ObligationState, StructureClass, SubjectId, TypeProofStatus,
+    EventId, FoldRegistry, ObligationState, StructureClass, SubjectId,
     TypeRegistryState, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -186,9 +186,8 @@ fn type_registry_with(subject: SubjectId, entity_type: EntityType) -> TypeRegist
         EntityId(subject.0),
         EntityTypeRecord {
             entity_type,
-            proof: TypeProofStatus::Alleged,
             originating_event_id: EventId(Uuid::new_v4()),
-            proof_event_id: None,
+            proofs: std::collections::BTreeMap::new(),
         },
     );
     registry

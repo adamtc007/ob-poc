@@ -35,14 +35,14 @@
 //! is the "after" half for the one that stays empty but stops recording
 //! why; the employment/containment case was already inert and stays so.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ob_poc_kyc_substrate::{
     compute_assurance, control_admission, detect_statutory_stops, pull_smo_on_exhaustion,
     ControlAdmission, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
     DeterminationStrategy, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId, EntityType,
-    EntityTypeRecord, EventId, FundControlStrategy, OwnershipProngStrategy, PersonId, Prong,
-    ProngCandidate, ProvisionalityReason, StateOwnedStrategy, StructureClass, TypeProofStatus,
+    EntityTypeRecord, EventId, FundControlStrategy, OwnershipProngStrategy, PersonId, ProofKind,
+    ProofRecord, Prong, ProngCandidate, ProvisionalityReason, StateOwnedStrategy, StructureClass,
     TypeRegistryState, EDGE_KIND_WIRE_VALUES,
 };
 
@@ -63,7 +63,7 @@ fn edge(id_tag: u128, kind: EdgeKind, from: EntityId, to: EntityId, orig_tag: u1
         to,
         percentage: None,
         status: EdgeStatus::Asserted,
-        evidence_event_id: None,
+        proofs: BTreeMap::new(),
         originating_event_id: evid(orig_tag),
         trust_revocable: None,
         superseded_by: None,
@@ -71,14 +71,41 @@ fn edge(id_tag: u128, kind: EdgeKind, from: EntityId, to: EntityId, orig_tag: u1
     }
 }
 
-fn edge_with_status(mut e: EdgeState, status: EdgeStatus) -> EdgeState {
-    e.status = status;
+/// EOP-DD-UBO-PROOF-001 §4 (T5): isolates the TYPE provisionality signal
+/// from the EDGE one — a proof-bearing edge never triggers `UncitedEdge`,
+/// the same role `edge_with_status(e, EdgeStatus::Verified)` played before
+/// the ratchet was retired.
+fn edge_with_proof(mut e: EdgeState, orig_tag: u128) -> EdgeState {
+    let citing = evid(orig_tag);
+    e.proofs.insert(
+        citing,
+        ProofRecord {
+            kind: ProofKind::FiledDocument,
+            source: "test fixture".to_string(),
+            date: "2026-08-28".to_string(),
+            event_id: citing,
+        },
+    );
     e
 }
 
-fn type_record(entity_type: EntityType, proof: TypeProofStatus, orig_tag: u128) -> EntityTypeRecord {
-    let proof_event_id = matches!(proof, TypeProofStatus::Proved).then(|| evid(orig_tag));
-    EntityTypeRecord { entity_type, proof, originating_event_id: evid(orig_tag), proof_event_id }
+/// EOP-DD-UBO-PROOF-001 §4 (T5): `has_proof` replaces the old `TypeProofStatus`
+/// parameter — `false` == the old `Alleged`, `true` == the old `Proved`.
+fn type_record(entity_type: EntityType, has_proof: bool, orig_tag: u128) -> EntityTypeRecord {
+    let citing = evid(orig_tag);
+    let mut proofs = BTreeMap::new();
+    if has_proof {
+        proofs.insert(
+            citing,
+            ProofRecord {
+                kind: ProofKind::FiledDocument,
+                source: "test fixture".to_string(),
+                date: "2026-08-28".to_string(),
+                event_id: citing,
+            },
+        );
+    }
+    EntityTypeRecord { entity_type, originating_event_id: citing, proofs }
 }
 
 // ── Phase 0 baseline receipt lives in the module doc comment above ──────────
@@ -514,7 +541,7 @@ fn determination_runs_at_any_board_state() {
     let mut type_registry = TypeRegistryState::default();
     type_registry
         .types
-        .insert(subject, type_record(EntityType::PrivateLimitedCompany, TypeProofStatus::Alleged, 19));
+        .insert(subject, type_record(EntityType::PrivateLimitedCompany, false, 19));
 
     let candidates = ControlProngStrategy.resolve(&state, subject, &natural_persons, 25.0);
     assert_eq!(candidates.len(), 1, "an unverified/alleged board must still produce a determination");
@@ -543,15 +570,15 @@ fn traversal_decisions_carry_provisionality() {
 
     // Part A: statutory stop at swv, swv's type alleged.
     let mut state_a = ControlState { structure_class: None, ..Default::default() };
-    let stop_edge = edge_with_status(
+    let stop_edge = edge_with_proof(
         edge(19, EdgeKind::StatutoryAuthority, govt, swv, 20),
-        EdgeStatus::Verified,
+        20,
     );
     state_a.edges.insert(stop_edge.id, stop_edge);
     let mut type_registry_a = TypeRegistryState::default();
     type_registry_a
         .types
-        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, TypeProofStatus::Alleged, 21));
+        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, false, 21));
     let stops_a = detect_statutory_stops(&state_a, swv);
     let assurance_a = compute_assurance(&[], &stops_a, &state_a, &type_registry_a);
     assert!(
@@ -565,13 +592,13 @@ fn traversal_decisions_carry_provisionality() {
     // Part B: an ordinary chain through `mid`, mid's type alleged, edges Verified
     // (isolating the AllegedType signal from AllegedEdge).
     let mut state_b = ControlState { structure_class: None, ..Default::default() };
-    let e1 = edge_with_status(
+    let e1 = edge_with_proof(
         edge(21, EdgeKind::VotingRights, mid, subject_for_chain, 22),
-        EdgeStatus::Verified,
+        22,
     );
-    let e2 = edge_with_status(
+    let e2 = edge_with_proof(
         edge(22, EdgeKind::VotingRights, EntityId(alice.0), mid, 23),
-        EdgeStatus::Verified,
+        23,
     );
     state_b.edges.insert(e1.id, e1);
     state_b.edges.insert(e2.id, e2);
@@ -582,14 +609,14 @@ fn traversal_decisions_carry_provisionality() {
     let mut type_registry_b = TypeRegistryState::default();
     type_registry_b
         .types
-        .insert(mid, type_record(EntityType::PrivateLimitedCompany, TypeProofStatus::Alleged, 24));
+        .insert(mid, type_record(EntityType::PrivateLimitedCompany, false, 24));
     let assurance_b = compute_assurance(&candidates_b, &[], &state_b, &type_registry_b);
     assert!(
         assurance_b
             .reasons
             .iter()
-            .any(|r| matches!(r, ProvisionalityReason::AllegedType { entity } if *entity == mid)),
-        "an alleged intermediate-entity type must carry AllegedType (not AdmissionOnAllegedType \
+            .any(|r| matches!(r, ProvisionalityReason::UncitedType { entity } if *entity == mid)),
+        "an uncited intermediate-entity type must carry UncitedType (not AdmissionOnAllegedType \
          — no Stop was involved here): {assurance_b:#?}"
     );
     assert!(
@@ -618,9 +645,9 @@ fn statutory_stop_on_alleged_type_is_provisional() {
     let swv = eid(32);
     let govt = eid(33);
     let mut state = ControlState { structure_class: None, ..Default::default() };
-    let stop_edge = edge_with_status(
+    let stop_edge = edge_with_proof(
         edge(23, EdgeKind::StatutoryAuthority, govt, swv, 25),
-        EdgeStatus::Verified, // isolate: only the TYPE varies below, not the edge
+        25,
     );
     state.edges.insert(stop_edge.id, stop_edge);
     let stops = detect_statutory_stops(&state, swv);
@@ -631,7 +658,7 @@ fn statutory_stop_on_alleged_type_is_provisional() {
     let mut alleged_registry = TypeRegistryState::default();
     alleged_registry
         .types
-        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, TypeProofStatus::Alleged, 26));
+        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, false, 26));
     let assurance_alleged = compute_assurance(&[], &stops, &state, &alleged_registry);
     assert!(
         assurance_alleged.reasons.iter().any(|r| matches!(
@@ -648,7 +675,7 @@ fn statutory_stop_on_alleged_type_is_provisional() {
     let mut proved_registry = TypeRegistryState::default();
     proved_registry
         .types
-        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, TypeProofStatus::Proved, 27));
+        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, true, 27));
     let assurance_proved = compute_assurance(&[], &stops, &state, &proved_registry);
     assert!(
         !assurance_proved.reasons.iter().any(|r| matches!(

@@ -63,22 +63,18 @@ fn attach_evidence_event(subj: SubjectId, edge: EdgeId) -> IntentEvent {
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
         TargetBinding::for_edge(subj, edge),
-        serde_json::json!({"doc_id": Uuid::new_v4()}),
+        serde_json::json!({
+            "kind": "filed-document",
+            "source": "test fixture",
+            "date": "2026-01-01",
+        }),
         t(),
     )
 }
 
-fn verify_event(subj: SubjectId, edge: EdgeId) -> IntentEvent {
-    IntentEvent::new(
-        subj,
-        "kyc_ubo.assert.edge.verification",
-        Principal::test_analyst(),
-        ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
-        TargetBinding::for_edge(subj, edge),
-        serde_json::json!({}),
-        t(),
-    )
-}
+// `verify_event` RETIRED (EOP-DD-UBO-PROOF-001 §3/§4, T5, 2026-08-28)
+// alongside `kyc_ubo.assert.edge.verification` (K-G7: 0 real committed
+// events) — there is no ratchet left to preview a step onto.
 
 // ── preview_is_pure ─────────────────────────────────────────────────────────
 //
@@ -117,7 +113,6 @@ fn per_step_matches_single_move() {
         register_event(subj),
         assert_control_event(subj, edge, from, to),
         attach_evidence_event(subj, edge),
-        verify_event(subj, edge),
     ];
 
     // The "single move" oracle: fold committed ++ candidates[..n] by hand,
@@ -152,7 +147,7 @@ fn committed_line_equals_preview() {
     let (from, to) = (entity(), entity());
 
     let committed = vec![assert_control_event(subj, edge, from, to)];
-    let candidates = vec![attach_evidence_event(subj, edge), verify_event(subj, edge)];
+    let candidates = vec![attach_evidence_event(subj, edge)];
 
     let (previewed, _previewed_obligation, _previewed_type_registry): (ControlState, _, _) =
         preview(&committed, &candidates, &lexicon).expect("legal chain must preview successfully");
@@ -181,12 +176,14 @@ fn illegal_mid_chain_rejected() {
     let (from, to) = (entity(), entity());
 
     // Step 0 legal (register), step 1 legal (assert-control), step 2
-    // illegal (verify with no evidence attached — the K-11 proof ratchet),
-    // step 3 would-be-legal (attach-evidence) never gets the chance to run.
+    // illegal (a second connect asserting the SAME kind/from/to —
+    // NoDuplicateActiveEdge, K-13: contradicting asserts must go through
+    // disconnect, never a repeat connect), step 3 would-be-legal
+    // (attach-evidence) never gets the chance to run.
     let candidates = vec![
         register_event(subj),
         assert_control_event(subj, edge, from, to),
-        verify_event(subj, edge),
+        assert_control_event(subj, EdgeId(Uuid::new_v4()), from, to),
         attach_evidence_event(subj, edge),
     ];
 
@@ -195,8 +192,8 @@ fn illegal_mid_chain_rejected() {
 
     let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("Asserted") || err.contains("evidence") || err.contains("Verify"),
-        "rejection must be attributable to the illegal verify step; got: {err}"
+        err.contains("active edge") || err.contains("already exists"),
+        "rejection must be attributable to the illegal duplicate-connect step; got: {err}"
     );
 
     // Nothing partial escapes: preview has no side channel to leak

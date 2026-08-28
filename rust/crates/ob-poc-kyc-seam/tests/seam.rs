@@ -219,18 +219,23 @@ async fn lexicon_precondition_rejects_through_the_seam() {
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
     let lexicon = assembly_lexicon();
-    let verify_entry = lexicon
-        .get("kyc_ubo.assert.edge.verification")
-        .expect("verify entry in lexicon");
+    // EOP-DD-UBO-PROOF-001 §3/§4 (T5, 2026-08-28): `kyc_ubo.assert.edge.
+    // verification` RETIRED (K-G7: 0 real committed events) — no ratchet
+    // left to reject a premature step onto. `disconnect`'s `EdgeExists`
+    // stud is the replacement precondition-through-the-seam proof: an
+    // edge that was never asserted cannot be disconnected.
+    let disconnect_entry = lexicon
+        .get("kyc_ubo.assert.edge.disconnect")
+        .expect("disconnect entry in lexicon");
 
-    // A verify event for an edge with no prior evidence in the (empty) stream.
+    // A disconnect event for an edge that was never asserted in the (empty) stream.
     let edge = Uuid::new_v4();
-    let verify_event = IntentEventDraft {
-        verb_fqn: "kyc_ubo.assert.edge.verification".into(),
+    let disconnect_event = IntentEventDraft {
+        verb_fqn: "kyc_ubo.assert.edge.disconnect".into(),
         subject_root: subject,
         target: TargetBinding::for_edge(subject, ob_poc_kyc_substrate::EdgeId(edge)),
         payload: serde_json::json!({}),
-        authority: AuthorityRef("analyst.verify".into()),
+        authority: AuthorityRef("analyst.disconnect".into()),
         lexicon_hash: lexicon.hash,
         as_of: chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
             .unwrap()
@@ -246,18 +251,18 @@ async fn lexicon_precondition_rejects_through_the_seam() {
     let result = append_in_scope(
         &mut scope,
         &registry,
-        &verify_event,
+        &disconnect_event,
         "(test-event)",
         |state: &ControlState,
          _obligation: &ob_poc_kyc_substrate::ObligationState,
          type_registry: &ob_poc_kyc_substrate::TypeRegistryState| {
-            check_control_preconditions(verify_entry, state, type_registry, &verify_event)
+            check_control_preconditions(disconnect_entry, state, type_registry, &disconnect_event)
         },
     )
     .await;
     assert!(
         result.is_err(),
-        "verify with no evidence must be rejected through the seam"
+        "disconnect of an edge that was never asserted must be rejected through the seam"
     );
     scope.rollback().await;
 

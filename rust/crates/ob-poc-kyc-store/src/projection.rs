@@ -63,8 +63,8 @@ impl PgKycProjector {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".kyc_control_edge_projection
                     (subject_root, edge_id, edge_kind, from_entity_id, to_entity_id,
-                     percentage, status, evidence_event_id, originating_event_id)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"#,
+                     percentage, status, originating_event_id)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8)"#,
             )
             .bind(subject_root.0)
             .bind(edge.id.0)
@@ -73,7 +73,6 @@ impl PgKycProjector {
             .bind(edge.to.0)
             .bind(edge.percentage)
             .bind(edge.status.to_string())
-            .bind(edge.evidence_event_id.map(|e| e.0))
             .bind(edge.originating_event_id.0)
             .execute(&mut *conn)
             .await?;

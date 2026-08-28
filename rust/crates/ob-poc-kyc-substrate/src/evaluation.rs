@@ -28,7 +28,7 @@ use uuid::Uuid;
 use crate::determination::{FrozenDetermination, ProvisionalityReason};
 use crate::error::KycError;
 use crate::fold::control::{ControlState, StructureClass};
-use crate::fold::type_registry::{TypeProofStatus, TypeRegistryState};
+use crate::fold::type_registry::TypeRegistryState;
 use crate::geometry::EntityType;
 use crate::types::{EventId, Hash, SubjectId};
 
@@ -208,16 +208,17 @@ pub fn evaluate_checks(
 /// Board-only, no compliance input — exercises all three verdicts from pure
 /// board state:
 ///
-/// - **Pass**: every registered, non-withdrawn entity's type is
-///   `TypeProofStatus::Proved` (vacuously true on an empty board — the
-///   founding property, D2.0 §1, applies here too: nothing to fail on is a
-///   legitimate Pass, not a special case).
-/// - **Unevaluable**: some entity's type is `Alleged` (asserted but not yet
-///   proved — TS.3 §2a's own provisionality distinction) or entirely absent
-///   (no type asserted at all — D2.0 §4's `FactAbsent`, a different,
-///   "unresolved" state from `Alleged`).
+/// - **Pass**: every registered, non-withdrawn entity's type has at least
+///   one proof logged (`TypeRegistryState::has_proof`, EOP-DD-UBO-PROOF-001
+///   §4, T5 — existence, not adequacy; vacuously true on an empty board —
+///   the founding property, D2.0 §1, applies here too: nothing to fail on
+///   is a legitimate Pass, not a special case).
+/// - **Unevaluable**: some entity's type is asserted but uncited (TS.3
+///   §2a's own provisionality distinction) or entirely absent (no type
+///   asserted at all — D2.0 §4's `FactAbsent`, a different, "unresolved"
+///   state from "asserted but uncited").
 /// - **Fail**: a WITHDRAWN member (`TypeRegistryState::withdrawn_members`)
-///   whose type was never proved. Withdrawal (TS.1 move 6) is a real,
+///   whose type was never cited. Withdrawal (TS.1 move 6) is a real,
 ///   board-only fact meaning no further evidence will ever arrive for that
 ///   entity within this determination — its type proof is now permanently
 ///   stuck, a genuine "cannot be proven going forward" derived purely from
@@ -243,18 +244,18 @@ impl Check for ProvenTypeCheck {
     fn evaluate(&self, board: &BoardSnapshot<'_>) -> CheckOutcome {
         for &entity in &board.control.registered_entity_ids {
             let withdrawn = board.type_registry.is_withdrawn(entity);
-            if withdrawn && !matches!(board.type_registry.proof_of(entity), Some(TypeProofStatus::Proved)) {
+            if withdrawn && !board.type_registry.has_proof(entity) {
                 // D2.0 §4: "a fail verdict is a finding, citing the facts
                 // it rests on." Cites the withdrawal event that actually
                 // CAUSED this Fail (`withdrawal_event_id_of`, the same
-                // discipline as `proof_event_id_of` — the real cause, not
-                // an assertion), plus whatever type-proof fact exists for
-                // this entity (an Alleged assertion, if one was ever made
-                // before withdrawal). When `proof_of` is `None` (no
-                // assertion ever made), the assertion half is empty and the
-                // verdict's own `detail` string explains why — but the
-                // withdrawal citation is always present, since withdrawal
-                // is a precondition of reaching this branch at all.
+                // discipline as `originating_event_id_of` — the real cause,
+                // not an assertion), plus whatever type-assertion fact
+                // exists for this entity (if one was ever made before
+                // withdrawal). When there is no assertion at all, the
+                // assertion half is empty and the verdict's own `detail`
+                // string explains why — but the withdrawal citation is
+                // always present, since withdrawal is a precondition of
+                // reaching this branch at all.
                 let mut cites: Vec<EventId> =
                     board.type_registry.withdrawal_event_id_of(entity).into_iter().collect();
                 cites.extend(board.type_registry.originating_event_id_of(entity));
@@ -276,28 +277,29 @@ impl Check for ProvenTypeCheck {
             if board.type_registry.is_withdrawn(entity) {
                 continue;
             }
-            match board.type_registry.proof_of(entity) {
-                Some(TypeProofStatus::Proved) => {
-                    // The fact this entity's contribution to a Pass rests
-                    // on: the event that PROVED its type (`attach-evidence`),
-                    // not `originating_event_id_of` (the type ASSERTION —
-                    // stays pinned to the pre-proof `assert-type` event even
-                    // after evidence flips `proof` to `Proved`; citing it
-                    // here would point at the allegation, not the proof).
-                    cites.extend(board.type_registry.proof_event_id_of(entity));
+            match board.type_registry.type_of(entity) {
+                Some(_) if board.type_registry.has_proof(entity) => {
+                    // The facts this entity's contribution to a Pass rests
+                    // on: every event that logged a proof against its type
+                    // (`evidence`), not `originating_event_id_of` (the type
+                    // ASSERTION — stays pinned to the pre-proof
+                    // `assert-type`/`place` event even after a proof is
+                    // logged; citing it here would point at the allegation,
+                    // not the proof).
+                    cites.extend(board.type_registry.proof_event_ids_of(entity));
                     continue;
                 }
-                Some(TypeProofStatus::Alleged) => {
+                Some(_) => {
                     // This Unevaluable rests on a real, resolvable fact:
-                    // the assertion event that made the type Alleged in
-                    // the first place — the same accessor and the same
-                    // reasoning as the Fail path above (an Alleged
-                    // assertion IS a fact the verdict rests on, not
+                    // the assertion event that made the type known in the
+                    // first place — the same accessor and the same
+                    // reasoning as the Fail path above (an asserted-but-
+                    // uncited type IS a fact the verdict rests on, not
                     // nothing). Distinct from the `None` arm below, where
                     // there is genuinely no event to cite.
                     return CheckOutcome {
                         verdict: Verdict::Unevaluable {
-                            reason: UnevaluableReason::Provisional(ProvisionalityReason::AllegedType { entity }),
+                            reason: UnevaluableReason::Provisional(ProvisionalityReason::UncitedType { entity }),
                         },
                         cites: board.type_registry.originating_event_id_of(entity).into_iter().collect(),
                     };
@@ -505,9 +507,11 @@ pub fn board_state_hash(board: &BoardSnapshot<'_>) -> Hash {
         .edges
         .values()
         .map(|e| {
+            let proofs: Vec<String> =
+                e.proofs.values().map(|p| format!("{:?}:{}:{}", p.kind, p.source, p.date)).collect();
             format!(
-                "{}|{:?}|{}->{}|{:?}|{:?}",
-                e.id.0, e.kind, e.from.0, e.to.0, e.status, e.percentage
+                "{}|{:?}|{}->{}|{:?}|{:?}|[{}]",
+                e.id.0, e.kind, e.from.0, e.to.0, e.status, e.percentage, proofs.join(",")
             )
         })
         .collect();
@@ -517,7 +521,14 @@ pub fn board_state_hash(board: &BoardSnapshot<'_>) -> Hash {
         .type_registry
         .types
         .iter()
-        .map(|(id, rec)| format!("{}|{:?}|{:?}", id.0, rec.entity_type, rec.proof))
+        .map(|(id, rec)| {
+            let proofs: Vec<String> = rec
+                .proofs
+                .values()
+                .map(|p| format!("{:?}:{}:{}", p.kind, p.source, p.date))
+                .collect();
+            format!("{}|{:?}|[{}]", id.0, rec.entity_type, proofs.join(","))
+        })
         .collect();
     type_parts.sort();
 

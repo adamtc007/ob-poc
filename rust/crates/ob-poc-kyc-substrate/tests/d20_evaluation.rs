@@ -146,7 +146,12 @@ fn proven_type_check_passes_when_every_entity_is_proved() {
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
-        serde_json::json!({ "entity_id": entity.0.to_string() }),
+        serde_json::json!({
+            "entity_id": entity.0.to_string(),
+            "kind": "identity-document",
+            "source": "test fixture",
+            "date": "2026-08-28",
+        }),
         as_of(),
     );
     let types = fold_type_registry(&[&assert_type, &evidence]);
@@ -154,16 +159,16 @@ fn proven_type_check_passes_when_every_entity_is_proved() {
     control.registered_entity_ids.insert(entity);
     let board = empty_board(&control, &types);
     let outcome = ProvenTypeCheck.evaluate(&board);
-    let evidence_event_id = types.proof_event_id_of(entity).expect("entity must have a proof event once Proved");
+    let evidence_event_ids = types.proof_event_ids_of(entity);
     assert_eq!(
         outcome.cites,
-        vec![evidence_event_id],
-        "a real Pass must cite the exact event that proved the entity's type — the mechanism-level \
+        evidence_event_ids,
+        "a real Pass must cite the exact events that proved the entity's type — the mechanism-level \
          half of `a_real_pass_cites_its_evidence`, at the pure `evaluate()` layer"
     );
     assert!(
         matches!(outcome.verdict, Verdict::Pass),
-        "a type-scoped evidence event must fold the entity's proof to Proved"
+        "a type-scoped evidence event must fold a proof against the entity's type"
     );
 }
 

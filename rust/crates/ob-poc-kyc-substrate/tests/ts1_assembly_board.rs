@@ -48,7 +48,11 @@ fn attach_evidence_for_entity(subject: SubjectId, entity: EntityId) -> IntentEve
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
-        serde_json::json!({}),
+        serde_json::json!({
+            "kind": "filed-document",
+            "source": "test fixture",
+            "date": "2026-08-28",
+        }),
         as_of(),
     )
 }
@@ -382,8 +386,10 @@ fn no_move_sets_status() {
     // NEW type-registry moves must never read a caller-supplied "proof"/
     // "status" value out of the payload and assign it directly — CTN-2f:
     // status is computed from evidence, never asserted. `assert-type`
-    // always starts `Alleged`; `Proved` is reachable only by deriving it
-    // from a subsequent `attach-evidence` event (a distinct match arm).
+    // always starts with an empty citation set; a proof is reachable only
+    // by deriving it from a subsequent `evidence` event (a distinct match
+    // arm) — EOP-DD-UBO-PROOF-001 §4, T5: citations replace status, but
+    // CTN-2f's discipline (never assert your way to a fact) is unchanged.
     let src = std::fs::read_to_string(
         concat!(env!("CARGO_MANIFEST_DIR"), "/src/fold/type_registry.rs"),
     )
@@ -398,7 +404,7 @@ fn no_move_sets_status() {
     }
 
     // Corroborating behavioural check: asserting a type with an (ignored)
-    // "proof": "proved" payload key still yields Alleged.
+    // "proof": "proved" payload key still yields an empty citation set.
     let subj = subject();
     let entity = EntityId(Uuid::new_v4());
     let mut event = assert_type_event(subj, entity, "private_limited_company");
@@ -406,18 +412,16 @@ fn no_move_sets_status() {
     let state = fold_type_registry(&[&event]);
     let record = state.types.get(&entity).expect("type recorded");
     assert!(
-        matches!(record.proof, ob_poc_kyc_substrate::TypeProofStatus::Alleged),
-        "a payload-supplied \"proof\": \"proved\" must be ignored; proof is fold-derived only"
+        !record.has_proof(),
+        "a payload-supplied \"proof\": \"proved\" must be ignored; a proof is fold-derived only \
+         from a genuine subsequent evidence event, never spoofed on the assertion itself"
     );
 
-    // Deriving Proved the only sanctioned way: a subsequent attach-evidence
-    // event targeting the entity (not an edge).
+    // Deriving a proof the only sanctioned way: a subsequent `evidence`
+    // event targeting the entity (not an edge), carrying a real kind.
     let evidenced = attach_evidence_for_entity(subj, entity);
     let state2 = fold_type_registry(&[&event, &evidenced]);
-    assert!(matches!(
-        state2.types.get(&entity).unwrap().proof,
-        ob_poc_kyc_substrate::TypeProofStatus::Proved
-    ));
+    assert!(state2.types.get(&entity).unwrap().has_proof());
 }
 
 // ── Gate 10 ──────────────────────────────────────────────────────────────────

@@ -132,7 +132,7 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 /// real `event_id` — the fact this board's Pass must cite.
 async fn build_real_proven_board(pool: &PgPool, subject: SubjectId, entity: Uuid) -> Uuid {
     run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false, "entity-type": "private_limited_company" }), pool).await;
-    run_ok(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": subject.0, "entity-id": entity }), pool).await;
+    run_ok(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "kind": "identity-document", "source": "test fixture", "date": "2026-08-28" }), pool).await;
     event_id_for(pool, subject, "kyc_ubo.assert.edge.evidence").await
 }
 
@@ -322,7 +322,7 @@ async fn p3_vacuous_case_is_self_evident_in_the_record() {
     let withdrawn_proved_subject = SubjectId(Uuid::new_v4());
     let withdrawn_entity = Uuid::new_v4();
     run_ok(&KycSubjectPlace, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
-    run_ok(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity }), &pool).await;
+    run_ok(&UboEdgeAttachEvidence, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity, "kind": "identity-document", "source": "test fixture", "date": "2026-08-28" }), &pool).await;
     run_ok(&KycSubjectRemove, serde_json::json!({ "subject-id": withdrawn_proved_subject.0, "entity-id": withdrawn_entity }), &pool).await;
     let mut ctx3 = test_verb_execution_context_with_session(Uuid::new_v4());
     let mut scope3 = Scope::begin(&pool).await;

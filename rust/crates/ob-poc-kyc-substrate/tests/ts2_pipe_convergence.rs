@@ -258,7 +258,7 @@ fn clone_edge(e: &EdgeState) -> EdgeState {
         to: e.to,
         percentage: e.percentage,
         status: e.status,
-        evidence_event_id: e.evidence_event_id,
+        proofs: e.proofs.clone(),
         originating_event_id: e.originating_event_id,
         trust_revocable: e.trust_revocable,
         superseded_by: e.superseded_by,

@@ -9,10 +9,13 @@ use std::time::Instant;
 
 use uuid::Uuid;
 
+use std::collections::BTreeMap;
+
 use ob_poc_kyc_substrate::{
     check_control_preconditions, enumerate_placement_set, assembly_lexicon, ControlState, EdgeId,
     EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, LexiconManifest, ObligationState,
-    PlacementSet, StructureClass, SubjectId, TargetBinding, TypeRegistryState,
+    PlacementSet, ProofKind, ProofRecord, StructureClass, SubjectId, TargetBinding,
+    TypeRegistryState,
 };
 
 fn subject() -> SubjectId {
@@ -39,8 +42,7 @@ fn edge(status: EdgeStatus) -> EdgeState {
         to: EntityId(Uuid::new_v4()),
         percentage: None,
         status,
-        evidence_event_id: matches!(status, EdgeStatus::Evidenced | EdgeStatus::Verified)
-            .then(EventId::new),
+        proofs: BTreeMap::new(),
         originating_event_id: EventId::new(),
         trust_revocable: None,
         superseded_by: None,
@@ -48,9 +50,33 @@ fn edge(status: EdgeStatus) -> EdgeState {
     }
 }
 
+/// EOP-DD-UBO-PROOF-001 §4 (T5): the only surviving axis `EdgeStatus`
+/// itself dropped — an `Asserted` edge with a proof logged against it.
+fn edge_with_proof() -> EdgeState {
+    let mut e = edge(EdgeStatus::Asserted);
+    let citing = EventId::new();
+    e.proofs.insert(
+        citing,
+        ProofRecord {
+            kind: ProofKind::FiledDocument,
+            source: "test fixture".to_string(),
+            date: "2026-08-28".to_string(),
+            event_id: citing,
+        },
+    );
+    e
+}
+
 fn state_with_edge(status: EdgeStatus) -> ControlState {
     let mut state = ControlState::default();
     let e = edge(status);
+    state.edges.insert(e.id, e);
+    state
+}
+
+fn state_with_edge_with_proof() -> ControlState {
+    let mut state = ControlState::default();
+    let e = edge_with_proof();
     state.edges.insert(e.id, e);
     state
 }
@@ -78,7 +104,7 @@ fn abstain_always_present() {
     for state in [
         empty_state(),
         state_with_edge(EdgeStatus::Asserted),
-        state_with_edge(EdgeStatus::Verified),
+        state_with_edge_with_proof(),
         strategized_state(),
     ] {
         let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
@@ -97,7 +123,7 @@ fn abstain_always_present() {
 fn placement_set_deterministic() {
     let subj = subject();
     let lexicon = assembly_lexicon();
-    let state = state_with_edge(EdgeStatus::Verified);
+    let state = state_with_edge_with_proof();
 
     let a = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
     let b = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
@@ -121,7 +147,7 @@ fn canonical_order_stable() {
     // the placement set's own BTreeMap<MoveId, _> must still emit sorted output.
     let mut state = ControlState::default();
     for _ in 0..5 {
-        let e = edge(EdgeStatus::Verified);
+        let e = edge_with_proof();
         state.edges.insert(e.id, e);
     }
 
@@ -219,19 +245,13 @@ fn placement_iff_precondition_asserted_edge() {
 }
 
 #[test]
-fn placement_iff_precondition_evidenced_edge() {
+fn placement_iff_precondition_edge_with_proof() {
+    // EOP-DD-UBO-PROOF-001 §4 (T5): `EdgeStatus` dropped its Evidenced/
+    // Verified rungs — the only surviving richer-than-bare-Asserted board
+    // state is an edge with a proof logged against it.
     assert_matches_oracle(
         subject(),
-        &state_with_edge(EdgeStatus::Evidenced),
-        &assembly_lexicon(),
-    );
-}
-
-#[test]
-fn placement_iff_precondition_verified_edge() {
-    assert_matches_oracle(
-        subject(),
-        &state_with_edge(EdgeStatus::Verified),
+        &state_with_edge_with_proof(),
         &assembly_lexicon(),
     );
 }
@@ -248,34 +268,18 @@ fn placement_iff_precondition_reconciled_and_strategized() {
 #[test]
 fn placement_iff_precondition_reconciled_strategized_with_verified_edge() {
     let mut state = strategized_state();
-    let e = edge(EdgeStatus::Verified);
+    let e = edge_with_proof();
     state.edges.insert(e.id, e);
     assert_matches_oracle(subject(), &state, &assembly_lexicon());
 }
 
-// ── verify specifically requires evidence (the one non-trivial edge precondition) ──
-
-#[test]
-fn verify_only_admitted_for_evidenced_or_verified_edges() {
-    let subj = subject();
-    let lexicon = assembly_lexicon();
-
-    let asserted = state_with_edge(EdgeStatus::Asserted);
-    let set = enumerate_placement_set(subj, &asserted, &empty_obligation(), &empty_type_registry(), &lexicon);
-    let target = TargetBinding::for_edge(subj, *asserted.edges.keys().next().unwrap());
-    assert!(
-        !set.admits("kyc_ubo.assert.edge.verification", &target),
-        "verify must be refused for an edge with no evidence attached"
-    );
-
-    let evidenced = state_with_edge(EdgeStatus::Evidenced);
-    let set = enumerate_placement_set(subj, &evidenced, &empty_obligation(), &empty_type_registry(), &lexicon);
-    let target = TargetBinding::for_edge(subj, *evidenced.edges.keys().next().unwrap());
-    assert!(
-        set.admits("kyc_ubo.assert.edge.verification", &target),
-        "verify must be admitted once evidence is cited"
-    );
-}
+// `verify_only_admitted_for_evidenced_or_verified_edges` RETIRED
+// (EOP-DD-UBO-PROOF-001 §3/§4, T5, 2026-08-28) — `kyc_ubo.assert.edge.
+// verification`, the precondition it exercised (`Precondition::
+// EvidenceCited`), and the `EdgeStatus::Evidenced`/`Verified` ratchet it
+// gated on are all deleted (K-G7: 0 real committed events under that FQN).
+// There is no successor verb to test a "requires evidence first" gate
+// for — `evidence` now logs a proof unconditionally.
 
 // ── §14 Q2 benchmark ────────────────────────────────────────────────────────
 
@@ -289,11 +293,10 @@ fn enumerate_placement_set_scales_to_200_edges() {
     let lexicon = assembly_lexicon();
     let mut state = ControlState::default();
     for i in 0..200 {
-        let mut e = edge(EdgeStatus::Verified);
-        // Half evidenced-only, half verified — realistic mixed board.
-        if i % 2 == 0 {
-            e.status = EdgeStatus::Evidenced;
-        }
+        // Half bare-Asserted, half with a proof logged — realistic mixed
+        // board (EOP-DD-UBO-PROOF-001 §4, T5: `EdgeStatus` lost its
+        // Evidenced/Verified rungs; a proof is now the richer axis).
+        let e = if i % 2 == 0 { edge_with_proof() } else { edge(EdgeStatus::Asserted) };
         state.edges.insert(e.id, e);
     }
 

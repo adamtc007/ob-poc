@@ -6,12 +6,15 @@
 # direct table write. Ops live in domain_ops::kyc_stream_ops.
 #
 # The domain split (four-segment scheme `kyc_ubo.<capability>.<domain>.<intent>`,
-# RATIFIED 2026-08-22): kyc_ubo.assert.edge.* (4 edge lifecycle as of T3,
-# EOP-VS-UBO-GAME-001, 2026-08-27 — connect/evidence/verification/disconnect;
+# RATIFIED 2026-08-22): kyc_ubo.assert.edge.* (4 edge lifecycle as of T5,
+# EOP-DD-UBO-PROOF-001, 2026-08-28 — connect/evidence/retract/disconnect;
 # connect merges the former control+economic-interest, disconnect renames
-# supersession, reconciliation is retired outright (§3.3); nominee-piercing
-# retired as a standalone verb TS.6 P2 — folded into a macro composing
-# assert.edge.connect's pierced-from arg + assert.edge.disconnect, K-8),
+# supersession, reconciliation is retired outright (§3.3, T3); nominee-
+# piercing retired as a standalone verb TS.6 P2 — folded into a macro
+# composing assert.edge.connect's pierced-from arg + assert.edge.disconnect,
+# K-8; verification retired T5 (K-G7, 0 real committed events) — "the board
+# collects facts; the policy rules on adequacy," no ratchet to move an edge
+# into; retract added T5 — withdraws a previously logged proof by citation),
 # kyc_ubo.decide.determination.* (1: freeze — the single Assembly verdict;
 # select-strategy/compute-fold/apply-smo-fallback all retired), and
 # kyc_ubo.assert.subject.* (6 subject/entity lifecycle). All are covered by
@@ -114,10 +117,12 @@ domains:
       evidence:
         flavour: attribute_mutating
         description: >-
-          Cite evidence for an asserted edge (moves edge from Asserted →
-          Evidenced), OR cite evidence for an entity's asserted type (moves
-          the type's proof from Alleged → Proved). Supply exactly one of
-          edge-id / entity-id — never both, never neither.
+          Log one proof — a kind, a source, and a date (EOP-DD-UBO-PROOF-001
+          §1/§2, RATIFIED 2026-08-28) — for an asserted edge, OR for an
+          entity's asserted type. Supply exactly one of edge-id / entity-id
+          — never both, never neither. No ratchet: the proof is added to
+          the assertion's citation set — the board collects facts, the
+          policy rules on adequacy (§3).
         effect_class: append_fact
         invocation_phrases:
           - "attach evidence"
@@ -150,47 +155,71 @@ domains:
           - name: edge-id
             type: uuid
             required: false
-            description: The edge to evidence. Mutually exclusive with entity-id.
+            description: The edge to log a proof against. Mutually exclusive with entity-id.
           - name: entity-id
             type: uuid
             required: false
-            description: The entity whose asserted type to evidence (proves it). Mutually exclusive with edge-id.
+            description: The entity whose asserted type to log a proof against. Mutually exclusive with edge-id.
+          - name: kind
+            type: string
+            required: true
+            description: The proof kind (EOP-DD-UBO-PROOF-001 §2, RATIFIED 2026-08-28) — the seven ratified kinds; a new kind is not yet a supported value.
+            valid_values:
+              - registry-extract
+              - constitutional-document
+              - share-register
+              - filed-document
+              - contract
+              - identity-document
+              - attestation
+          - name: source
+            type: string
+            required: true
+            description: Where the proof came from — free text today (§6 Q3), a document reference, a registry and its query, a provider, or a person.
+          - name: date
+            type: string
+            required: true
+            description: When the proof was obtained — distinct from the citing event's own commit time.
         returns:
           type: record
           fields:
             - name: seq
               type: integer
+            - name: citation_id
+              type: uuid
         three_axis:
           state_effect: preserving
           external_effects: []
           consequence:
             baseline: reviewable
 
-      verification:
+      # `verification` RETIRED (EOP-DD-UBO-PROOF-001 §3/§4, T5,
+      # 2026-08-28) — "the board collects facts; the policy rules on
+      # adequacy," so there is no ratchet left to move an edge into.
+      # K-G7: 0 real committed events under this FQN.
+
+      retract:
         flavour: attribute_mutating
-        description: Verify an evidenced edge (moves Evidenced → Verified; requires evidence first)
+        description: >-
+          Withdraw one previously logged proof by its citation id
+          (EOP-DD-UBO-PROOF-001 §4, T5 — §3.1's move table: "that proof no
+          longer stands — group, citation"). The citation set shrinks;
+          nothing else changes — there is no status to demote.
         effect_class: append_fact
         invocation_phrases:
-          - "verify edge"
-          - "verify control edge"
-          - "verify ownership"
-          - "verify this edge"
-          - "mark edge as verified"
-          - "verify the control relationship"
-          - "verify this ownership"
-          - "verify economic interest"
-          - "confirm and verify edge"
-          - "verify the assertion"
-          - "verify the UBO evidence"
-          - "verify the UBO evidence is sufficient"
-          - "is the evidence sufficient to verify this edge"
+          - "retract this proof"
+          - "withdraw this evidence"
+          - "that proof no longer stands"
+          - "remove this citation"
+          - "retract the evidence"
+          - "this document is no longer valid evidence"
         behavior: plugin
         metadata:
           tier: intent
           source_of_truth: kyc_stream
           scope: global
           noun: control_edge
-          tags: [ubo, verification, determination, stream-backed, dsl-kyc]
+          tags: [ubo, evidence, determination, stream-backed, dsl-kyc]
           phase_tags: [kyc]
           side_effects: state_write
         args:
@@ -198,10 +227,10 @@ domains:
             type: uuid
             required: true
             description: Determination root
-          - name: edge-id
+          - name: citation-id
             type: uuid
             required: true
-            description: The evidenced edge to verify
+            description: The id of the evidence event that logged the proof being withdrawn.
         returns:
           type: record
           fields:

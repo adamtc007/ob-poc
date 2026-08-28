@@ -180,7 +180,10 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     // Attach evidence to the mandate edge — freeze must now succeed.
     run(
         &UboEdgeAttachEvidence,
-        serde_json::json!({ "subject-id": subject, "edge-id": mandate_edge }),
+        serde_json::json!({
+            "subject-id": subject, "edge-id": mandate_edge,
+            "kind": "contract", "source": "test fixture", "date": "2026-08-28",
+        }),
         &pool,
     )
     .await;

@@ -46,15 +46,19 @@ pub enum FoldId {
 /// event.  Enforcement is in `check_preconditions()`; the fold never enforces
 /// them (the fold just applies; the write path guards).
 ///
-/// Two verbs with non-trivial preconditions (§3):
-/// - `kyc_ubo.assert.edge.verification`       → `EvidenceCited`
+/// A verb with a non-trivial precondition:
 /// - `kyc_ubo.decide.determination.freeze` → `EntityTypeSupportsStrategy`
 ///   (T4, 2026-08-28 — was `StructureClassSupported`)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Precondition {
-    /// A prior `kyc_ubo.assert.edge.evidence` event must exist in the stream for
-    /// the same `target.edge_id` (K-11).  Enforces: evidence before verify.
-    EvidenceCited,
+    // The verification-gate variant RETIRED (EOP-DD-UBO-PROOF-001 §3/§4,
+    // T5, 2026-08-28) alongside `kyc_ubo.assert.edge.verification`, its
+    // sole reader (K-G7: 0 real committed events under that FQN — full
+    // deletion, not an R5 historical keep). "Log a proof before moving to
+    // the next state" gated a ratchet that no longer exists — `evidence`
+    // now logs a proof unconditionally (still gated by
+    // `EdgeActive`/`EdgeExists`, unchanged), and there is no second move
+    // left to cite it as a precondition for.
     // `ReconciledProjection` REMOVED (EOP-VS-UBO-GAME-001 T3, §3.3,
     // 2026-08-27) alongside `kyc_ubo.assert.edge.reconciliation`, its sole
     // writer, and the K-14 gate on freeze, its sole reader — "No reconcile.
@@ -401,13 +405,13 @@ pub fn assembly_lexicon() -> LexiconManifest {
         ),
         LexiconEntry::build(
             "kyc_ubo.assert.edge.evidence",
-            "Cite documentary proof for a control/economic edge, OR for an \
+            "Log one proof — kind, source, and date (EOP-DD-UBO-PROOF-001 \
+             §1/§2) — against a control/economic edge, OR against an \
              entity's asserted type (TS.1 §3 row 4: \"this document/source \
              evidences a TYPE OR A LINKAGE — one verb, two possible \
-             targets\"). Edge-scoped: moves the edge Asserted -> Evidenced. \
-             Entity-scoped (2026-08-24, Item 3a): moves the entity's type \
-             proof Alleged -> Proved (`fold::type_registry`'s sole Proved-\
-             producing arm).",
+             targets\"). No ratchet: the proof is added to the assertion's \
+             citation set (§4, T5) — the board collects facts, the policy \
+             rules on adequacy (§3).",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
             // T6.2 row 3 (edge-scoped: target edge must exist and not be
@@ -427,13 +431,18 @@ pub fn assembly_lexicon() -> LexiconManifest {
             AuthoritySpec::analyst(),
             vec![],
         ),
+        // `kyc_ubo.assert.edge.verification` RETIRED (EOP-DD-UBO-PROOF-001
+        // §3/§4, T5, 2026-08-28) — "the board collects facts; the policy
+        // rules on adequacy." K-G7: 0 real committed events under this FQN.
         LexiconEntry::build(
-            // The non-trivial one: requires EvidenceCited (K-11).
-            "kyc_ubo.assert.edge.verification",
-            "Ratchet edge to Verified state; requires evidence previously attached",
+            "kyc_ubo.assert.edge.retract",
+            "Withdraw one previously logged proof by its citation id (§3.1's \
+             move table: \"that proof no longer stands — group, citation\"). \
+             The citation set shrinks; nothing else changes — there is no \
+             status to demote (EOP-DD-UBO-PROOF-001 §4, T5).",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            vec![Precondition::EvidenceCited],
+            vec![],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),

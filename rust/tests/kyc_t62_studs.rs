@@ -290,7 +290,10 @@ async fn row3_attach_evidence_admits_active_edge() {
 
     let result = UboEdgeAttachEvidence
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "edge-id": edge_id }),
+            &serde_json::json!({
+                "subject-id": subject.0, "edge-id": edge_id,
+                "kind": "filed-document", "source": "test fixture", "date": "2026-08-28",
+            }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )
@@ -322,7 +325,10 @@ async fn row3_attach_evidence_blocks_superseded_edge() {
 
     let result = UboEdgeAttachEvidence
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "edge-id": edge_id }),
+            &serde_json::json!({
+                "subject-id": subject.0, "edge-id": edge_id,
+                "kind": "filed-document", "source": "test fixture", "date": "2026-08-28",
+            }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )

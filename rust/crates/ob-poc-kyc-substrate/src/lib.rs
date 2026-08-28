@@ -46,10 +46,11 @@ pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
     check_control_preconditions, check_preconditions, control_admission, dispatch_for_entity_type,
     edges_of_kind_into, fold_control, governing_mandate_edges_into, natural_persons_from_events,
-    reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges,
-    unpierced_nominee_edges, ControlAdmission, ControlState, DeterminationDispatch, EdgeKind,
-    EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge,
-    StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
+    proof_kind_from_wire, reconciled_control_edges, reconciled_economic_edges,
+    reconciled_trust_edges, unpierced_nominee_edges, ControlAdmission, ControlState,
+    DeterminationDispatch, EdgeKind, EdgeState, EdgeStatus, ProofKind, ProofRecord,
+    ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge, StructureClass,
+    TrustRoleKind, EDGE_KIND_WIRE_VALUES, PROOF_KIND_WIRE_VALUES,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
@@ -60,7 +61,7 @@ pub use fold::registry::{
 };
 pub use fold::type_registry::{
     entity_type_from_wire, fold_type_registry, EnquiryRecord,
-    EntityTypeRecord, TypeCorrectionRecord, TypeProofStatus, TypeRegistryState,
+    EntityTypeRecord, TypeCorrectionRecord, TypeRegistryState,
     ENTITY_TYPE_WIRE_VALUES,
 };
 pub use geometry::{

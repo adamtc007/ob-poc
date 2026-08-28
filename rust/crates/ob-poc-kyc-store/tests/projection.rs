@@ -3,7 +3,11 @@
 //! Proves the load-bearing §5 properties of `rebuild_projection`:
 //! - idempotent (re-running yields identical rows),
 //! - convergent (the projection always equals the fold),
-//! - tracks derived edge status (Asserted→Evidenced→Verified→Superseded),
+//! - tracks derived edge status (Asserted→Superseded — EOP-DD-UBO-PROOF-001
+//!   §4, T5, 2026-08-28: the Evidenced/Verified rungs are gone; `evidence`
+//!   logs a proof without moving status at all, this projection's own
+//!   `evidence_event_id` column dropped with them, migration
+//!   `20260828_kyc_control_edge_projection_drop_evidence_event_id.sql`),
 //! - disposable (K-34): drop the rows, rebuild from the stream, no data loss.
 
 use std::sync::Arc;
@@ -198,6 +202,8 @@ async fn projection_tracks_derived_edge_status() {
     rebuild(&pool, &registry, subject).await;
     assert_eq!(status_of(&pool, subject, edge).await, "Asserted");
 
+    // EOP-DD-UBO-PROOF-001 §4 (T5): `evidence` logs a proof — status is
+    // unaffected, there is no ratchet left to move.
     append(
         &pool,
         &registry,
@@ -205,16 +211,7 @@ async fn projection_tracks_derived_edge_status() {
     )
     .await;
     rebuild(&pool, &registry, subject).await;
-    assert_eq!(status_of(&pool, subject, edge).await, "Evidenced");
-
-    append(
-        &pool,
-        &registry,
-        &edge_op(subject, "kyc_ubo.assert.edge.verification", edge, "vf"),
-    )
-    .await;
-    rebuild(&pool, &registry, subject).await;
-    assert_eq!(status_of(&pool, subject, edge).await, "Verified");
+    assert_eq!(status_of(&pool, subject, edge).await, "Asserted");
 
     // K-13: supersede-never-delete — the edge stays, status flips.
     append(
@@ -298,7 +295,7 @@ async fn append_does_not_enqueue_projection_effects() {
     append(&pool, &registry, &register(subject)).await;
     let e1 = Uuid::new_v4();
     append(&pool, &registry, &assert_control(subject, e1, "e1")).await;
-    append(&pool, &registry, &edge_op(subject, "kyc_ubo.assert.edge.verification", e1, "v1")).await;
+    append(&pool, &registry, &edge_op(subject, "kyc_ubo.assert.edge.evidence", e1, "v1")).await;
 
     // Keyed `{subject}:{seq}` by the removed fan-out.
     let outbox_rows: i64 = sqlx::query_scalar(
@@ -341,14 +338,14 @@ async fn projector_rebuilds_from_a_multi_event_stream() {
     assert_eq!(status_of(&pool, subject, e1).await, "Asserted");
 
     // Extend the stream, then rebuild #2 over the WHOLE stream.
-    // K-11 evidence ratchet: `verify` only advances an already-Evidenced edge.
+    // EOP-DD-UBO-PROOF-001 §4 (T5): `evidence` logs a proof without moving
+    // status — there is no ratchet left to advance.
     append(
         &pool,
         &registry,
         &edge_op(subject, "kyc_ubo.assert.edge.evidence", e1, "ev1"),
     )
     .await;
-    append(&pool, &registry, &edge_op(subject, "kyc_ubo.assert.edge.verification", e1, "v1")).await;
     append(
         &pool,
         &registry,
@@ -364,7 +361,7 @@ async fn projector_rebuilds_from_a_multi_event_stream() {
         2,
         "full replace — the rebuild must not accumulate rows"
     );
-    assert_eq!(status_of(&pool, subject, e1).await, "Verified");
+    assert_eq!(status_of(&pool, subject, e1).await, "Asserted");
     assert_eq!(status_of(&pool, subject, e2).await, "Superseded");
     assert_ne!(
         after_two_edges, after_transitions,

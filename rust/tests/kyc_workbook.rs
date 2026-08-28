@@ -155,7 +155,6 @@ async fn session_roundtrip() {
 
     let edge = Uuid::new_v4();
     let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
-    let doc_id = Uuid::new_v4();
 
     let mut conn = pool.acquire().await.unwrap();
     let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
@@ -218,7 +217,9 @@ async fn session_roundtrip() {
 
     workbook
         .stage(
-            &format!(r#"(kyc_ubo.assert.edge.evidence :edge-id "{edge}" :doc_id "{doc_id}")"#),
+            &format!(
+                r#"(kyc_ubo.assert.edge.evidence :edge-id "{edge}" :kind "filed-document" :source "test fixture" :date "2026-01-01")"#
+            ),
             &principal,
             AuthorityRef("analyst.attach-evidence".into()),
             as_of,
@@ -228,15 +229,22 @@ async fn session_roundtrip() {
              a committed-only frontier would wrongly refuse this",
         );
 
+    // EOP-DD-UBO-PROOF-001 §3/§4 (T5, 2026-08-28): move 3 was `verification`
+    // (RETIRED, K-G7) — replaced with `retract`, targeting the citation id
+    // of the evidence move JUST STAGED (not yet committed). This is if
+    // anything a SHARPER proof of the frontier property this test is about:
+    // `retract` must resolve a citation that exists only in the staged
+    // frontier, not the committed history.
+    let citation = workbook.staged.last().expect("evidence move staged").event.id;
     workbook
         .stage(
-            &format!(r#"(kyc_ubo.assert.edge.verification :edge-id "{edge}")"#),
+            &format!(r#"(kyc_ubo.assert.edge.retract :citation-id "{}")"#, citation.0),
             &principal,
-            AuthorityRef("analyst.verify".into()),
+            AuthorityRef("analyst.retract".into()),
             as_of,
         )
         .expect(
-            "move 3 (verify) must recognise against the frontier AFTER moves 1+2 — \
+            "move 3 (retract) must recognise against the frontier AFTER moves 1+2 — \
              a committed-only frontier would wrongly refuse this too",
         );
 
@@ -466,8 +474,13 @@ async fn invalid_workbook_blocks_commit() {
     let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
     drop(conn);
 
-    // Move 1: legal. Move 2: illegal (verify with no evidence attached — the
-    // K-11 proof ratchet). Move 3: would-be-legal, never gets the chance.
+    // Move 1: legal. Move 2: illegal (EOP-DD-UBO-PROOF-001 §3/§4, T5,
+    // 2026-08-28: was "verify with no evidence attached — the K-11 proof
+    // ratchet"; `verification` is RETIRED, K-G7 — replaced with a second
+    // `connect` asserting the SAME kind/from/to, illegal under
+    // `NoDuplicateActiveEdge`, K-13: contradicting asserts must go through
+    // disconnect, never a repeat connect). Move 3: would-be-legal, never
+    // gets the chance.
     workbook.staged.push(manual_staged_move(
         subject,
         "kyc_ubo.assert.edge.connect",
@@ -478,9 +491,9 @@ async fn invalid_workbook_blocks_commit() {
     ));
     workbook.staged.push(manual_staged_move(
         subject,
-        "kyc_ubo.assert.edge.verification",
-        TargetBinding::for_edge(subject, EdgeId(edge)),
-        serde_json::json!({}),
+        "kyc_ubo.assert.edge.connect",
+        TargetBinding::for_subject(subject),
+        serde_json::json!({"edge_id": Uuid::new_v4(), "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"}),
         as_of,
         &lexicon,
     ));
@@ -488,7 +501,9 @@ async fn invalid_workbook_blocks_commit() {
         subject,
         "kyc_ubo.assert.edge.evidence",
         TargetBinding::for_edge(subject, EdgeId(edge)),
-        serde_json::json!({"doc_id": Uuid::new_v4()}),
+        serde_json::json!({
+            "kind": "filed-document", "source": "test fixture", "date": "2026-01-01",
+        }),
         as_of,
         &lexicon,
     ));
@@ -652,7 +667,9 @@ async fn stale_snapshot_recovers() {
             Principal::test_analyst(),
             AuthorityRef("setup.attach-evidence".into()),
             TargetBinding::for_edge(subject, EdgeId(edge)),
-            serde_json::json!({"doc_id": Uuid::new_v4()}),
+            serde_json::json!({
+                "kind": "filed-document", "source": "test fixture", "date": "2026-01-01",
+            }),
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
@@ -668,20 +685,25 @@ async fn stale_snapshot_recovers() {
         scope.commit().await;
     }
 
-    // Workbook opens: sees the edge Evidenced, stages `verify` — legal
-    // against THIS frontier.
+    // Workbook opens: sees the edge active, stages a SECOND `evidence` call
+    // — legal against THIS frontier (EOP-DD-UBO-PROOF-001 §3/§4, T5,
+    // 2026-08-28: `verification`, this test's original move, is RETIRED —
+    // `evidence` itself already carries `EdgeActive`, the same precondition
+    // this test needs, so it is the direct replacement, not a workaround).
     let mut conn = pool.acquire().await.unwrap();
     let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
     drop(conn);
     workbook
         .stage(
-            &format!(r#"(kyc_ubo.assert.edge.verification :edge-id "{edge}")"#),
+            &format!(
+                r#"(kyc_ubo.assert.edge.evidence :edge-id "{edge}" :kind "share-register" :source "test fixture" :date "2026-01-02")"#
+            ),
             &principal,
-            AuthorityRef("analyst.verify".into()),
+            AuthorityRef("analyst.attach-evidence".into()),
             as_of,
         )
         .expect(
-            "verify must recognise — the edge is Evidenced in this workbook's committed history",
+            "a second evidence citation must recognise — the edge is active in this workbook's committed history",
         );
 
     // Concurrent connection commits `supersede` on the SAME edge mid-session
@@ -716,25 +738,26 @@ async fn stale_snapshot_recovers() {
         );
     }
 
-    // Workbook 1 now commits its staged `verify` — the edge it validated
-    // against is gone (superseded) by the time commit runs. The fail-fast
-    // whole-chain preview (against a FRESH load_events on the scope's own
-    // connection) must catch this and reject — never silently commit a
-    // verify against a now-superseded edge.
+    // Workbook 1 now commits its staged second `evidence` call — the edge
+    // it validated against is gone (superseded) by the time commit runs.
+    // The fail-fast whole-chain preview (against a FRESH load_events on the
+    // scope's own connection) must catch this and reject — never silently
+    // commit evidence against a now-superseded edge.
     let mut scope1 = TestScope::begin(&pool).await;
     let result = workbook.commit(&mut scope1, &registry).await;
     assert!(
         result.is_err(),
-        "commit() must re-validate against TRUE current state and reject the now-stale verify"
+        "commit() must re-validate against TRUE current state and reject the now-stale evidence citation"
     );
     scope1.rollback().await;
 
     // The concurrent supersede is the only row that landed for the workbook's
-    // own staged verify — confirm nothing from the stale commit attempt did.
+    // own staged evidence citation — confirm nothing from the stale commit
+    // attempt did.
     assert_eq!(
         count(&pool, subject).await,
         3,
-        "2 setup rows + 1 concurrent supersede; the stale verify must NOT have appended a 4th"
+        "2 setup rows + 1 concurrent supersede; the stale evidence citation must NOT have appended a 4th"
     );
 
     cleanup(&pool, subject).await;

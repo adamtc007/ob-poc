@@ -28,7 +28,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationUpdateIdentity, KycObligationUpdateRisk, KycObligationUpdateScreening,
     KycSubjectPlace, KycSubjectRecordEnquiry, UboDeterminationFreeze, UboEdgeAttachEvidence,
-    UboEdgeConnect, UboEdgeDisconnect, UboEdgeVerify,
+    UboEdgeConnect, UboEdgeDisconnect, UboEdgeRetract,
 };
 // kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject TS.6 P2 — moved
 // to ob-poc-kyc-decide. kyc_ubo.decide.obligation.waiver moved there too, D2.0 §5.
@@ -122,6 +122,31 @@ async fn run_connect(
         panic!("connect must return a Record outcome, got {out:?}");
     };
     Uuid::parse_str(v["edge_id"].as_str().expect("edge_id")).expect("edge_id must be a valid UUID")
+}
+
+/// EOP-DD-UBO-PROOF-001 §4 (T5): `evidence` returns the logged proof's own
+/// citation id — the fact `retract` later targets. Mirrors `run_connect`'s
+/// direct-call-and-extract shape.
+async fn run_attach_evidence(subject: SubjectId, edge: Uuid, pool: &PgPool) -> Uuid {
+    let mut ctx = ob_poc_kyc_decide::test_verb_execution_context_with_session(Uuid::new_v4());
+    let mut scope = Scope::begin(pool).await;
+    let out = UboEdgeAttachEvidence
+        .execute(
+            &serde_json::json!({
+                "subject-id": subject.0, "edge-id": edge,
+                "kind": "filed-document", "source": "test fixture", "date": "2026-08-28",
+            }),
+            &mut ctx,
+            &mut scope,
+        )
+        .await
+        .expect("attach-evidence must succeed");
+    scope.commit().await;
+    let dsl_runtime::VerbExecutionOutcome::Record(v) = out else {
+        panic!("attach-evidence must return a Record outcome, got {out:?}");
+    };
+    Uuid::parse_str(v["citation_id"].as_str().expect("citation_id"))
+        .expect("citation_id must be a valid UUID")
 }
 
 /// Dispatch a verb op expecting refusal; commits nothing (rolls back).
@@ -251,7 +276,10 @@ async fn coverage_ubo_edge_attach_evidence() {
     let edge = run_connect(subject, Uuid::new_v4(), Uuid::new_v4(), "voting_rights", &pool).await;
     run(
         &UboEdgeAttachEvidence,
-        serde_json::json!({ "subject-id": subject.0, "edge-id": edge }),
+        serde_json::json!({
+            "subject-id": subject.0, "edge-id": edge,
+            "kind": "filed-document", "source": "test fixture", "date": "2026-08-28",
+        }),
         &pool,
     )
     .await;
@@ -259,8 +287,14 @@ async fn coverage_ubo_edge_attach_evidence() {
     cleanup(&pool, &[subject]).await;
 }
 
+// `coverage_ubo_edge_verify` RETIRED (EOP-DD-UBO-PROOF-001 §3/§4, T5,
+// 2026-08-28) alongside `kyc_ubo.assert.edge.verification`/`UboEdgeVerify`
+// (K-G7: 0 real committed events under that FQN) — no ratchet left to
+// exercise. `coverage_ubo_edge_retract`, below, is T5's replacement
+// coverage: `UboEdgeRetract` withdraws the proof `UboEdgeAttachEvidence`
+// just logged.
 #[tokio::test]
-async fn coverage_ubo_edge_verify() {
+async fn coverage_ubo_edge_retract() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
@@ -270,20 +304,14 @@ async fn coverage_ubo_edge_verify() {
     )
     .await;
     let edge = run_connect(subject, Uuid::new_v4(), Uuid::new_v4(), "voting_rights", &pool).await;
-    // Precondition: must attach evidence before verify (EvidenceCited precondition, K-11)
+    let citation = run_attach_evidence(subject, edge, &pool).await;
     run(
-        &UboEdgeAttachEvidence,
-        serde_json::json!({ "subject-id": subject.0, "edge-id": edge }),
+        &UboEdgeRetract,
+        serde_json::json!({ "subject-id": subject.0, "citation-id": citation }),
         &pool,
     )
     .await;
-    run(
-        &UboEdgeVerify,
-        serde_json::json!({ "subject-id": subject.0, "edge-id": edge }),
-        &pool,
-    )
-    .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.edge.verification").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.retract").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -579,9 +607,9 @@ async fn coverage_kyc_person_reject() {
 /// D2.1 §2, so K-23 does not refuse this run — deliberately the SIMPLEST
 /// passing case, not a claim that a real Proved board is unreachable:
 /// `UboEdgeAttachEvidence` called with `entity-id` instead of `edge-id`
-/// evidences an entity's type instead of an edge, reaching
-/// `TypeProofStatus::Proved` for real — wired 2026-08-24 corrective
-/// tranche Item 3a, exercised by `tests/kyc_d21_engine.rs`'s
+/// evidences an entity's type instead of an edge, logging a real cited
+/// proof (EOP-DD-UBO-PROOF-001 §4) — wired 2026-08-24 corrective tranche
+/// Item 3a, exercised by `tests/kyc_d21_engine.rs`'s
 /// `unevaluable_flips_to_pass_through_production`, not duplicated here)
 /// and `kyc_ubo.decide.subject.reject` (citation recorded even though
 /// rejection is allowed at any stage, board has one registered-but-untyped

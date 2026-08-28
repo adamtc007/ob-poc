@@ -50,14 +50,14 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, check_preconditions, fold_control_versioned, assembly_lexicon,
+    check_control_preconditions, fold_control_versioned, assembly_lexicon,
     evaluation_lexicon,
     AuthorityRef, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
     DeterminationDispatch, DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId,
     EntityType, EntityTypeRecord, EventId, FoldRegistry, FoundationCouncilStrategy,
-    FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy, ObligationState,
-    OwnershipProngStrategy, PersonId, Precondition, Principal, Prong, StateOwnedStrategy,
-    SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy, TypeProofStatus,
+    FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy,
+    OwnershipProngStrategy, PersonId, Precondition, Principal, Prong, ProofKind, ProofRecord,
+    StateOwnedStrategy, SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy,
     TypeRegistryState, V1FoldImpl,
 };
 
@@ -280,13 +280,18 @@ fn assembly_pack_is_exactly_known() {
     // T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `structure-class` RETIRED
     // (12→11) — the strategy is now derived from EntityType directly, no
     // replacement entry.
+    // T5 (EOP-DD-UBO-PROOF-001, 2026-08-28): `verification` RETIRED
+    // (K-G7, 0 real committed events) — "the board collects facts; the
+    // policy rules on adequacy," so there is no ratchet left to verify
+    // into. `retract` ADDED (net zero, 11→11) — withdraws a previously
+    // logged proof by citation id.
     let expected: BTreeSet<String> = [
         "kyc_ubo.assert.subject.place",
         "kyc_ubo.assert.subject.remove",
         "kyc_ubo.assert.subject.enquiry",
         "kyc_ubo.assert.edge.connect",
         "kyc_ubo.assert.edge.evidence",
-        "kyc_ubo.assert.edge.verification",
+        "kyc_ubo.assert.edge.retract",
         "kyc_ubo.assert.edge.disconnect",
         "kyc_ubo.decide.determination.freeze",
         "kyc_ubo.assert.entity.identity",
@@ -798,10 +803,12 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         .collect();
 
     let mut expected: BTreeMap<String, Vec<Precondition>> = BTreeMap::new();
-    expected.insert(
-        "kyc_ubo.assert.edge.verification".to_string(),
-        vec![Precondition::EvidenceCited],
-    );
+    // T5 (EOP-DD-UBO-PROOF-001, 2026-08-28): `verification`/`EvidenceCited`
+    // RETIRED together (K-G7, 0 real committed events) — the ratchet they
+    // gated no longer exists. `retract` carries no preconditions: a
+    // citation either exists to be withdrawn or the removal is a no-op
+    // (§4 — "the set shrinks and nothing else happens").
+    expected.insert("kyc_ubo.assert.edge.retract".to_string(), vec![]);
     // T6.1(c) (2026-08-12): the fail-closed strategy guard (matrix rows
     // 6a/8a), originally split across `select-strategy` (6a) and `freeze`
     // (8a, defense in depth). TS.6 P2 (K-G7) RETIRED `select-strategy` —
@@ -956,7 +963,9 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     assert_eq!(
         actual.len(),
         11,
-        "assembly_lexicon() entry count drifted from the post-T4 11 \
+        "assembly_lexicon() entry count drifted from the post-T5 11 \
+         (post-T4 11, minus verification RETIRED, plus retract ADDED — \
+         EOP-DD-UBO-PROOF-001, 2026-08-28, net zero) \
          (post-T3 12, minus structure-class RETIRED — EOP-DD-UBO-DISPATCH-001, \
          2026-08-28, the strategy is now derived from EntityType directly) \
          (14 post-T2, minus control+economic-interest MERGED into connect, \
@@ -971,18 +980,22 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of T4 (2026-08-28, \
-         EOP-DD-UBO-DISPATCH-001: structure-class RETIRED, freeze's \
-         StructureClassSupported superseded by EntityTypeSupportsStrategy; \
-         T3, 2026-08-27, §3.2/§3.3/§3.4 R8: control+economic-interest MERGED \
+        "K-G5 precondition map changed — as of T5 (2026-08-28, \
+         EOP-DD-UBO-PROOF-001: verification RETIRED taking EvidenceCited \
+         with it — no ratchet left to gate; retract ADDED with no \
+         preconditions); T4 (2026-08-28, EOP-DD-UBO-DISPATCH-001: \
+         structure-class RETIRED, freeze's StructureClassSupported \
+         superseded by EntityTypeSupportsStrategy; T3, 2026-08-27, \
+         §3.2/§3.3/§3.4 R8: control+economic-interest MERGED \
          into connect, supersession renamed disconnect, reconciliation \
          DISSOLVED taking freeze's ReconciledProjection with it; remove's \
          precondition set is unchanged — R8 is enforced by fold-time \
          pruning, not a precondition refusal), every one of the 11 \
-         remaining dsl.kyc verbs with a stud carries it \
-         (verify, freeze, connect, evidence, disconnect, place, remove, \
-         and the 3 obligation verbs — piercing's precondition pair now \
-         reaches the stream via connect's and disconnect's own entries); \
+         remaining dsl.kyc verbs carries its correct stud set \
+         (freeze, connect, evidence, disconnect, place, remove, \
+         and the 3 obligation verbs; retract and enquiry carry none — \
+         piercing's precondition pair now reaches the stream via connect's \
+         and disconnect's own entries); \
          any other change is either matrix progress (update the T0.3 \
          audit) or a regression"
     );
@@ -1132,35 +1145,33 @@ fn edge_status_lifecycle_is_fully_reachable() {
     );
     let state = fold_control_versioned(&[&assert_event], &reg).expect("fold ok");
     assert_eq!(state.edges.get(&edge).unwrap().status, EdgeStatus::Asserted);
+    assert!(!state.edges.get(&edge).unwrap().has_proof());
 
+    // EOP-DD-UBO-PROOF-001 §4 (T5, 2026-08-28): `EdgeStatus::Evidenced`/
+    // `Verified` are gone — the ratchet they formed is replaced by a
+    // citation set. An `evidence` event with a real kind logs a proof;
+    // `status` stays `Asserted` throughout (only `disconnect` moves it).
     let evidence_event = make_event(
         subject,
         "kyc_ubo.assert.edge.evidence",
         TargetBinding::for_edge(subject, edge),
-        serde_json::json!({}),
+        serde_json::json!({
+            "kind": "filed-document",
+            "source": "test fixture",
+            "date": "2026-01-01",
+        }),
         as_of,
         lexicon_hash,
     );
     let state = fold_control_versioned(&[&assert_event, &evidence_event], &reg).expect("fold ok");
-    assert_eq!(
-        state.edges.get(&edge).unwrap().status,
-        EdgeStatus::Evidenced
-    );
+    let edge_state = state.edges.get(&edge).unwrap();
+    assert_eq!(edge_state.status, EdgeStatus::Asserted, "status is unaffected by evidence");
+    assert!(edge_state.has_proof());
+    assert_eq!(edge_state.proofs.len(), 1);
 
-    let verify_event = make_event(
-        subject,
-        "kyc_ubo.assert.edge.verification",
-        TargetBinding::for_edge(subject, edge),
-        serde_json::json!({}),
-        as_of,
-        lexicon_hash,
-    );
-    let state = fold_control_versioned(&[&assert_event, &evidence_event, &verify_event], &reg)
-        .expect("fold ok");
-    assert_eq!(state.edges.get(&edge).unwrap().status, EdgeStatus::Verified);
-
-    // Supersede-from-Verified — proves Superseded is reachable from every
-    // prior status, not just Asserted (K-G1/K-G2: no dead end mid-lifecycle).
+    // Supersede-from-proof-bearing — proves Superseded is reachable
+    // regardless of the edge's citation set, not just from a bare-Asserted
+    // edge (K-G1/K-G2: no dead end mid-lifecycle).
     let supersede_event = make_event(
         subject,
         "kyc_ubo.assert.edge.disconnect",
@@ -1169,20 +1180,11 @@ fn edge_status_lifecycle_is_fully_reachable() {
         as_of,
         lexicon_hash,
     );
-    let state = fold_control_versioned(
-        &[
-            &assert_event,
-            &evidence_event,
-            &verify_event,
-            &supersede_event,
-        ],
-        &reg,
-    )
-    .expect("fold ok");
-    assert_eq!(
-        state.edges.get(&edge).unwrap().status,
-        EdgeStatus::Superseded
-    );
+    let state = fold_control_versioned(&[&assert_event, &evidence_event, &supersede_event], &reg)
+        .expect("fold ok");
+    let edge_state = state.edges.get(&edge).unwrap();
+    assert_eq!(edge_state.status, EdgeStatus::Superseded);
+    assert!(edge_state.has_proof(), "supersede never touches the citation set (K-13)");
 }
 
 // ── Part A (EOP-PLAN-KYCUBO-KIT-001) — the checker-reach tooth ─────────────
@@ -1316,7 +1318,7 @@ fn every_precondition_carrying_verb_is_reached_by_the_checker() {
     // retired TS.6 P2, `apply-smo-fallback` TS.6 §5 — all dropped from this
     // floor list; `freeze` still carries the identical precondition pair the
     // last two of those declared.)
-    for known_wired in ["kyc_ubo.assert.edge.verification", "kyc_ubo.decide.determination.freeze"] {
+    for known_wired in ["kyc_ubo.assert.edge.evidence", "kyc_ubo.decide.determination.freeze"] {
         assert!(
             precondition_carrying.contains(known_wired),
             "scanner sanity: {known_wired} must still carry a precondition in the pinned \
@@ -1336,7 +1338,6 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     let lexicon = assembly_lexicon();
     let subject = SubjectId(uuid::Uuid::new_v4());
     let as_of = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-    let empty_obligation = ObligationState::default();
 
     let probe = |verb_fqn: &str, target: TargetBinding| {
         IntentEvent::new(
@@ -1350,51 +1351,11 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         )
     };
 
-    // kyc_ubo.assert.edge.verification — EvidenceCited: an Asserted (not-yet-evidenced) edge
-    // must block; an Evidenced edge must admit.
-    let edge = EdgeId(uuid::Uuid::new_v4());
-    let verify_entry = lexicon.get("kyc_ubo.assert.edge.verification").unwrap();
-    let mut asserted_only = ControlState::default();
-    asserted_only.edges.insert(
-        edge,
-        ob_poc_kyc_substrate::EdgeState {
-            id: edge,
-            kind: ob_poc_kyc_substrate::EdgeKind::VotingRights,
-            from: EntityId(uuid::Uuid::new_v4()),
-            to: EntityId(uuid::Uuid::new_v4()),
-            percentage: None,
-            status: EdgeStatus::Asserted,
-            evidence_event_id: None,
-            originating_event_id: ob_poc_kyc_substrate::EventId::new(),
-            trust_revocable: None,
-            superseded_by: None,
-            pierced_from: None,
-        },
-    );
-    assert!(
-        check_preconditions(
-            verify_entry,
-            &asserted_only,
-            &empty_obligation,
-            &TypeRegistryState::default(),
-            &probe("kyc_ubo.assert.edge.verification", TargetBinding::for_edge(subject, edge)),
-        )
-        .is_err(),
-        "verify must block an edge with no evidence attached"
-    );
-    let mut evidenced = asserted_only.clone();
-    evidenced.edges.get_mut(&edge).unwrap().status = EdgeStatus::Evidenced;
-    assert!(
-        check_preconditions(
-            verify_entry,
-            &evidenced,
-            &empty_obligation,
-            &TypeRegistryState::default(),
-            &probe("kyc_ubo.assert.edge.verification", TargetBinding::for_edge(subject, edge)),
-        )
-        .is_ok(),
-        "verify must admit an edge with evidence attached"
-    );
+    // `kyc_ubo.assert.edge.verification` — EvidenceCited sub-test RETIRED
+    // (EOP-DD-UBO-PROOF-001 §3/§4, T5, 2026-08-28) alongside the verb and
+    // its precondition (K-G7: 0 real committed events). `retract`, its
+    // replacement in the assembly pack, carries no preconditions — there
+    // is no successor stud for this sub-test to exercise.
 
     // kyc_ubo.decide.determination.freeze — EntityTypeSupportsStrategy.
     // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): `StructureClassSupported`
@@ -1410,14 +1371,20 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     let freeze_entry_for_totality = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
     let typed = |t: EntityType| -> TypeRegistryState {
         let mut tr = TypeRegistryState::default();
+        let citing = EventId::new();
+        let mut proofs = BTreeMap::new();
+        proofs.insert(
+            citing,
+            ProofRecord {
+                kind: ProofKind::FiledDocument,
+                source: "test fixture".to_string(),
+                date: "2026-08-28".to_string(),
+                event_id: citing,
+            },
+        );
         tr.types.insert(
             EntityId(subject.0),
-            EntityTypeRecord {
-                entity_type: t,
-                proof: TypeProofStatus::Proved,
-                originating_event_id: EventId::new(),
-                proof_event_id: Some(EventId::new()),
-            },
+            EntityTypeRecord { entity_type: t, originating_event_id: EventId::new(), proofs },
         );
         tr
     };
@@ -1584,7 +1551,7 @@ fn edge_kind_strategy_admission_is_exactly_known() {
                 to: subject_entity,
                 percentage: matches!(kind, EdgeKind::EconomicInterest).then_some(100.0),
                 status: EdgeStatus::Asserted,
-                evidence_event_id: None,
+                proofs: BTreeMap::new(),
                 originating_event_id: EventId::new(),
                 trust_revocable: None,
                 superseded_by: None,
@@ -1767,7 +1734,7 @@ fn determination_is_unchanged_by_whitelisting() {
                 to: subject_entity,
                 percentage: None,
                 status: EdgeStatus::Asserted,
-                evidence_event_id: None,
+                proofs: BTreeMap::new(),
                 originating_event_id: fixed_event,
                 trust_revocable: None,
                 superseded_by: None,
@@ -1869,7 +1836,7 @@ fn new_edge_kinds_are_not_traversed_as_control() {
                 to: subject_entity,
                 percentage: None,
                 status: EdgeStatus::Asserted,
-                evidence_event_id: None,
+                proofs: BTreeMap::new(),
                 originating_event_id: EventId::new(),
                 trust_revocable: None,
                 superseded_by: None,

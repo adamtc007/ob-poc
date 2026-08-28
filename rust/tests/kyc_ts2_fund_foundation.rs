@@ -284,7 +284,10 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
     let mandate_edge = connect_out["edge_id"].as_str().expect("edge_id").to_string();
     run(
         &UboEdgeAttachEvidence,
-        serde_json::json!({ "subject-id": subject.0, "edge-id": mandate_edge }),
+        serde_json::json!({
+            "subject-id": subject.0, "edge-id": mandate_edge,
+            "kind": "contract", "source": "test fixture", "date": "2026-08-28",
+        }),
         &pool,
     )
     .await;

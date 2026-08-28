@@ -562,9 +562,22 @@ fn ec2_reconciled_edges_do_not_exceed_100_percent() {
 // "`kyc_ubo.assert.edge.verification` without a cited-evidence event is rejected; status is
 // never settable" (K-11, gap-report Test 3).
 
+// `ec3_verify_without_evidence_is_rejected` RETIRED (EOP-DD-UBO-PROOF-001
+// §3/§4, T5, 2026-08-28) alongside `kyc_ubo.assert.edge.verification` and
+// `Precondition::EvidenceCited` (K-G7: 0 real committed events under that
+// FQN). K-11 ("evidence before verify") gated a ratchet that no longer
+// exists — `evidence` now logs a proof unconditionally, with no second
+// move left to require it first.
+
+// `ec3_verify_after_evidence_succeeds` RETIRED (EOP-DD-UBO-PROOF-001 §3/§4,
+// T5, 2026-08-28): the exit criterion it proved — "verify after evidence
+// succeeds" — named `kyc_ubo.assert.edge.verification`, deleted with the
+// `EdgeStatus::Evidenced`/`Verified` ratchet it gated on (K-G7: 0 real
+// committed events under that FQN). What replaces it, `ec3_evidence_logs_a_proof`
+// below, proves the surviving half of the original intent: an `evidence`
+// event with a real kind actually lands a proof in the edge's citation set.
 #[test]
-fn ec3_verify_without_evidence_is_rejected() {
-    let lexicon = assembly_lexicon();
+fn ec3_evidence_logs_a_proof() {
     let subject = fixture_subject_id();
     let h = dummy_hash();
     let a = entity_subject();
@@ -586,70 +599,7 @@ fn ec3_verify_without_evidence_is_rejected() {
             idem("assert"),
             t,
         ),
-        // Deliberately NO attach-evidence event.
-    ];
-    let event_refs: Vec<&IntentEvent> = events.iter().collect();
-    let control = fold_control(&event_refs);
-
-    // Edge must be Asserted, not Evidenced.
-    let edge_state = control.edges.get(&edge).expect("edge must exist");
-    assert_eq!(
-        edge_state.status,
-        ob_poc_kyc_substrate::EdgeStatus::Asserted,
-        "edge without attach-evidence must be Asserted",
-    );
-
-    // Attempting verify must fail the precondition.
-    let verify_entry = lexicon.get("kyc_ubo.assert.edge.verification").expect("verify in lexicon");
-    let verify_event = te(
-        1,
-        subject,
-        "kyc_ubo.assert.edge.verification",
-        h,
-        analyst(),
-        authority(),
-        TargetBinding::for_edge(subject, edge),
-        serde_json::json!({}),
-        idem("verify-attempt"),
-        t,
-    );
-    let result =
-        check_control_preconditions(verify_entry, &control, &TypeRegistryState::default(), &verify_event);
-    assert!(result.is_err(), "verify without evidence must fail (K-11)");
-
-    // Verify the error is the right kind.
-    let err_str = result.unwrap_err().to_string();
-    assert!(
-        err_str.contains("Asserted") || err_str.contains("evidence") || err_str.contains("Verify"),
-        "error message should mention evidence state; got: {err_str}",
-    );
-}
-
-#[test]
-fn ec3_verify_after_evidence_succeeds() {
-    let lexicon = assembly_lexicon();
-    let subject = fixture_subject_id();
-    let h = dummy_hash();
-    let a = entity_subject();
-    let b = entity_b();
-    let t = ts(2026, 1, 1);
-
-    let edge = eid("b_a");
-    let events = vec![
-        te(
-            0,
-            subject,
-            "kyc_ubo.assert.edge.connect",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"kind": "economic_interest", "edge_id": edge.0, "from_entity_id": b.0,
-                "to_entity_id": a.0, "percentage": 60.0}),
-            idem("assert"),
-            t,
-        ),
-        // Attach evidence.
+        // Log a proof.
         te(
             1,
             subject,
@@ -658,7 +608,11 @@ fn ec3_verify_after_evidence_succeeds() {
             analyst(),
             authority(),
             TargetBinding::for_edge(subject, edge),
-            serde_json::json!({"doc_id": Uuid::new_v4()}),
+            serde_json::json!({
+                "kind": "filed-document",
+                "source": "test fixture",
+                "date": "2026-01-01",
+            }),
             idem("attach"),
             t,
         ),
@@ -666,46 +620,13 @@ fn ec3_verify_after_evidence_succeeds() {
     let event_refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control(&event_refs);
 
-    // Edge must now be Evidenced.
     let edge_state = control.edges.get(&edge).expect("edge must exist");
-    assert_eq!(
-        edge_state.status,
-        ob_poc_kyc_substrate::EdgeStatus::Evidenced
-    );
-
-    // Verify must now pass the precondition.
-    let verify_entry = lexicon.get("kyc_ubo.assert.edge.verification").expect("verify in lexicon");
-    let verify_event = te(
-        2,
-        subject,
-        "kyc_ubo.assert.edge.verification",
-        h,
-        analyst(),
-        authority(),
-        TargetBinding::for_edge(subject, edge),
-        serde_json::json!({}),
-        idem("verify"),
-        t,
-    );
-    let result =
-        check_control_preconditions(verify_entry, &control, &TypeRegistryState::default(), &verify_event);
-    assert!(
-        result.is_ok(),
-        "verify after evidence must pass: {:?}",
-        result
-    );
-
-    // Apply the verify event and check fold output.
-    let mut all_events = events;
-    all_events.push(verify_event);
-    let event_refs2: Vec<&IntentEvent> = all_events.iter().collect();
-    let control2 = fold_control(&event_refs2);
-    let edge_state2 = control2.edges.get(&edge).expect("edge must still exist");
-    assert_eq!(
-        edge_state2.status,
-        ob_poc_kyc_substrate::EdgeStatus::Verified,
-        "edge after verify event must be Verified",
-    );
+    assert!(edge_state.has_proof(), "edge must have a proof logged after evidence");
+    assert_eq!(edge_state.proofs.len(), 1);
+    let proof = edge_state.proofs.values().next().unwrap();
+    assert_eq!(proof.kind, ob_poc_kyc_substrate::ProofKind::FiledDocument);
+    assert_eq!(proof.source, "test fixture");
+    assert_eq!(proof.date, "2026-01-01");
 }
 
 // ── Exit criterion 4: SMO never-empty (K-5) ───────────────────────────────────

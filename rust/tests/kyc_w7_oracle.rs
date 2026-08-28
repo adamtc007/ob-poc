@@ -18,7 +18,7 @@ use ob_poc_kyc_substrate::{
     EventId, OwnershipProngStrategy, PersonId,
 };
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
 fn w7_oracle_ownership_prong_on_private_company_fixture() {
@@ -42,8 +42,8 @@ fn w7_oracle_ownership_prong_on_private_company_fixture() {
                 from,
                 to,
                 percentage: Some(pct),
-                status: EdgeStatus::Verified,
-                evidence_event_id: None,
+                status: EdgeStatus::Asserted,
+                proofs: BTreeMap::new(),
                 originating_event_id: nil_event,
                 trust_revocable: None,
                 superseded_by: None,
