@@ -54,7 +54,7 @@ fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> Intent
 fn assert_control_event(subject: SubjectId, from: EntityId, to: EntityId, kind: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding::for_edge(subject, EdgeId(Uuid::new_v4())),
@@ -85,7 +85,7 @@ fn illegal_target_type_is_refused() {
     let obligation = ObligationState::default();
 
     let lexicon = assembly_lexicon();
-    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let event = assert_control_event(subject, person, trust, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
     assert!(matches!(verdict, Err(KycError::GeometryRefused { .. })), "got {verdict:?}");
@@ -100,7 +100,7 @@ fn illegal_target_type_is_refused() {
 #[test]
 fn preview_and_append_agree() {
     let lexicon = assembly_lexicon();
-    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
 
     // Half 1 — a board on which the GEOMETRY-REFUSED kinds must be refused by
     // both sides. Two NaturalPerson-typed members: a person is never a target
@@ -131,7 +131,7 @@ fn preview_and_append_agree() {
         let offered_voting = board
             .moves
             .iter()
-            .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+            .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.connect")
             .filter_map(|m| m.proposed_edge.as_ref())
             .any(|t| t.kind_wire == "voting_rights");
         assert!(
@@ -162,7 +162,7 @@ fn preview_and_append_agree() {
         let offered = board
             .moves
             .iter()
-            .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+            .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.connect")
             .filter_map(|m| m.proposed_edge.as_ref())
             .any(|t| t.from == person && t.to == corp && t.kind_wire == "voting_rights");
         assert!(offered, "board SHOULD offer person --voting_rights--> corp");
@@ -189,7 +189,7 @@ fn untyped_endpoint_admits_provisionally() {
     let obligation = ObligationState::default();
 
     let lexicon = assembly_lexicon();
-    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let assert_event = assert_control_event(subject, a, b, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
     assert!(verdict.is_ok(), "untyped endpoint must ADMIT, not refuse: {verdict:?}");
@@ -234,7 +234,7 @@ fn alleged_type_admits_provisionally() {
     let obligation = ObligationState::default();
 
     let lexicon = assembly_lexicon();
-    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let assert_event = assert_control_event(subject, person, corp, "voting_rights");
     let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
     assert!(verdict.is_ok(), "alleged-typed endpoint must ADMIT: {verdict:?}");
@@ -261,7 +261,7 @@ fn alleged_type_admits_provisionally() {
 #[test]
 fn geometry_refusal_is_distinguishable_from_stud_refusal() {
     let lexicon = assembly_lexicon();
-    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
 
     // Geometry violation: ManagementMandate sourced from a natural person.
     let subject = subject();
@@ -354,7 +354,7 @@ fn illegal_triple_is_not_offered() {
     let offered_triples: Vec<(EntityId, EntityId, String)> = board
         .moves
         .iter()
-        .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+        .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.connect")
         .filter_map(|m| m.proposed_edge.as_ref())
         .map(|t| (t.from, t.to, t.kind_wire.clone()))
         .collect();
@@ -398,7 +398,7 @@ fn preview_and_append_agree_for_every_triple() {
     use ob_poc_kyc_substrate::EDGE_KIND_WIRE_VALUES;
 
     let lexicon = assembly_lexicon();
-    let entry = lexicon.get("kyc_ubo.assert.edge.control").unwrap();
+    let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let (subject, person, person2, corp, evs) = mixed_board();
     let refs: Vec<&IntentEvent> = evs.iter().collect();
     let control = fold_control(&refs);
@@ -409,7 +409,7 @@ fn preview_and_append_agree_for_every_triple() {
     let offered: std::collections::BTreeSet<(EntityId, EntityId, String)> = board
         .moves
         .iter()
-        .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.control")
+        .filter(|m| m.verb_fqn.0 == "kyc_ubo.assert.edge.connect")
         .filter_map(|m| m.proposed_edge.as_ref())
         .map(|t| (t.from, t.to, t.kind_wire.clone()))
         .collect();

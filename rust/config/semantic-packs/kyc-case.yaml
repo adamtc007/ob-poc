@@ -213,12 +213,13 @@ capabilities:
     - structure.list
     - structure.roles
     - structure.select
-    - kyc_ubo.assert.edge.control
-    - kyc_ubo.assert.edge.economic-interest
+    # EOP-VS-UBO-GAME-001 T3 (2026-08-27, §3.2/§3.3): control+economic-interest
+    # MERGED into connect; supersession renamed disconnect; reconciliation
+    # DISSOLVED (no successor FQN).
+    - kyc_ubo.assert.edge.connect
     - kyc_ubo.assert.edge.evidence
     - kyc_ubo.assert.edge.verification
-    - kyc_ubo.assert.edge.supersession
-    - kyc_ubo.assert.edge.reconciliation
+    - kyc_ubo.assert.edge.disconnect
     - kyc_ubo.decide.determination.freeze
     - kyc_ubo.assert.subject.register
     - kyc_ubo.assert.subject.structure-class

@@ -11,7 +11,7 @@
 //! (assert → attach-evidence → verify, etc.).
 //!
 //! Verbs already proven in dedicated test files:
-//!   kyc_ubo.assert.edge.control          → tests/kyc_stream_ops.rs
+//!   kyc_ubo.assert.edge.connect          → tests/kyc_stream_ops.rs
 //!   kyc_ubo.assert.subject.register             → tests/kyc_stream_ops.rs + kyc_w3_w5_w6.rs
 //!
 //! `coverage_kyc_obligation_update_identity/screening/risk` below now assert
@@ -27,9 +27,8 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationUpdateIdentity, KycObligationUpdateRisk, KycObligationUpdateScreening,
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
-    UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence, UboEdgeReconcileConflict,
-    UboEdgeSupersede, UboEdgeVerify,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
+    UboEdgeConnect, UboEdgeDisconnect, UboEdgeVerify,
 };
 // kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject TS.6 P2 — moved
 // to ob-poc-kyc-decide. kyc_ubo.decide.obligation.waiver moved there too, D2.0 §5.
@@ -92,6 +91,37 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> se
         .unwrap_or_else(|error| panic!("{}: {error}", op.fqn()));
     scope.commit().await;
     serde_json::to_value(format!("{:?}", out)).unwrap()
+}
+
+/// §8 Q3: `connect` refuses a caller-supplied edge id — it mints one and
+/// returns it. This file's `run()` Debug-stringifies the whole outcome, so
+/// this dedicated helper calls the op directly and extracts the real
+/// `edge_id` for tests that need to reference a KNOWN edge afterward
+/// (attach-evidence/verify/disconnect setup).
+async fn run_connect(
+    subject: SubjectId,
+    from: Uuid,
+    to: Uuid,
+    kind: &str,
+    pool: &PgPool,
+) -> Uuid {
+    let mut ctx = ob_poc_kyc_decide::test_verb_execution_context_with_session(Uuid::new_v4());
+    let mut scope = Scope::begin(pool).await;
+    let out = UboEdgeConnect
+        .execute(
+            &serde_json::json!({
+                "subject-id": subject.0, "from_entity_id": from, "to_entity_id": to, "kind": kind,
+            }),
+            &mut ctx,
+            &mut scope,
+        )
+        .await
+        .expect("connect must succeed");
+    scope.commit().await;
+    let dsl_runtime::VerbExecutionOutcome::Record(v) = out else {
+        panic!("connect must return a Record outcome, got {out:?}");
+    };
+    Uuid::parse_str(v["edge_id"].as_str().expect("edge_id")).expect("edge_id must be a valid UUID")
 }
 
 /// Dispatch a verb op expecting refusal; commits nothing (rolls back).
@@ -176,8 +206,14 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 
 // ── Edge lifecycle (ubo.edge.*) ────────────────────────────────────────────────
 
+// EOP-VS-UBO-GAME-001 T3 (§3.2, 2026-08-27): `assert-control` +
+// `assert-economic-interest` MERGED into `connect` — one coverage test,
+// exercised once with `kind: economic_interest` (the sub-case that also
+// carries `percentage`); `coverage_ubo_edge_attach_evidence`/`_verify`/
+// `_disconnect` below each independently prove `connect` with
+// `kind: voting_rights` as their setup step.
 #[tokio::test]
-async fn coverage_ubo_edge_assert_economic_interest() {
+async fn coverage_ubo_edge_connect() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(
@@ -187,17 +223,18 @@ async fn coverage_ubo_edge_assert_economic_interest() {
     )
     .await;
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0,
             "from_entity_id": Uuid::new_v4(),
             "to_entity_id": Uuid::new_v4(),
+            "kind": "economic_interest",
             "percentage": 45.0,
         }),
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.edge.economic-interest").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.connect").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -205,17 +242,13 @@ async fn coverage_ubo_edge_assert_economic_interest() {
 async fn coverage_ubo_edge_attach_evidence() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let edge = Uuid::new_v4();
     run(
         &KycSubjectPlace,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
-    run(&UboEdgeAssertControl, serde_json::json!({
-        "subject-id": subject.0, "edge-id": edge, "edge_id": edge.to_string(),
-        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights",
-    }), &pool).await;
+    let edge = run_connect(subject, Uuid::new_v4(), Uuid::new_v4(), "voting_rights", &pool).await;
     run(
         &UboEdgeAttachEvidence,
         serde_json::json!({ "subject-id": subject.0, "edge-id": edge }),
@@ -230,19 +263,13 @@ async fn coverage_ubo_edge_attach_evidence() {
 async fn coverage_ubo_edge_verify() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let edge = Uuid::new_v4();
     run(
         &KycSubjectPlace,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
-    // Pass edge_id (underscore) so the fold's edge_id_from_payload() finds it
-    // and stores the edge under our explicit UUID (not a derived v5).
-    run(&UboEdgeAssertControl, serde_json::json!({
-        "subject-id": subject.0, "edge-id": edge, "edge_id": edge.to_string(),
-        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights",
-    }), &pool).await;
+    let edge = run_connect(subject, Uuid::new_v4(), Uuid::new_v4(), "voting_rights", &pool).await;
     // Precondition: must attach evidence before verify (EvidenceCited precondition, K-11)
     run(
         &UboEdgeAttachEvidence,
@@ -261,54 +288,37 @@ async fn coverage_ubo_edge_verify() {
 }
 
 #[tokio::test]
-async fn coverage_ubo_edge_supersede() {
+async fn coverage_ubo_edge_disconnect() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    let edge = Uuid::new_v4();
     run(
         &KycSubjectPlace,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
-    run(&UboEdgeAssertControl, serde_json::json!({
-        "subject-id": subject.0, "edge-id": edge, "edge_id": edge.to_string(),
-        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights",
-    }), &pool).await;
+    let edge = run_connect(subject, Uuid::new_v4(), Uuid::new_v4(), "voting_rights", &pool).await;
     run(
-        &UboEdgeSupersede,
+        &UboEdgeDisconnect,
         serde_json::json!({ "subject-id": subject.0, "edge-id": edge }),
         &pool,
     )
     .await;
-    assert_event(&pool, subject, "kyc_ubo.assert.edge.supersession").await;
+    assert_event(&pool, subject, "kyc_ubo.assert.edge.disconnect").await;
     // K-13: edge still in stream, not deleted
     let edge_count: i64 = sqlx::query_scalar(
-        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.assert.edge.control'"#,
+        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.assert.edge.connect'"#,
     ).bind(subject.0).fetch_one(&pool).await.unwrap();
     assert_eq!(
         edge_count, 1,
-        "K-13: assert-control event stays in stream after supersede"
+        "K-13: connect event stays in stream after disconnect"
     );
     cleanup(&pool, &[subject]).await;
 }
 
-#[tokio::test]
-async fn coverage_ubo_edge_reconcile_conflict() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    run(
-        &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
-        &pool,
-    )
-    .await;
-    run(&UboEdgeReconcileConflict, serde_json::json!({
-        "subject-id": subject.0, "resolution": "dominant edge selected based on date precedence",
-    }), &pool).await;
-    assert_event(&pool, subject, "kyc_ubo.assert.edge.reconciliation").await;
-    cleanup(&pool, &[subject]).await;
-}
+// `coverage_ubo_edge_reconcile_conflict` RETIRED (EOP-VS-UBO-GAME-001 T3,
+// §3.3, 2026-08-27, K-G7): `kyc_ubo.assert.edge.reconciliation` no longer
+// exists — "No reconcile ... a third path to what two moves already do."
 
 // ── Determination verbs (ubo.determination.*) ─────────────────────────────────
 //
@@ -350,12 +360,6 @@ async fn coverage_ubo_determination_freeze() {
         &pool,
     )
     .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
     // K-5: a determination must never be silent. This used to be satisfied by
     // asserting an SMO (`ubo.determination.apply-smo-fallback`, retired
     // TS.6 §5 — SMO is PULLED on exhaustion by the traversal, never written).
@@ -370,10 +374,10 @@ async fn coverage_ubo_determination_freeze() {
     )
     .await;
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": owner, "to_entity_id": subject.0,
-            "percentage": 60.0,
+            "kind": "economic_interest", "percentage": 60.0,
         }),
         &pool,
     )

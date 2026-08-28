@@ -45,7 +45,7 @@ use uuid::Uuid;
 
 use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboEdgeAssertControl,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboEdgeConnect,
 };
 use ob_poc_kyc_decide::{test_verb_execution_context_with_session, DecideObligationWaive, DecideReject};
 use ob_poc_kyc_read::PgKycEventReader;
@@ -190,7 +190,7 @@ async fn build_alleged_board(pool: &PgPool, subject: SubjectId) -> (Uuid, Uuid) 
         .await;
     }
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": p1, "to_entity_id": co,
             "kind": "voting_rights", "percentage": 30.0,

@@ -10,7 +10,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeAssertControl};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeConnect};
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{fold_control, SubjectId};
 use ob_poc_types::TransactionScopeId;
@@ -101,7 +101,7 @@ async fn unparseable_wire_value_is_not_dominant_influence() {
 
     // Garbage kind: rejected, nothing appended.
     let garbage = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": from, "to_entity_id": to,
             "kind": "not_a_real_pipe_kind",
@@ -113,7 +113,7 @@ async fn unparseable_wire_value_is_not_dominant_influence() {
 
     // Absent kind: rejected, nothing appended.
     let absent = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": from, "to_entity_id": to,
         }),

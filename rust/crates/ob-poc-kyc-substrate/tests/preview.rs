@@ -44,7 +44,7 @@ fn register_event(subj: SubjectId) -> IntentEvent {
 fn assert_control_event(subj: SubjectId, edge: EdgeId, from: EntityId, to: EntityId) -> IntentEvent {
     IntentEvent::new(
         subj,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         Principal::test_analyst(),
         ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
         TargetBinding::for_subject(subj),

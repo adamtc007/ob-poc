@@ -194,13 +194,20 @@ fn historical_edges_reclassify_without_mutation() {
     let fund = EntityId(uuid::Uuid::new_v4());
     let as_of = chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap();
 
+    // `kyc_ubo.assert.edge.economic-interest` RETIRED (EOP-VS-UBO-GAME-001
+    // T3, §3.2, 2026-08-27) — merged into `connect`, `kind` now carried
+    // explicitly in the payload. P0c census found 0 real committed events
+    // under the old FQN, so the fold arm is a full K-G7 deletion (unlike
+    // `control`, kept R5) — this fixture uses the live FQN, since there is
+    // no historical arm left to exercise for a hypothetical pre-tranche event.
     let assert_event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.edge.economic-interest",
+        "kyc_ubo.assert.edge.connect",
         Principal::test_analyst(),
         AuthorityRef("historical".into()),
         TargetBinding::for_subject(subject),
         serde_json::json!({
+            "kind": "economic_interest",
             "from_entity_id": holder.0, "to_entity_id": fund.0, "percentage": 40.0,
         }),
         as_of,

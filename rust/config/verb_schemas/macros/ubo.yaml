@@ -109,7 +109,9 @@ ubo.trace-chains:
 # derivation-dressed-as-a-verb candidate for outright deletion — but two
 # effects in one bespoke op (supersede the nominee edge + assert the
 # nominator's real edge) had no governed multi-step composition mechanism
-# other than a single-purpose verb. `kyc_ubo.assert.edge.control` gained an
+# other than a single-purpose verb. `kyc_ubo.assert.edge.control` (renamed
+# `kyc_ubo.assert.edge.connect`, EOP-VS-UBO-GAME-001 T3, 2026-08-27, §3.2 —
+# merged with the former assert-economic-interest) gained an
 # optional `pierced-from` arg (fold-side: stamps `EdgeState.pierced_from`;
 # op-side: fail-closed checks the referenced edge exists, is
 # `EdgeKind::Nominee`, and is active — K-8, the same check the retired
@@ -142,7 +144,7 @@ kyc_ubo.assert.edge.nominee-piercing:
       edge-id:
         type: str
         ui-label: "Nominee Edge"
-        description: "The target nominee edge to pierce (must exist, be active, and be of kind nominee — checked fail-closed on the assert-control step)"
+        description: "The target nominee edge to pierce (must exist, be active, and be of kind nominee — checked fail-closed on the connect step)"
       nominator-id:
         type: str
         ui-label: "Disclosed Nominator"
@@ -154,7 +156,7 @@ kyc_ubo.assert.edge.nominee-piercing:
       kind:
         type: str
         ui-label: "Underlying Kind"
-        description: "The UNDERLYING kind the nominator actually holds. Any canonical wire value EXCEPT nominee — a pierce cannot produce another nominee edge (fail-closed on the assert-control step)."
+        description: "The UNDERLYING kind the nominator actually holds. Any canonical wire value EXCEPT nominee — a pierce cannot produce another nominee edge (fail-closed on the connect step)."
     optional:
       percentage:
         type: str
@@ -168,7 +170,7 @@ kyc_ubo.assert.edge.nominee-piercing:
   prereqs: []
 
   expands-to:
-    - verb: kyc_ubo.assert.edge.control
+    - verb: kyc_ubo.assert.edge.connect
       args:
         subject-id: "${arg.subject-id}"
         from_entity_id: "${arg.nominator-id}"
@@ -177,7 +179,7 @@ kyc_ubo.assert.edge.nominee-piercing:
         pierced-from: "${arg.edge-id}"
         percentage: "${arg.percentage}"
         trust-revocable: "${arg.trust-revocable}"
-    - verb: kyc_ubo.assert.edge.supersession
+    - verb: kyc_ubo.assert.edge.disconnect
       args:
         subject-id: "${arg.subject-id}"
         edge-id: "${arg.edge-id}"

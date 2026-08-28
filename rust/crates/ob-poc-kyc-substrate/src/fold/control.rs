@@ -193,9 +193,11 @@ pub struct ControlState {
     pub structure_class: Option<StructureClass>,
     /// Event that set the structure class (K-35 traceability).
     pub classify_event_id: Option<EventId>,
-    /// Event id of the most-recent `kyc_ubo.assert.edge.reconciliation`.
-    /// Required before `freeze` (K-14; `compute-fold` retired TS.6 P2).
-    pub reconciliation_event_id: Option<EventId>,
+    // `reconciliation_event_id` REMOVED (EOP-VS-UBO-GAME-001 T3, §3.3,
+    // 2026-08-27) with `kyc_ubo.assert.edge.reconciliation`, its sole
+    // writer, and `Precondition::ReconciledProjection`/the K-14 gate on
+    // freeze, its sole reader. See fold/control.rs's former reconciliation
+    // fold arm (deleted) for the full reasoning.
     // `smo_person_id` / `smo_event_id` removed TS.6 §5 (2026-08-22) with
     // `ubo.determination.apply-smo-fallback`, their ONLY writer. Left in
     // place they would have been permanently `None` while two `match` sites
@@ -232,10 +234,8 @@ impl ControlState {
             .sum()
     }
 
-    /// True if a reconcile-conflict event has been recorded (K-14 precondition).
-    pub fn is_reconciled(&self) -> bool {
-        self.reconciliation_event_id.is_some()
-    }
+    // `is_reconciled()` REMOVED (EOP-VS-UBO-GAME-001 T3, §3.3) with
+    // `reconciliation_event_id` above — see that field's retirement comment.
 
     /// True if a supported strategy is derivable from the structure class
     /// (K-4 precondition for fold/freeze). TS.6 P2: "strategy follows from
@@ -369,26 +369,30 @@ pub(crate) fn edge_kind_from_wire(wire: &str) -> EdgeKind {
 /// `TypeGeometryPermits` arm (the append/preview chokepoint) and
 /// `placement.rs`'s R2 existence check — ONE extraction, not two.
 fn geometry_triple_for_event(event: &IntentEvent) -> Option<(EntityId, EntityId, EdgeKind)> {
-    match event.verb_fqn.as_str() {
-        "kyc_ubo.assert.edge.economic-interest" => entity_id(&event.payload, "from_entity_id")
-            .zip(entity_id(&event.payload, "to_entity_id"))
-            .map(|(from, to)| (from, to, EdgeKind::EconomicInterest)),
-        // "kyc_ubo.assert.edge.nominee-piercing" special case RETIRED (TS.6 P2, K-G7):
-        // the old bespoke verb derived `to` from the pierced edge (needing
-        // the folded `ControlState`, since its own payload never carried
-        // `to_entity_id`). The macro composition that replaced it
-        // (`config/verb_schemas/macros/ubo.yaml`) issues an ordinary
-        // `kyc_ubo.assert.edge.control` call with an explicit `to_entity_id` —
-        // indistinguishable from any other assert-control call, so it falls
-        // through to the generic arm below with no special-casing and no
-        // `ControlState` lookup needed (the now-unused `control` parameter
-        // was removed with this arm). A historical event still bearing the
-        // retired verb_fqn falls through too and evaluates as `None` —
-        // `Unevaluable`, which admits — not a crash.
-        _ => entity_id(&event.payload, "from_entity_id")
-            .zip(entity_id(&event.payload, "to_entity_id"))
-            .map(|(from, to)| (from, to, edge_kind_from_payload(&event.payload))),
-    }
+    // "kyc_ubo.assert.edge.economic-interest" special case RETIRED
+    // (EOP-VS-UBO-GAME-001 T3, §3.2): the old FQN's payload never carried
+    // `kind` (it was implicitly always EconomicInterest), so this used to
+    // be a per-FQN match with a hardcoded arm. `connect` (the live FQN,
+    // §3.2) always carries `kind` — including "economic_interest" as an
+    // ordinary value — so every verb_fqn now reads the same way, with no
+    // special-casing needed. P0c census: 0 real committed events under the
+    // old FQN, so there is no historical stream this special case would
+    // still need to serve.
+    // "kyc_ubo.assert.edge.nominee-piercing" special case RETIRED (TS.6 P2, K-G7):
+    // the old bespoke verb derived `to` from the pierced edge (needing the
+    // folded `ControlState`, since its own payload never carried
+    // `to_entity_id`). The macro composition that replaced it
+    // (`config/verb_schemas/macros/ubo.yaml`) issues an ordinary
+    // `kyc_ubo.assert.edge.connect` call with an explicit `to_entity_id` —
+    // indistinguishable from any other connect call, so it reads the same
+    // generic way, with no special-casing and no `ControlState` lookup
+    // needed (the now-unused `control` parameter was removed with that
+    // arm). A historical event still bearing the retired verb_fqn reads the
+    // same way too and evaluates as `None` — `Unevaluable`, which admits —
+    // not a crash.
+    entity_id(&event.payload, "from_entity_id")
+        .zip(entity_id(&event.payload, "to_entity_id"))
+        .map(|(from, to)| (from, to, edge_kind_from_payload(&event.payload)))
 }
 
 /// Outcome of evaluating type geometry for one (from, kind, to) triple.
@@ -512,34 +516,79 @@ pub(crate) fn apply_one_control_event(
             state.classify_event_id = Some(event.id);
         }
 
-        "kyc_ubo.assert.edge.economic-interest" => {
+        // §3.4 R8 (EOP-VS-UBO-GAME-001 T3, corrected 2026-08-27): `remove`
+        // is never refused — it PRUNES the links that touch the removed
+        // block, computed here at fold time from prior state, never in the
+        // payload (R6 purity — the event carries only `entity_id`, same
+        // shape T2 gave it; `canonical_event_shape`'s `remove` arm is
+        // unchanged by this correction). Only edges with this entity at
+        // either endpoint go inactive; nothing propagates past them (no
+        // cascade), and the far-end blocks keep every other link they had.
+        // This is the ControlGraph half of `remove`'s two-axis fold —
+        // `fold::type_registry`'s arm (unchanged by this correction)
+        // records the withdrawal itself.
+        "kyc_ubo.assert.subject.remove" => {
+            if let Some(eid) = entity_id(p, "entity_id") {
+                for edge in state.edges.values_mut() {
+                    if edge.is_active() && (edge.from == eid || edge.to == eid) {
+                        edge.status = EdgeStatus::Superseded;
+                        edge.superseded_by = Some(event.id);
+                    }
+                }
+            }
+        }
+
+        // `kyc_ubo.assert.edge.economic-interest` — RETIRED (EOP-VS-UBO-GAME-001
+        // T3 §3.2, absorbed into `connect` below). P0c census: 0 real
+        // committed events under this FQN — K-G7 full deletion of the arm
+        // (unlike `control` below, which has real history and stays R5).
+        // A historical event still bearing this verb_fqn falls through to
+        // the catch-all `_ => {}`, a no-op — replay-faithful, and provably
+        // inert (there is nothing to replay).
+
+        // Historical only (EOP-VS-UBO-GAME-001 T3 retired the FQN; the arm
+        // stays so any pre-existing stream with real `control` events still
+        // folds correctly — R5, nothing is deleted; P0c census: 4 real
+        // committed events). No new event of this kind can be produced
+        // going forward: absent from `assembly_lexicon()` and unregistered
+        // as an op — `connect` below is the live arm.
+        "kyc_ubo.assert.edge.control" => {
             if let (Some(from), Some(to)) =
                 (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
             {
-                let edge_id = edge_id_from_payload(p).unwrap_or_else(|| {
-                    let key = format!("economic:{}:{}", from.0, to.0);
-                    EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes()))
-                });
+                let kind = edge_kind_from_payload(p);
+                let key = format!("control:{}:{}:{:?}", from.0, to.0, kind);
+                let edge_id = edge_id_from_payload(p)
+                    .unwrap_or_else(|| EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes())));
                 state.edges.insert(
                     edge_id,
                     EdgeState {
                         id: edge_id,
-                        kind: EdgeKind::EconomicInterest,
+                        kind,
                         from,
                         to,
                         percentage: opt_f64(p, "percentage"),
                         status: EdgeStatus::Asserted,
                         evidence_event_id: None,
                         originating_event_id: event.id,
-                        trust_revocable: None,
+                        trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
                         superseded_by: None,
-                        pierced_from: None,
+                        pierced_from: edge_id_field(p, "pierced_from"),
                     },
                 );
             }
         }
 
-        "kyc_ubo.assert.edge.control" => {
+        // §3.2: `connect` absorbs assert-control + assert-economic-interest
+        // — one merged verb, kind (including "economic_interest") always
+        // present in the payload, geometry validates the classified pipe
+        // (TS.5 R1) the same way for every kind. The live arm going
+        // forward; identical shape to `control`'s historical arm above,
+        // minus the special-casing economic-interest's old FQN needed
+        // (kind is never absent on a live `connect` event — the
+        // op-normalizer rejects anything outside `EDGE_KIND_WIRE_VALUES`
+        // before append, TS.1 §1b).
+        "kyc_ubo.assert.edge.connect" => {
             if let (Some(from), Some(to)) =
                 (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
             {
@@ -562,10 +611,10 @@ pub(crate) fn apply_one_control_event(
                         // (see the field's polarity doc on `EdgeState`).
                         trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
                         superseded_by: None,
-                        // TS.6 P2 (K-G7): set only when this assert-control
-                        // call is the first half of the `pierce-nominee`
-                        // macro composition (op-layer stamps `pierced_from`
-                        // from the caller's `pierced-from` arg).
+                        // TS.6 P2 (K-G7): set only when this connect call is
+                        // the first half of the `nominee-piercing` macro
+                        // composition (op-layer stamps `pierced_from` from
+                        // the caller's `pierced-from` arg).
                         pierced_from: edge_id_field(p, "pierced_from"),
                     },
                 );
@@ -593,8 +642,16 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "kyc_ubo.assert.edge.supersession" => {
-            // K-13: supersede-never-delete.
+        // `kyc_ubo.assert.edge.supersession` — RETIRED (EOP-VS-UBO-GAME-001
+        // T3 §3.2, renamed to `disconnect` below). P0c census: 0 real
+        // committed events under this FQN — K-G7 full deletion of the arm.
+        // A historical event still bearing this verb_fqn falls through to
+        // the catch-all `_ => {}`, a no-op.
+
+        // §3.2: `disconnect` absorbs supersession — pure rename, identical
+        // shape (K-13: supersede-never-delete still holds — the edge stays,
+        // status flips).
+        "kyc_ubo.assert.edge.disconnect" => {
             if let Some(eid) = edge_id_from_target(event) {
                 if let Some(edge) = state.edges.get_mut(&eid) {
                     edge.status = EdgeStatus::Superseded;
@@ -607,8 +664,8 @@ pub(crate) fn apply_one_control_event(
         // bespoke two-effect fold arm is gone — the same two effects (assert
         // the nominator's real edge with `pierced_from` provenance +
         // supersede the nominee edge) are now two ordinary fold arms above
-        // (`kyc_ubo.assert.edge.control`'s `pierced_from` read) and below
-        // (`kyc_ubo.assert.edge.supersession`), composed by the `kyc_ubo.assert.edge.nominee-piercing`
+        // (`kyc_ubo.assert.edge.connect`'s `pierced_from` read) and below
+        // (`kyc_ubo.assert.edge.disconnect`), composed by the `kyc_ubo.assert.edge.nominee-piercing`
         // MACRO (config/verb_schemas/macros/ubo.yaml), not a single event
         // under this verb_fqn. A historical event still bearing this
         // verb_fqn falls through to the catch-all `_ => {}` below, a
@@ -616,9 +673,20 @@ pub(crate) fn apply_one_control_event(
         // K-18/K-31), same discipline as select-strategy/compute-fold's
         // retirement.
 
-        "kyc_ubo.assert.edge.reconciliation" => {
-            state.reconciliation_event_id = Some(event.id);
-        }
+        // `kyc_ubo.assert.edge.reconciliation` — RETIRED (EOP-VS-UBO-GAME-001
+        // T3 §3.3, 2026-08-27, K-G7 full deletion): "No reconcile ... a
+        // third path to what two moves already do." P0c census found 2
+        // real committed events under this FQN — unlike `control`
+        // (kept R5) this is deleted anyway, because the concept it fed
+        // (the K-14 freeze gate, `ControlState::is_reconciled()`) is
+        // dissolved in the SAME tranche (see the `Precondition` enum and
+        // `check_preconditions`'s former `ReconciledProjection` arm, both
+        // deleted). Nothing downstream ever reads `reconciliation_event_id`
+        // again once that gate is gone, so there is nothing left to keep
+        // the field or the arm alive FOR — R5's replay-fidelity concern
+        // only matters when some consumer still reads the reconstructed
+        // state; here none does. A historical event still bearing this
+        // verb_fqn falls through to the catch-all `_ => {}`, a no-op.
 
         // TS.6 P2 (K-G7): "ubo.determination.select-strategy" retired —
         // strategy is now derived from `structure_class`
@@ -759,14 +827,6 @@ pub fn check_preconditions(
                     None => return Err(KycError::EdgeNotFound(eid)),
                 }
             }
-            Precondition::ReconciledProjection => {
-                if !control.is_reconciled() {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "reconcile-conflict must fire before freeze".into(),
-                    });
-                }
-            }
             Precondition::SubjectRegistered => {
                 if !control.registered {
                     return Err(KycError::PreconditionFailed {
@@ -862,11 +922,11 @@ pub fn check_preconditions(
                 let (Some(from), Some(to)) = (from, to) else {
                     continue;
                 };
-                let kind = if event.verb_fqn.as_str() == "kyc_ubo.assert.edge.economic-interest" {
-                    EdgeKind::EconomicInterest
-                } else {
-                    edge_kind_from_payload(&event.payload)
-                };
+                // EOP-VS-UBO-GAME-001 T3: the old economic-interest FQN's
+                // special case (its payload never carried `kind`) is gone —
+                // `connect`, the live FQN, always carries `kind`, so
+                // `edge_kind_from_payload` alone is correct now.
+                let kind = edge_kind_from_payload(&event.payload);
                 let duplicate = control
                     .edges
                     .values()
@@ -876,7 +936,7 @@ pub fn check_preconditions(
                         verb: lexicon_entry.fqn.clone(),
                         reason: format!(
                             "an active edge of kind {kind:?} already exists from {from:?} to \
-                             {to:?}; use kyc_ubo.assert.edge.supersession, never a contradicting assert (K-13)"
+                             {to:?}; use kyc_ubo.assert.edge.disconnect, never a contradicting assert (K-13)"
                         ),
                     });
                 }
@@ -1035,6 +1095,7 @@ pub fn check_preconditions(
                     }
                 }
             }
+
         }
     }
     Ok(())

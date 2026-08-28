@@ -1553,7 +1553,12 @@ pub fn recover_determination_at(
     use crate::fold::type_registry::fold_type_registry;
 
     let control = fold_control(events);
-    if !control.is_reconciled() || !control.has_strategy() {
+    // EOP-VS-UBO-GAME-001 T3 (§3.3, 2026-08-27): the `is_reconciled()` gate
+    // is removed here alongside the live K-14 freeze gate it mirrored — a
+    // determination frozen under the new (reconciliation-free) rules must
+    // still be replayable; keeping this half of the check would refuse to
+    // recover a validly-frozen determination.
+    if !control.has_strategy() {
         return None;
     }
     let type_registry = fold_type_registry(events);

@@ -423,17 +423,19 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // dsl.kyc stream-backed determination verbs (EOP-DD-KYCUBO-002 rip-and-replace R1/R2).
     // Domain: ubo.edge.* (5), ubo.determination.* (4), kyc.subject.* (2).
     // YAML: config/verbs/kyc/dsl-kyc.yaml.
-    registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertControl));
-    registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertEconomicInterest));
+    // EOP-VS-UBO-GAME-001 T3 (2026-08-27): `UboEdgeAssertControl` +
+    // `UboEdgeAssertEconomicInterest` MERGED into `UboEdgeConnect` (§3.2);
+    // `UboEdgeSupersede` renamed `UboEdgeDisconnect` (§3.1); `UboEdgeReconcile
+    // Conflict` RETIRED outright (§3.3, K-G7 — no successor registered).
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeConnect));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeAttachEvidence));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeVerify));
-    registry.register(Arc::new(kyc_stream_ops::UboEdgeSupersede));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeDisconnect));
     // `UboEdgePierceNominee` retired TS.6 P2 (K-G7) — folded into the
     // `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/macros/ubo.yaml)
-    // composing `UboEdgeAssertControl` (extended with an optional
-    // `pierced-from` arg) + `UboEdgeSupersede`, both already registered
-    // above/below.
-    registry.register(Arc::new(kyc_stream_ops::UboEdgeReconcileConflict));
+    // composing `UboEdgeConnect` (extended with an optional
+    // `pierced-from` arg) + `UboEdgeDisconnect`, both already registered
+    // above.
     // `UboDeterminationSelectStrategy` retired TS.6 P2 (K-G7) — strategy is
     // now derived from `structure_class`, never separately asserted.
     // `UboDeterminationComputeFold` retired TS.6 P2 (K-G7) — a pure read

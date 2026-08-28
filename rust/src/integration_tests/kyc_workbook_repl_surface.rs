@@ -218,7 +218,7 @@ async fn surface_session_end_to_end() {
             session_id,
             UserInputV2::Message {
                 content: format!(
-                    r#"kyc-workbook.stage (kyc_ubo.assert.edge.control :subject-id "@{handle_name}" :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
+                    r#"kyc-workbook.stage (kyc_ubo.assert.edge.connect :subject-id "@{handle_name}" :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
                 ),
             },
         )
@@ -340,15 +340,15 @@ async fn run_stops_at_first_failure_prefix_stands() {
 
         let assert_event = IntentEvent::new(
             subject,
-            "kyc_ubo.assert.edge.control",
+            "kyc_ubo.assert.edge.connect",
             SubstratePrincipal::test_analyst(),
-            AuthorityRef("setup.assert-control".into()),
+            AuthorityRef("setup.connect".into()),
             TargetBinding::for_subject(subject),
             serde_json::json!({"edge_id": edge1, "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights"}),
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_, _, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &assert_event, "(setup-connect)", |_, _, _| Ok(())).await.unwrap();
 
         let evidence_event = IntentEvent::new(
             subject,
@@ -378,7 +378,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
         session_id,
         UserInputV2::Message {
             content: format!(
-                r#"kyc-workbook.stage (kyc_ubo.assert.edge.control :edge_id "{edge2}" :from_entity_id "{from2}" :to_entity_id "{to2}" :kind "voting_rights")"#
+                r#"kyc-workbook.stage (kyc_ubo.assert.edge.connect :edge_id "{edge2}" :from_entity_id "{from2}" :to_entity_id "{to2}" :kind "voting_rights")"#
             ),
         },
     )
@@ -402,15 +402,15 @@ async fn run_stops_at_first_failure_prefix_stands() {
         let mut scope2 = crate::sequencer_tx::PgTransactionScope::begin(&pool).await.unwrap();
         let supersede_event = IntentEvent::new(
             subject,
-            "kyc_ubo.assert.edge.supersession",
+            "kyc_ubo.assert.edge.disconnect",
             SubstratePrincipal::test_analyst(),
-            AuthorityRef("concurrent.supersede".into()),
+            AuthorityRef("concurrent.disconnect".into()),
             TargetBinding::for_edge(subject, EdgeId(edge1)),
             serde_json::json!({}),
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_, _, _| Ok(()))
+        append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-disconnect)", |_, _, _| Ok(()))
             .await
             .unwrap();
         scope2.commit().await.unwrap();
@@ -421,7 +421,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
         .await
         .expect("run dispatch itself must not error at the transport level");
     let run_msg = expect_info(&run_resp.kind);
-    assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.control"), "got: {run_msg}");
+    assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.connect"), "got: {run_msg}");
     assert!(run_msg.contains("FAILED kyc_ubo.assert.edge.verification"), "got: {run_msg}");
     assert!(run_msg.contains("1 move(s) remain staged"), "got: {run_msg}");
 
@@ -467,7 +467,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
         session_id,
         UserInputV2::Message {
             content: format!(
-                r#"kyc-workbook.stage (kyc_ubo.assert.edge.control :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
+                r#"kyc-workbook.stage (kyc_ubo.assert.edge.connect :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
             ),
         },
     )
@@ -491,7 +491,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
     .with_lexicon_hash(lexicon.hash);
     let expected_event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         SubstratePrincipal::test_analyst(),
         AuthorityRef("preview-only".into()),
         TargetBinding::for_subject(subject),
@@ -509,7 +509,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
         .expect("run must succeed");
     let run_msg = expect_info(&run_resp.kind);
     assert!(run_msg.contains("LANDED kyc_ubo.assert.subject.register"), "got: {run_msg}");
-    assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.control"), "got: {run_msg}");
+    assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.connect"), "got: {run_msg}");
 
     let mut conn = pool.acquire().await.unwrap();
     let committed = PgKycEventStore::load_events(&mut conn, subject).await.unwrap();

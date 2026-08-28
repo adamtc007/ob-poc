@@ -126,18 +126,21 @@ async fn w2_manifest_publishing() {
 
     // ── Assembly pack ────────────────────────────────────────────────────
     let assembly = assembly_lexicon();
-    // Universe pin: 14 `assembly_lexicon()` entries (15 post-P1/P2, minus
+    // Universe pin: 12 `assembly_lexicon()` entries (14 post-T2, minus
+    // `control`+`economic-interest` MERGED into `connect` and
+    // `reconciliation` DISSOLVED, T3 2026-08-27 §3.2/§3.3 — `supersession`
+    // renamed `disconnect` is net zero; 15 post-P1/P2, minus
     // `type-correction` DISSOLVED, T2 2026-08-27 §8 Q1 P3; 16 post-D2.0,
     // minus `register`+`type` MERGED into `place`; 19 post-TS.6-P1, minus
     // `creation`/`satisfaction` DISSOLVED and `waiver` MOVED to
     // evaluation_lexicon(), D2.0 §5, 2026-08-22). This
     // counts `LexiconEntry::build()` calls in lexicon.rs — NOT the same
-    // number as `declared_verb_universe()` (17, YAML-scanned across BOTH
+    // number as `declared_verb_universe()` (15, YAML-scanned across BOTH
     // packs, `kyc_pack_closure.rs`): lexicon coverage of the declared verb
     // set is intentionally partial (K-G6), so the two counts are expected
     // to differ, not drift-checked against each other. Bump consciously
     // alongside `kyc_pack_closure.rs`'s own lexicon-entry-count assertion.
-    assert_eq!(assembly.entries.len(), 14, "assembly_lexicon universe (see kyc_pack_closure)");
+    assert_eq!(assembly.entries.len(), 12, "assembly_lexicon universe (see kyc_pack_closure)");
     clear_prior_state(&pool, &assembly).await;
     assert_publish_roundtrip(&pool, &assembly, |mut conn| async move {
         publish_assembly_manifest(&mut conn, Some("w2-test")).await.unwrap()

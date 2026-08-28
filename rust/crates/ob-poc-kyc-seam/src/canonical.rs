@@ -63,12 +63,15 @@ fn required_string_arg<'a>(verb_fqn: &str, args: &'a serde_json::Value, name: &s
 /// Map one verb's declared arguments to `(target, payload, edge_id)`.
 ///
 /// `edge_id` is `Some` exactly when this call creates or addresses an edge
-/// (control/economic-interest mint one if the caller didn't supply one and
-/// return it either way — VS §8 Q3's "the system mints it and returns it",
-/// applied to today's verbs without forcing Q3's stronger, not-yet-ratified
-/// "a caller-chosen id is disallowed" reading onto them; see this crate's
-/// `docs` note in the seam module for the full reasoning) or evidence
-/// targets an existing one.
+/// (`connect` always mints one — EOP-VS-UBO-GAME-001 §8 Q3, RATIFIED
+/// (worded as a Recommendation in the source document, not marked RULED
+/// like Q1, but stated with no dissenting alternative and applied here as
+/// such — flagged, not silently resolved): "the system mints it and returns
+/// it; a caller-chosen id is a stored identifier the board cannot predict."
+/// T3 (2026-08-27) closes the gap this doc used to describe: a
+/// caller-supplied `edge-id` on `connect` is now refused outright, not
+/// merely ignored) or `evidence`/`verification`/`disconnect` target an
+/// existing one.
 ///
 /// Deliberately excluded, not silently missing — see the module doc:
 /// - `kyc_ubo.decide.determination.freeze` (§3.2: computes a verdict from
@@ -76,7 +79,7 @@ fn required_string_arg<'a>(verb_fqn: &str, args: &'a serde_json::Value, name: &s
 /// - `kyc_ubo.decide.subject.{approve,reject}` / `.decide.obligation.waiver`
 ///   — never build an `IntentEvent` (TS.6 P2); calling this with one of
 ///   these FQNs is a caller bug, not a shape question, hence `bail!`.
-/// - `kyc_ubo.assert.edge.control`'s `pierced-from` existence/kind/active
+/// - `kyc_ubo.assert.edge.connect`'s `pierced-from` existence/kind/active
 ///   check — needs a live DB read; stays a separate op-layer step around
 ///   this call, same principle.
 pub fn canonical_event_shape(
@@ -149,8 +152,22 @@ pub fn canonical_event_shape(
             Ok((subj_target, payload, None))
         }
 
-        "kyc_ubo.assert.edge.control" => {
-            let edge = EdgeId(uuid_arg(args, "edge-id").unwrap_or_else(Uuid::new_v4));
+        // EOP-VS-UBO-GAME-001 T3, §3.2: `connect` absorbs assert-control +
+        // assert-economic-interest — they differ by kind, and geometry
+        // already validates the classified pipe (TS.5 R1); their
+        // preconditions are identical (P0b's merge test, confirmed from
+        // source). §8 Q3: the system mints the link id and returns it — a
+        // caller-supplied `edge-id` is refused, not silently accepted or
+        // ignored: it is a stored identifier the board cannot predict,
+        // which is what made the old verb unstageable through the board.
+        "kyc_ubo.assert.edge.connect" => {
+            if args.get("edge-id").is_some() {
+                bail!(
+                    "{verb_fqn}: a caller-supplied edge id is refused (§8 Q3) — the system \
+                     mints the link id and returns it"
+                );
+            }
+            let edge = EdgeId(Uuid::new_v4());
             let from = required_uuid_arg(verb_fqn, args, "from_entity_id")?;
             let to = required_uuid_arg(verb_fqn, args, "to_entity_id")?;
             let kind = required_string_arg(verb_fqn, args, "kind")?;
@@ -182,25 +199,26 @@ pub fn canonical_event_shape(
             if let Some(pf) = pierced_from {
                 payload["pierced_from"] = serde_json::Value::String(pf.to_string());
             }
-            let target = TargetBinding::for_edge(subject, edge);
+            // `connect` is geometry-gated (TS.5 R1), not edge-scoped:
+            // `enumerate_placement_set`'s per-triple candidates all share
+            // the bare `TargetBinding::for_subject(subject)` (the specific
+            // triple lives in the move's `proposed_edge`/payload, not the
+            // target — there is no way to build a per-triple target ahead
+            // of the mint, since §8 Q3 means the edge id doesn't exist
+            // until this call runs). Setting `target.edge_id` to the freshly
+            // minted id here would make this event's own target
+            // unmatchable against any legal move (`KycWorkbook::stage`
+            // compares `target` verbatim) and would re-render as a
+            // caller-supplied `:edge-id`, which a fresh connect call must
+            // refuse (§8 Q3) — both wrong for the event that MINTS the id.
+            // The mint still flows via `payload["edge_id"]` (read by the
+            // fold) and this function's own `Some(edge)` return.
+            let target = TargetBinding::for_subject(subject);
             Ok((target, payload, Some(edge)))
         }
 
-        "kyc_ubo.assert.edge.economic-interest" => {
-            let edge = EdgeId(uuid_arg(args, "edge-id").unwrap_or_else(Uuid::new_v4));
-            let from = required_uuid_arg(verb_fqn, args, "from_entity_id")?;
-            let to = required_uuid_arg(verb_fqn, args, "to_entity_id")?;
-            let mut payload = serde_json::json!({
-                "edge_id": edge.0,
-                "from_entity_id": from,
-                "to_entity_id": to,
-            });
-            if let Some(p) = args.get("percentage") {
-                payload["percentage"] = p.clone();
-            }
-            let target = TargetBinding::for_edge(subject, edge);
-            Ok((target, payload, Some(edge)))
-        }
+        // `kyc_ubo.assert.edge.economic-interest` retired T3 (§3.2, absorbed
+        // into `connect` above) — no live arm here.
 
         "kyc_ubo.assert.edge.evidence" => {
             let edge = uuid_arg(args, "edge-id").map(EdgeId);
@@ -222,19 +240,26 @@ pub fn canonical_event_shape(
             }
         }
 
-        "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.supersession" => {
+        "kyc_ubo.assert.edge.verification" => {
             let edge = EdgeId(required_uuid_arg(verb_fqn, args, "edge-id")?);
             let target = TargetBinding::for_edge(subject, edge);
             Ok((target, serde_json::json!({}), Some(edge)))
         }
 
-        "kyc_ubo.assert.edge.reconciliation" => {
-            let mut payload = serde_json::json!({});
-            if let Some(r) = args.get("resolution") {
-                payload["resolution"] = r.clone();
-            }
-            Ok((subj_target, payload, None))
+        // EOP-VS-UBO-GAME-001 T3, §3.2: `disconnect` absorbs supersession —
+        // "the link is no longer on the board" (K-13 supersede-never-delete
+        // still holds: the edge stays, status flips). Pure rename, shape
+        // unchanged.
+        "kyc_ubo.assert.edge.disconnect" => {
+            let edge = EdgeId(required_uuid_arg(verb_fqn, args, "edge-id")?);
+            let target = TargetBinding::for_edge(subject, edge);
+            Ok((target, serde_json::json!({}), Some(edge)))
         }
+
+        // `kyc_ubo.assert.edge.reconciliation` RETIRED (EOP-VS-UBO-GAME-001
+        // T3, §3.3, 2026-08-27, K-G7 full deletion — see dsl-kyc.yaml's
+        // retirement comment at this verb's former entry for the full
+        // reasoning) — no live arm here.
 
         "kyc_ubo.assert.entity.identity"
         | "kyc_ubo.assert.entity.screening"
@@ -362,21 +387,25 @@ mod tests {
     }
 
     #[test]
-    fn control_mints_edge_id_when_absent_and_returns_it() {
+    fn connect_mints_edge_id_when_absent_and_returns_it() {
         let s = subj();
         let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
         let args = serde_json::json!({
             "subject-id": s.0, "from_entity_id": from, "to_entity_id": to, "kind": "board_appointment"
         });
         let (target, payload, edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).unwrap();
-        let minted = edge.expect("control must mint and return an edge id");
-        assert_eq!(target.edge_id, Some(minted));
+            canonical_event_shape("kyc_ubo.assert.edge.connect", s, &args).unwrap();
+        let minted = edge.expect("connect must mint and return an edge id");
+        // `connect` is geometry-gated, not edge-scoped — its own target is
+        // the bare subject (matching `enumerate_placement_set`'s per-triple
+        // candidates); the mint flows via the payload and the return value.
+        assert_eq!(target.edge_id, None);
         assert_eq!(payload["edge_id"], minted.0.to_string());
     }
 
+    /// §8 Q3: a caller-supplied edge id is REFUSED — the system mints it.
     #[test]
-    fn control_accepts_caller_supplied_edge_id() {
+    fn connect_rejects_caller_supplied_edge_id() {
         let s = subj();
         let chosen = Uuid::new_v4();
         let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
@@ -384,14 +413,11 @@ mod tests {
             "subject-id": s.0, "edge-id": chosen, "from_entity_id": from, "to_entity_id": to,
             "kind": "voting_rights"
         });
-        let (_, payload, edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).unwrap();
-        assert_eq!(edge, Some(EdgeId(chosen)));
-        assert_eq!(payload["edge_id"], chosen.to_string());
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.connect", s, &args).is_err());
     }
 
     #[test]
-    fn control_kebab_trust_revocable_and_pierced_from_renamed() {
+    fn connect_kebab_trust_revocable_and_pierced_from_renamed() {
         let s = subj();
         let (from, to, pierced) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
         let args = serde_json::json!({
@@ -399,44 +425,49 @@ mod tests {
             "kind": "trust_settlor", "trust-revocable": true, "pierced-from": pierced
         });
         let (_, payload, _) =
-            canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).unwrap();
+            canonical_event_shape("kyc_ubo.assert.edge.connect", s, &args).unwrap();
         assert_eq!(payload["trust_revocable"], true);
         assert_eq!(payload["pierced_from"], pierced.to_string());
     }
 
     #[test]
-    fn control_rejects_nominee_kind_with_pierced_from() {
+    fn connect_rejects_nominee_kind_with_pierced_from() {
         let s = subj();
         let (from, to, pierced) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
         let args = serde_json::json!({
             "subject-id": s.0, "from_entity_id": from, "to_entity_id": to,
             "kind": "nominee", "pierced-from": pierced
         });
-        assert!(canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).is_err());
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.connect", s, &args).is_err());
     }
 
     #[test]
-    fn control_rejects_unknown_kind() {
+    fn connect_rejects_unknown_kind() {
         let s = subj();
         let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
         let args = serde_json::json!({
             "subject-id": s.0, "from_entity_id": from, "to_entity_id": to, "kind": "made_up_kind"
         });
-        assert!(canonical_event_shape("kyc_ubo.assert.edge.control", s, &args).is_err());
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.connect", s, &args).is_err());
     }
 
+    /// §3.2: connect absorbs assert-economic-interest — same verb, kind
+    /// "economic_interest", percentage attribute.
     #[test]
-    fn economic_interest_mints_and_returns_edge_id() {
+    fn connect_economic_interest_kind_mints_and_returns_edge_id() {
         let s = subj();
         let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
         let args = serde_json::json!({
-            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to, "percentage": 25.0
+            "subject-id": s.0, "from_entity_id": from, "to_entity_id": to,
+            "kind": "economic_interest", "percentage": 25.0
         });
         let (target, payload, edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.economic-interest", s, &args).unwrap();
+            canonical_event_shape("kyc_ubo.assert.edge.connect", s, &args).unwrap();
         let minted = edge.unwrap();
-        assert_eq!(target.edge_id, Some(minted));
+        assert_eq!(target.edge_id, None);
+        assert!(minted.0 != Uuid::nil());
         assert_eq!(payload["percentage"], 25.0);
+        assert_eq!(payload["kind"], "economic_interest");
     }
 
     #[test]
@@ -478,25 +509,24 @@ mod tests {
     }
 
     #[test]
-    fn verification_and_supersession_target_the_edge() {
+    fn verification_and_disconnect_target_the_edge() {
         let s = subj();
         let edge = Uuid::new_v4();
         let args = serde_json::json!({ "subject-id": s.0, "edge-id": edge });
-        for fqn in ["kyc_ubo.assert.edge.verification", "kyc_ubo.assert.edge.supersession"] {
+        for fqn in ["kyc_ubo.assert.edge.verification", "kyc_ubo.assert.edge.disconnect"] {
             let (target, _, returned_edge) = canonical_event_shape(fqn, s, &args).unwrap();
             assert_eq!(target.edge_id, Some(EdgeId(edge)), "{fqn}");
             assert_eq!(returned_edge, Some(EdgeId(edge)), "{fqn}");
         }
     }
 
+    /// EOP-VS-UBO-GAME-001 T3, §3.3: reconciliation is retired, not merged —
+    /// `canonical_event_shape` must refuse the FQN outright now.
     #[test]
-    fn reconciliation_is_subject_scoped() {
+    fn reconciliation_is_gone() {
         let s = subj();
         let args = serde_json::json!({ "subject-id": s.0 });
-        let (target, _, edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.reconciliation", s, &args).unwrap();
-        assert_eq!(target.subject_root, Some(s));
-        assert!(edge.is_none());
+        assert!(canonical_event_shape("kyc_ubo.assert.edge.reconciliation", s, &args).is_err());
     }
 
     #[test]
@@ -551,6 +581,9 @@ mod tests {
             "kyc_ubo.assert.subject.type",
             "kyc_ubo.assert.subject.type-correction",
             "kyc_ubo.assert.subject.member-withdrawal",
+            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.supersession",
+            "kyc_ubo.assert.edge.reconciliation",
         ] {
             assert!(canonical_event_shape(fqn, s, &args).is_err(), "{fqn} must no longer be recognized");
         }

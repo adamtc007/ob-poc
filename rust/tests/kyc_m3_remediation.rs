@@ -13,8 +13,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
-    UboEdgeAssertEconomicInterest, UboEdgeReconcileConflict,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
@@ -150,51 +149,45 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
 
     // B → A: 60%
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": entity_b, "to_entity_id": subject.0,
-            "percentage": 60.0,
+            "kind": "economic_interest", "percentage": 60.0,
         }),
         &pool,
     )
     .await;
     // P1 → B: 80% (effective on A: 48%)
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": p1, "to_entity_id": entity_b,
-            "percentage": 80.0,
+            "kind": "economic_interest", "percentage": 80.0,
         }),
         &pool,
     )
     .await;
     // P2 → B: 20% (effective on A: 12% — below 25% threshold)
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": p2, "to_entity_id": entity_b,
-            "percentage": 20.0,
+            "kind": "economic_interest", "percentage": 20.0,
         }),
         &pool,
     )
     .await;
     // P3 → A: 40% direct
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": p3, "to_entity_id": subject.0,
-            "percentage": 40.0,
+            "kind": "economic_interest", "percentage": 40.0,
         }),
         &pool,
     )
     .await;
 
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     let freeze_out = run(
         &UboDeterminationFreeze,
@@ -287,12 +280,6 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
     )
     .await;
 
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     // `ubo.determination.compute-fold` retired TS.6 P2 (K-G7) — it was a
     // pure read with no replacement verb, so this fold-correctness check
@@ -328,9 +315,9 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
 // as `ownership_prong_strategy` (`ob_poc::domain_ops::kyc_stream_ops`).
 //
 // Fixture: an LP fund (subject) whose GP-statutory control edge points to a
-// natural person P1 directly. `kyc_ubo.assert.edge.control` with `kind:
-// gp_statutory` — the same verb `ownership_prong_strategy` fixtures use for
-// `assert-economic-interest`, just the control counterpart.
+// natural person P1 directly. `kyc_ubo.assert.edge.connect` with `kind:
+// gp_statutory` — the same merged verb `ownership_prong_strategy` fixtures
+// use with `kind: economic_interest`, just the control counterpart.
 
 #[tokio::test]
 async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
@@ -363,19 +350,13 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
     )
     .await;
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0,
             "from_entity_id": p1,
             "to_entity_id": subject.0,
             "kind": "gp_statutory",
         }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;

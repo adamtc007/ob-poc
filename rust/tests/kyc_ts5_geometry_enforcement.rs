@@ -1,6 +1,6 @@
 //! EOP-DD-KYCUBO-TS.5 §5 gate suite — the headline live-op gate, plus the
 //! §4 tooth. Live-DB harness, same pattern as `kyc_ts4_pierce_traversal.rs`:
-//! drives the REAL governed `kyc_ubo.assert.edge.control` op end-to-end, not a
+//! drives the REAL governed `kyc_ubo.assert.edge.connect` op end-to-end, not a
 //! direct call to `geometry::check_type_geometry`.
 //!
 //! Everything else in TS.5 §5 (target-side, preview/append agreement,
@@ -14,7 +14,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeAssertControl};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeConnect};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -73,7 +73,7 @@ async fn assert_control(
     kind: &str,
 ) -> anyhow::Result<serde_json::Value> {
     let mut ctx = VerbExecutionContext::default();
-    UboEdgeAssertControl
+    UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject,
@@ -124,7 +124,7 @@ async fn illegal_source_type_is_refused_at_the_op() {
 
 /// §4's tooth: `every_geometry_rule_is_reachable_from_the_write_path` — one
 /// illegal triple per §2a source restriction, driven through the REAL
-/// `kyc_ubo.assert.edge.control` op, asserting refusal. RED before R1 landed
+/// `kyc_ubo.assert.edge.connect` op, asserting refusal. RED before R1 landed
 /// (proven in P0); green now; stays as the permanent guard against the
 /// wiring being lost again.
 #[tokio::test]
@@ -175,7 +175,7 @@ async fn every_geometry_rule_is_reachable_from_the_write_path() {
 // `crates/ob-poc-kyc-substrate/tests/ts5_geometry_enforcement.rs` call
 // `check_preconditions` directly. That function IS the shared chokepoint (TS.5
 // §1), so those gates are correct about the RULE — but they cannot see the op.
-// A regression that stopped `UboEdgeAssertControl` from routing through
+// A regression that stopped `UboEdgeConnect` from routing through
 // `check_preconditions`, or that made the op fail closed on an unevaluable
 // triple before ever reaching it, would leave that suite green while R5/R6 were
 // broken in production. These two drive the real governed op instead.

@@ -214,7 +214,7 @@ mod tests {
         let mut scores = HashMap::new();
         scores.insert("kyc_ubo.assert.subject.register".to_string(), 0.9);
         // A verb NOT on this board at all — must never leak into the output.
-        scores.insert("kyc_ubo.assert.edge.control".to_string(), 0.99);
+        scores.insert("kyc_ubo.assert.edge.connect".to_string(), 0.99);
 
         let ranked = rank_board_with_scores(&board, &scores);
 

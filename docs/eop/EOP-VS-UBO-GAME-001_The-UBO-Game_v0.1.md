@@ -10,6 +10,26 @@
 
 ---
 
+## §0 The problem
+
+**What KYC actually asks.** Who ultimately owns and controls this client? Answer it for a corporate group that may run to dozens of entities across several jurisdictions, where ownership runs through holding companies, control runs through management mandates that own nothing, nominees hold shares for people whose names are elsewhere, and funds are directed by a company that is not part of them.
+
+**Four things make that hard, and they are what this design is built against.**
+
+**1. You are told before you are shown.** A client describes their structure; research suggests more. None of it is proven on the day it is recorded, and much of it never will be. A system that requires proof before it will record a fact cannot represent the first six weeks of any onboarding — so allegation must be a first-class state, not an error, and proof must be something that arrives later and can be withdrawn again.
+
+**2. The answer must survive being asked years later.** A regulator asks what you concluded in March, on what basis, and why. That is two different questions — *what was true then* and *what did you know then* — and a system that stores current state can answer neither. If any conclusion is stored rather than derived, it drifts from the facts underneath it and nobody notices.
+
+**3. The structures are wildly various, and the rules follow the vehicle.** A company has share classes, so control follows votes. A partnership has an agreement, so control follows designation. A trust has neither, so control is the fiduciary roles. A fund is directed from outside itself. Encode those as special cases and you get a system that is confidently wrong on the fifth structure it meets — which is worse than one that refuses, because nobody looks at a plausible answer.
+
+**4. What is *acceptable* changes constantly; what things *are* does not.** Regulations move, thresholds move, policies differ by region and by product. How a limited partnership expresses control has not changed in a century. Bind those together and every policy tweak destabilises the model of the world.
+
+**And one thing that makes it harder than it sounds.** The people doing this work are not modellers. They are analysts assembling a picture from documents, calls and registry searches — building, correcting, and rebuilding as diligence proceeds. A system that presents this as form-filling over a fixed schema fights them; a system that lets them place a piece, connect it, take it out again and try another arrangement matches what they are actually doing.
+
+**What this design solves for, then:** a picture that can be assembled from allegations and hardened by proof; that can be reconstructed exactly as at any past moment in either axis; whose rules about what can connect to what come from the vehicle rather than from special cases; that separates *what is* from *whether that is acceptable* so the second can churn without disturbing the first; and that behaves, in the hands of an analyst, like building rather than filing.
+
+Everything below follows from those five things. Several of the rulings look unusual against ordinary practice — nothing structural is stored, no state is updated in place, status is computed rather than recorded, a disconnected block is a normal position. **Each one is there because of a specific failure it prevents**, and where that is not obvious the rule says which.
+
 ## §1 The game, in plain terms
 
 A **board** is a picture of who owns and controls what, for one client group, built up piece by piece.
@@ -26,7 +46,23 @@ A **board** is a picture of who owns and controls what, for one client group, bu
 
 **The inspect game** reads it. At any moment, against any state of the board, you run checks: does this meet regulation, policy, our own standards? It needs no permission and no completeness. If the board is half-built, checks fail, and **the failures are the work list**.
 
-That is the whole idea. It is a typed graph builder and a rule runner over the same graph — no harder in principle than an abstract syntax tree, and with fewer node kinds than most.
+That is the whole idea. It is a typed graph builder and a rule runner over the same graph — and it has fewer node kinds than most compilers. Small, though — as §1a explains — it is not shaped like a compiler's tree at all.
+
+## §1a Closer to Go than to a tree
+
+The instinct most implementers bring to a graph is the wrong one here, and it is worth naming before it costs a defect.
+
+**An abstract syntax tree, or a table with referential integrity, holds its invariant at every instant.** Every node has a parent. A dangling subtree is corrupt. A foreign key pointing nowhere is by definition a fault, and the right response is to prevent it — refuse the write, or cascade the delete.
+
+**This board is not that. It is closer to Go.** A stone is legal on its own. Connection is built up over the course of play; groups form and dissolve as the game continues; an isolated stone is not a malformed position but an ordinary one. You throw tiles onto the board and then arrange them.
+
+**Concretely: broken branches and disconnected blocks are normal and expected.** A board *opens* with every entity unconnected. Mid-build, blocks sit in the pool waiting to be arranged. `remove` prunes the links touching a block and leaves the far ends less connected, which is a legal position, not damage.
+
+**So the build game has no completeness invariant.** Nothing requires the board to be connected, at any moment, ever.
+
+**Completeness is judged, not enforced** — and by two things downstream, both of which look at a position rather than at a move. The **determination** traverses, and a traversal that finds no path resolves to nothing; `freeze` then refuses a silent determination. The **inspect game** runs a quality check against a threshold the applicable policy sets. Neither is a rule about what may be placed; both are judgments about whether the arrangement is far enough along.
+
+This is *record freely, conclude carefully* (R1) one level up: the board tolerates any arrangement, and the conclusions drawn from it are honest about the state it is in.
 
 ## §2 The board
 
@@ -115,11 +151,33 @@ Derived from the graph, not from what exists. Two moves merge only if they diffe
 
 **R4 — Provisionality propagates through decisions, not only facts.** If a link was admitted on the basis of a type that is itself only alleged, the conclusion drawn from it is provisional — and the record says *which* of the three reasons applied.
 
-**R5 — Nothing is deleted.** `retire` ends an assertion prospectively or corrects it retroactively, and says which. The board as at any past moment is exactly what it was.
+**R5 — Nothing is deleted.** `remove` and `disconnect` take things off the board; the assertions that they were once there stand. The board as at any past moment is exactly what it was.
 
 **R6 — Every surface builds the same event.** One function maps declared arguments to a stored event; every surface calls it. A second constructor is how two surfaces come to disagree, and it is forbidden rather than merely discouraged.
 
 **R7 — Every rule is enforced where writes happen.** A rule expressed only in one surface's code is not a rule. Preconditions are declared on the move and evaluated at the chokepoint.
+
+**R9 — The geometry is read forward as affordances, not only backward as refusals.** The same table that refuses an illegal write tells a session what it *may* do next. `place` offers **the entity types that may be added**; `connect` offers, for a chosen source, **the pipes valid out of it and the targets each may reach** — both directions, from `source_permits` and `target_permits`. This is a higher-order game rule: nothing new is computed, the matrix is simply consulted in the offering direction as well as the judging one. R2's rule that preview and append agree (C2) means they cannot disagree by construction — one table, two readings.
+
+**The two halves of placing a block, which must not be conflated.** *What kind of thing may go here* is a game rule, answerable now from the geometry. *Which specific entity is it* is a reference to something that exists independently in the store, resolved by lookup. The game needs a way to **name** an entity; it does not need a pre-discovered universe to know which kinds are legal. Conflating the two makes the board look as though it requires a discovery layer before it can offer anything, and it does not.
+
+**Granularity, ruled:** `place` offers affordances at **type level** — these kinds may be added. `connect` offers **concrete triples** — this source, this pipe, this target — because a link is only legal against real endpoints. Type-level for placement keeps the offer small; concrete for connection is what C2 requires, and it is where the quadratic term lives.
+
+**R8 — Every prior board shape is reachable again.** No legal move may produce a board you cannot get back out of: no orphan links, no stranded placements, and no one-way doors — a move whose consequences some other rule makes unrecoverable.
+
+The board opens as a **pool of unconnected entities** — the group universe, islands and satellites — and every block must be returnable to that pool. **`remove` is never refused.** It has no effect outside this board, so pulling a block out is always available; the links that touched it are cleaned up with it.
+
+**RULED 2026-08-27: `remove` prunes the links that touch the block, and nothing else.** The event says only *remove this block*. The fold, seeing the block withdrawn, marks the links that touched it inactive. **It does not cascade onward.** Nothing propagates past the pruned links: the blocks at their far ends stay exactly where they are, keep every other link they have, and simply become less connected. A block that ends up with no links at all is **not** an error state — it is a normal member of the pool. A board opens with every entity unconnected, and a board with disconnected members mid-build is the same ordinary condition.
+
+The mechanism matters: computing the pruned set **at write time and storing it in the event** is what made `type-correction` impure and its replay dependent on a caller-supplied list. Deriving it **at fold time** keeps the event pure, keeps `canonical_event_shape` pure, and makes replay recompute the same result deterministically with nothing hidden.
+
+*(This supersedes an earlier ruling that `remove` should refuse while links touch the block. Two of that ruling's three reasons — impure payload, hidden state in the event — assumed the pruned set was written into the payload and dissolve once it is a fold consequence. The third, that a refusal tells the operator what to do, was a preference rather than a correctness argument, and it fits an administrative model rather than a building one: you pull a block out and what was attached to it comes away.)*
+
+**Scoping, which matters once an entity sits on more than one board:** placement, links and pruning are all **per board**. The same entity may be placed on a UBO board and in several CBUs — a management company is the standard case. Removing it from one board withdraws that board's placement and prunes that board's links, and touches nothing on any other. Everything the game does, it does about *this* board.
+
+**Consequence for reaching a prior shape:** `remove` and `place` are not exact inverses, because `place` does not restore the links that were pruned. Reaching a prior shape means placing the block and reconnecting. That is more moves, not a trapdoor — R8's property is *every prior board shape is reachable again*, not *every move has a symmetric inverse*. **Viewing** a prior state needs no moves at all: the stream is immutable, so any past board is constructed by folding to that moment.
+
+**This remains directly fuzzable** and is the strongest property in the harness: build a random legal sequence, then assert that every intermediate board shape can be reached again by forward moves, and that a fully emptied board is the pool with no orphan links and no stranded placements. Any shape that cannot be reached again is a trapdoor with a concrete reproduction.
 
 ## §4 The inspect game
 
@@ -195,7 +253,7 @@ A **check** declares when it applies and what it tests. The applicable set is **
 
 ## §8 Open questions
 
-**Q1 — `place` on a block already on the board, with a different type.** Is that `remove` then `place`, or does `place` supersede in one move? *Recommendation: `remove` then `place` — rebuilding is the normal way to correct a board, and it keeps `place` from carrying update semantics.*
+**Q1 — RULED 2026-08-27: `remove` then `place`.** Correcting a block's type is two moves, not a superseding placement. Rebuilding is the natural way to correct a board, `place` keeps meaning one thing, and the change is explicit in the stream rather than implied by an update.
 **Q2 — RESOLVED** by the reversible pairs: the awkward one-move-over-three-targets question disappears.
 **Q3 — `connect` and the link id.** Today a caller may supply one, which makes the move unstageable through the board, or omit it and lose the ability to reference it. *Recommendation: the system mints it and returns it; a caller-chosen id is a stored identifier the board cannot predict.*
 **Q4 — RESOLVED 2026-08-25.** Verified is a composite quality derived from the logged proofs (§2). No move sets it; `evidence` carries a **proof kind**, and verification is set-satisfaction over what has been logged. Which proof kinds an assertion requires is domain vocabulary; whether the result is good enough to clear is policy.

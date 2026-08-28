@@ -1,6 +1,6 @@
 //! R1 proof — the stream-backed verb pattern, end to end.
 //!
-//! Calls the `kyc_ubo.assert.edge.control` SemOsVerbOp through a real
+//! Calls the `kyc_ubo.assert.edge.connect` SemOsVerbOp through a real
 //! `VerbExecutionContext` + `TransactionScope`, and proves: the verb appends an
 //! `IntentEvent` to the durable stream (committing/rolling back with the scope),
 //! `as_of` flows from the context onto the event, and the outbox drainer
@@ -13,7 +13,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
-use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeAssertControl};
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectPlace, UboEdgeConnect};
 use ob_poc_kyc_store::PgKycProjector;
 use ob_poc_kyc_substrate::{assembly_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
@@ -85,7 +85,7 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 }
 
 #[tokio::test]
-async fn assert_control_verb_appends_to_stream_and_projects() {
+async fn connect_verb_appends_to_stream_and_projects() {
     let pool = connect().await;
     let subject = SubjectId(Uuid::new_v4());
 
@@ -104,7 +104,7 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
         "kind": "voting_rights",
     });
 
-    // T6.2 (2026-08-12): `assert-control` now carries `SubjectRegistered`
+    // T6.2 (2026-08-12): `connect` now carries `SubjectRegistered`
     // (matrix row 1) — register first, inside each scope, same fix as the
     // other T4/T4.5/M3 fixtures updated for this tranche. A FRESH
     // `VerbExecutionContext` per call: `execution_id` seeds the idempotency
@@ -120,7 +120,7 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
             .execute(&register_args, &mut VerbExecutionContext::default(), &mut scope)
             .await
             .expect("register executes");
-        UboEdgeAssertControl
+        UboEdgeConnect
             .execute(&args, &mut ctx, &mut scope)
             .await
             .expect("op executes");
@@ -142,7 +142,7 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
             .execute(&register_args, &mut VerbExecutionContext::default(), &mut scope)
             .await
             .expect("register executes");
-        let outcome = UboEdgeAssertControl
+        let outcome = UboEdgeConnect
             .execute(&args, &mut ctx, &mut scope)
             .await
             .expect("op executes");
@@ -156,13 +156,13 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     }
 
     let (verb, as_of): (String, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
-        r#"SELECT verb_fqn, as_of FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.assert.edge.control'"#,
+        r#"SELECT verb_fqn, as_of FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'kyc_ubo.assert.edge.connect'"#,
     )
     .bind(subject.0)
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(verb, "kyc_ubo.assert.edge.control");
+    assert_eq!(verb, "kyc_ubo.assert.edge.connect");
     assert_eq!(
         as_of, fixed_as_of,
         "as_of flowed from the context, frozen at entry"
@@ -183,7 +183,7 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(edges, 1, "the asserted control edge is projected");
+    assert_eq!(edges, 1, "the asserted edge is projected");
 
     cleanup(&pool, subject).await;
 }

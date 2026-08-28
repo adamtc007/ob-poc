@@ -42,8 +42,7 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycSubjectClassifyStructure, KycSubjectPlace,
-    UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
-    UboEdgeReconcileConflict,
+    UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_substrate::{
     fold_control_versioned, assembly_lexicon, DeterminationStrategy, FoldRegistry, IntentEvent,
@@ -230,7 +229,7 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
     .await;
 
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": manager, "to_entity_id": subject.0,
             "kind": "dominant_influence",
@@ -240,22 +239,16 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
     .await;
     for (inv, pct) in [(investor_big, 90.0), (investor_small, 10.0)] {
         run(
-            &UboEdgeAssertEconomicInterest,
+            &UboEdgeConnect,
             serde_json::json!({
                 "subject-id": subject.0, "from_entity_id": inv, "to_entity_id": subject.0,
-                "percentage": pct,
+                "kind": "economic_interest", "percentage": pct,
             }),
             &pool,
         )
         .await;
     }
 
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     // The gate widening proven at the REAL op: freeze on an
     // InvestmentFund-classified subject is now ADMITTED (StructureClassSupported)
@@ -327,7 +320,7 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
 
     for member in [council_a, council_b] {
         run(
-            &UboEdgeAssertControl,
+            &UboEdgeConnect,
             serde_json::json!({
                 "subject-id": subject.0, "from_entity_id": member, "to_entity_id": subject.0,
                 "kind": "board_appointment",
@@ -337,7 +330,7 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
         .await;
     }
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": stray_voter, "to_entity_id": subject.0,
             "kind": "voting_rights",
@@ -346,12 +339,6 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
     )
     .await;
 
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
     let candidates = freeze_candidates(&pool, subject, "foundation_council_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
@@ -529,12 +516,6 @@ async fn d_select_strategy_admits_nominee_after_ts4() {
     // fixture has none. The fail-closed floor for unknown/garbage class
     // strings is pinned in kyc_t61_studs.rs and kyc_pack_closure.rs.
     setup_subject(&pool, subject, &[], "nominee").await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     // StructureClassSupported must ADMIT a Nominee-classified subject
     // (widened to the total 11-variant set at TS.4). Previously probed via

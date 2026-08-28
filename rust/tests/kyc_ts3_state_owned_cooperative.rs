@@ -47,8 +47,7 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycSubjectClassifyStructure, KycSubjectPlace,
-    UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
-    UboEdgeReconcileConflict,
+    UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_substrate::{
@@ -132,7 +131,7 @@ async fn run_fallible(
     })
 }
 
-/// Appends a `kyc_ubo.assert.edge.control` event directly, bypassing
+/// Appends a `kyc_ubo.assert.edge.connect` event directly, bypassing
 /// `check_control_preconditions` (so `TypeGeometryPermits`, TS.5) — for
 /// test (d) only, which deliberately puts an INCOMPATIBLE-geometry
 /// `gp_statutory` edge onto a typed cooperative subject to prove
@@ -164,7 +163,7 @@ async fn append_historical_control_edge(
     let mut scope = Scope::begin(pool).await;
     let event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         Principal::test_analyst(),
         AuthorityRef("test.historical-shape".into()),
         TargetBinding::for_edge(subject, edge),
@@ -305,17 +304,11 @@ async fn a_state_owned_strategy_resolves_rare_natural_person_controller() {
     setup_subject(&pool, subject, &[controller], "state_owned").await;
 
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": controller, "to_entity_id": subject.0,
             "kind": "dominant_influence",
         }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;
@@ -373,7 +366,7 @@ async fn b_state_owned_strategy_yields_empty_when_no_natural_person_crosses() {
     // The state organ's control edge: `ministry` is NOT a registered natural
     // person and has no onward control edges, so the chain dead-ends.
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": ministry, "to_entity_id": subject.0,
             "kind": "voting_rights",
@@ -382,17 +375,11 @@ async fn b_state_owned_strategy_yields_empty_when_no_natural_person_crosses() {
     )
     .await;
     run(
-        &UboEdgeAssertEconomicInterest,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": economic_only, "to_entity_id": subject.0,
-            "percentage": 15.0,
+            "kind": "economic_interest", "percentage": 15.0,
         }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;
@@ -460,17 +447,11 @@ async fn c_cooperative_member_strategy_resolves_office_holder() {
     setup_subject(&pool, subject, &[board_chair], "cooperative").await;
 
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": board_chair, "to_entity_id": subject.0,
             "kind": "board_appointment",
         }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;
@@ -524,7 +505,7 @@ async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
     setup_subject(&pool, subject, &[concentrated_voter, gp_holder], "cooperative").await;
 
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": concentrated_voter,
             "to_entity_id": subject.0, "kind": "voting_rights",
@@ -536,12 +517,6 @@ async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
     // (no EntityType permits both VotingShares and GpDesignation) — bypass
     // geometry via a historical-shaped append; see the helper's doc comment.
     append_historical_control_edge(subject, gp_holder, subject.0, "gp_statutory", &pool).await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
     // `freeze_candidates` succeeding proves StructureClassSupported admits
     // Cooperative (`compute-fold`'s standalone probe retired TS.6 P2 as
     // redundant with this call — see test (a)'s comment).
@@ -589,12 +564,6 @@ async fn e_select_strategy_admits_nominee_after_ts4() {
     // fixture has none. The fail-closed floor for unknown/garbage class
     // strings is pinned in kyc_t61_studs.rs and kyc_pack_closure.rs.
     setup_subject(&pool, subject, &[], "nominee").await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     // StructureClassSupported must ADMIT a Nominee-classified subject
     // (widened to the total 11-variant set at TS.4). Previously probed via

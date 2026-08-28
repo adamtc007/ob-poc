@@ -221,7 +221,7 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_17() {
+fn verb_universe_is_exactly_15() {
     // TS.6 P1/P2: kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject
     // and moved to a new `decide:` domain block in the SAME YAML file
     // (dsl-kyc-obligation.yaml) — a rename+relocation, not a retirement, so
@@ -236,14 +236,23 @@ fn verb_universe_is_exactly_17() {
     // into `place` (one verb absorbs two declarations, 19→18, P1);
     // `member-withdrawal` renamed `remove` — a rename, not a count change
     // (P2). `type-correction` DISSOLVED (18→17, P3) — no replacement.
+    //
+    // T3 (2026-08-27, §3.2/§3.3): `control` + `economic-interest` MERGED
+    // into `connect` (one verb absorbs two declarations, 17→16, P1);
+    // `supersession` renamed `disconnect` — a rename, not a count change
+    // (P2, R8's fold-time-pruning correction touches `remove`'s behavior,
+    // not the verb count). `reconciliation` DISSOLVED (16→15, P3) — no
+    // replacement.
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        17,
-        "dsl.kyc verb count drifted from the post-T2 17 (18 post-P1/P2, \
-         minus type-correction DISSOLVED) (19 post-D2.0, minus \
-         register+type MERGED into place) (21 post-TS.6-§5, \
-         minus creation/satisfaction DISSOLVED) (25 post-D1, \
+        15,
+        "dsl.kyc verb count drifted from the post-T3 15 (17 post-T2, \
+         minus control+economic-interest MERGED into connect, minus \
+         reconciliation DISSOLVED; supersession renamed disconnect is net \
+         zero) (18 post-P1/P2, minus type-correction DISSOLVED) (19 \
+         post-D2.0, minus register+type MERGED into place) (21 \
+         post-TS.6-§5, minus creation/satisfaction DISSOLVED) (25 post-D1, \
          minus the retired select-strategy, compute-fold, and pierce-nominee \
          verb declarations) — update the T0.3 audit and every other pinned \
          test in this file, not just this assertion: {fqns:#?}"
@@ -259,17 +268,19 @@ fn assembly_pack_is_exactly_known() {
     // T2 (2026-08-27, §8 Q1): `register` + `type` MERGED into `place`
     // (16→15, P1); `member-withdrawal` renamed `remove` (P2).
     // `type-correction` DISSOLVED (15→14, P3) — no replacement entry.
+    // T3 (2026-08-27, §3.2/§3.3): `control` + `economic-interest` MERGED
+    // into `connect` (14→13, P1); `supersession` renamed `disconnect`
+    // (net zero, P2); `reconciliation` DISSOLVED (13→12, P3) — no
+    // replacement entry.
     let expected: BTreeSet<String> = [
         "kyc_ubo.assert.subject.place",
         "kyc_ubo.assert.subject.structure-class",
         "kyc_ubo.assert.subject.remove",
         "kyc_ubo.assert.subject.enquiry",
-        "kyc_ubo.assert.edge.control",
-        "kyc_ubo.assert.edge.economic-interest",
+        "kyc_ubo.assert.edge.connect",
         "kyc_ubo.assert.edge.evidence",
         "kyc_ubo.assert.edge.verification",
-        "kyc_ubo.assert.edge.supersession",
-        "kyc_ubo.assert.edge.reconciliation",
+        "kyc_ubo.assert.edge.disconnect",
         "kyc_ubo.decide.determination.freeze",
         "kyc_ubo.assert.entity.identity",
         "kyc_ubo.assert.entity.screening",
@@ -560,14 +571,20 @@ fn every_declared_verb_has_a_registered_op() {
     // MERGED into one `KycSubjectPlace` op (21→20, P1). `KycSubjectWithdrawMember`
     // renamed `KycSubjectRemove` — still counted once, no further change (P2).
     // `KycSubjectCorrectType` DELETED (20→19, P3) — no op survives it.
+    //
+    // T3 (2026-08-27, §3.2/§3.3): `UboEdgeAssertControl` + `UboEdgeAssertEconomicInterest`
+    // MERGED into one `UboEdgeConnect` op (19→18, P1). `UboEdgeSupersede`
+    // renamed `UboEdgeDisconnect` — still counted once, no further change
+    // (P2). `UboEdgeReconcileConflict` DELETED (18→17, P3) — no op
+    // survives it.
     let declared = kyc_stream_ops_declared_universe();
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        19,
+        17,
         "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
          ops co-hosted in kyc_stream_ops.rs, and kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject/ \
-         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 19: {registered:#?}"
+         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 17: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -795,17 +812,17 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // `ubo.determination.compute-fold` (which also carried this pair) was
     // ITSELF retired TS.6 P2 as a derivation dressed as a verb, redundant
     // with `freeze`'s own independent declaration — no entry survives it
-    // here. The strategy-COUNT pin below (2) is unchanged — this is a
-    // precondition-map change, not a new `DeterminationStrategy`. The
-    // `StructureClassified`/bare `SubjectRegistered` variants that used to
-    // attach to `select-strategy` remain evaluable T6.1(b) machinery,
+    // here. EOP-VS-UBO-GAME-001 T3 (§3.3, 2026-08-27) removed the
+    // `ReconciledProjection` half of the pair entirely, alongside
+    // `reconciliation` itself — `StructureClassSupported` is now freeze's
+    // sole precondition. The strategy-COUNT pin below (2) is unchanged —
+    // this is a precondition-map change, not a new `DeterminationStrategy`.
+    // The `StructureClassified`/bare `SubjectRegistered` variants that used
+    // to attach to `select-strategy` remain evaluable T6.1(b) machinery,
     // unattached to any entry today.
     expected.insert(
         "kyc_ubo.decide.determination.freeze".to_string(),
-        vec![
-            Precondition::ReconciledProjection,
-            Precondition::StructureClassSupported,
-        ],
+        vec![Precondition::StructureClassSupported],
     );
     // T6.2 (2026-08-12, edge family — EOP-DD-KYCUBO-KIT-T6 matrix rows 1-5):
     // 5 more verbs go from geometry-free to studded. Rows 1/2 share the same
@@ -817,16 +834,13 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // edge-asserting verbs — TS.1 §1's FIRST constraint layer (the type
     // geometry) was never actually reachable from this checker before TS.5;
     // it is now, and this is a conscious widening of the pin, not a drift.
+    //
+    // EOP-VS-UBO-GAME-001 T3 (§3.2, 2026-08-27): `control` + `economic-
+    // interest` MERGED into `connect` — the merge test (P0b) confirmed
+    // their precondition sets were already identical, so this row is
+    // unchanged in substance, just one name now covering both former rows.
     expected.insert(
-        "kyc_ubo.assert.edge.control".to_string(),
-        vec![
-            Precondition::SubjectRegistered,
-            Precondition::NoDuplicateActiveEdge,
-            Precondition::TypeGeometryPermits,
-        ],
-    );
-    expected.insert(
-        "kyc_ubo.assert.edge.economic-interest".to_string(),
+        "kyc_ubo.assert.edge.connect".to_string(),
         vec![
             Precondition::SubjectRegistered,
             Precondition::NoDuplicateActiveEdge,
@@ -848,22 +862,21 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
             Precondition::MembershipActive,
         ],
     );
+    // T3 (§3.2): `supersession` renamed `disconnect` — precondition pair
+    // unchanged.
     expected.insert(
-        "kyc_ubo.assert.edge.supersession".to_string(),
+        "kyc_ubo.assert.edge.disconnect".to_string(),
         vec![Precondition::EdgeExists, Precondition::EdgeActive],
     );
-    expected.insert(
-        "kyc_ubo.assert.edge.reconciliation".to_string(),
-        vec![Precondition::SubjectRegistered],
-    );
+    // T3 (§3.3): `reconciliation` DISSOLVED — no entry survives it here.
     // "kyc_ubo.assert.edge.nominee-piercing" LexiconEntry RETIRED (TS.6 P2, K-G7,
     // 2026-08-22) — no entry survives it here. Its precondition set (subject
     // registered + target edge exists + active + geometry, TS.5 §6 Q2)
-    // decomposes exactly across `kyc_ubo.assert.edge.control`'s entry (above:
+    // decomposes exactly across `kyc_ubo.assert.edge.connect`'s entry (above:
     // SubjectRegistered, NoDuplicateActiveEdge, TypeGeometryPermits) and
-    // `kyc_ubo.assert.edge.supersession`'s entry (below: EdgeExists, EdgeActive); the
+    // `kyc_ubo.assert.edge.disconnect`'s entry (above: EdgeExists, EdgeActive); the
     // "target is actually a nominee edge" check (no precondition primitive)
-    // moved to assert-control's op-layer, gated on its new `pierced-from`
+    // moved to connect's op-layer, gated on its new `pierced-from`
     // arg.
 
     // T6.3 (2026-08-12, determination-family remainder — EOP-DD-KYCUBO-KIT-T6
@@ -922,20 +935,31 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // is true by construction).
     //
     // T2 (2026-08-27, §8 Q1): standalone `type` MERGED into `place` (above);
-    // `member-withdrawal` renamed `remove`, precondition pair unchanged.
-    // `type-correction` DISSOLVED (P3) — no entry survives it here.
+    // `member-withdrawal` renamed `remove`. `type-correction` DISSOLVED
+    // (P3) — no entry survives it here.
+    // T3 (§3.4 R8, corrected 2026-08-27): `remove`'s precondition set is
+    // UNCHANGED from T2 — it is never refused for touching links. Instead
+    // it PRUNES them as a fold-time side effect (see
+    // `fold::control::apply_one_control_event`'s `remove` arm); a
+    // precondition-based refusal was tried and superseded before this
+    // tranche closed, see EOP-STATE-KYCUBO-D1's T3 section.
     expected.insert(
         "kyc_ubo.assert.subject.remove".to_string(),
-        vec![Precondition::EntityRegistered, Precondition::MembershipActive],
+        vec![
+            Precondition::EntityRegistered,
+            Precondition::MembershipActive,
+        ],
     );
     expected.insert("kyc_ubo.assert.subject.enquiry".to_string(), vec![]);
 
     assert_eq!(
         actual.len(),
-        14,
-        "assembly_lexicon() entry count drifted from the post-T2 14 \
-         (15 post-P1/P2, minus type-correction DISSOLVED) (16 post-D2.0, \
-         minus register+type MERGED into place) \
+        12,
+        "assembly_lexicon() entry count drifted from the post-T3 12 \
+         (14 post-T2, minus control+economic-interest MERGED into connect, \
+         minus reconciliation DISSOLVED; supersession renamed disconnect is \
+         net zero) (15 post-P1/P2, minus type-correction DISSOLVED) \
+         (16 post-D2.0, minus register+type MERGED into place) \
          lexicon-covered verbs (19 post-TS.6-P1, minus creation/satisfaction \
          DISSOLVED and waiver MOVED to evaluation_lexicon(), D2.0 §5) \
          (25 post-D1, minus the retired select-strategy, \
@@ -944,13 +968,15 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of T2 (2026-08-27, §8 Q1: register+type \
-         MERGED into place carrying NotCurrentlyPlaced, member-withdrawal renamed \
-         remove, type-correction DISSOLVED), every one of the 14 remaining dsl.kyc \
-         verbs with a stud carries it \
-         (verify, freeze, the 5 edge-family verbs, apply-smo-fallback, place, \
-         classify-structure, and the 6 obligation verbs — piercing's precondition \
-         pair now reaches the stream via assert-control's and supersede's own \
+        "K-G5 precondition map changed — as of T3 (2026-08-27, §3.2/§3.3/§3.4 R8: \
+         control+economic-interest MERGED into connect, supersession renamed \
+         disconnect, reconciliation DISSOLVED taking freeze's ReconciledProjection \
+         with it; remove's precondition set is unchanged — R8 is enforced by \
+         fold-time pruning, not a precondition refusal), every one of the 12 \
+         remaining dsl.kyc verbs with a stud carries it \
+         (verify, freeze, connect, evidence, disconnect, place, remove, \
+         classify-structure, and the 3 obligation verbs — piercing's precondition \
+         pair now reaches the stream via connect's and disconnect's own \
          entries); any other change is either matrix progress (update the T0.3 \
          audit) or a regression"
     );
@@ -1179,7 +1205,7 @@ fn edge_status_lifecycle_is_fully_reachable() {
 
     let assert_event = make_event(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         TargetBinding::for_edge(subject, edge),
         serde_json::json!({
             "from_entity_id": from.0,
@@ -1223,7 +1249,7 @@ fn edge_status_lifecycle_is_fully_reachable() {
     // prior status, not just Asserted (K-G1/K-G2: no dead end mid-lifecycle).
     let supersede_event = make_event(
         subject,
-        "kyc_ubo.assert.edge.supersession",
+        "kyc_ubo.assert.edge.disconnect",
         TargetBinding::for_edge(subject, edge),
         serde_json::json!({}),
         as_of,
@@ -1487,7 +1513,6 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     for class in all_classes {
         let supported = ControlState {
             registered: true,
-            reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
             structure_class: Some(class.clone()),
             ..Default::default()
         };
@@ -1507,10 +1532,9 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         );
     }
     // The fail-closed floor: no class (= what a garbage wire string folds
-    // to) still blocks, even with registration+reconciliation satisfied.
+    // to) still blocks, even with registration satisfied.
     let unclassified = ControlState {
         registered: true,
-        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         structure_class: None,
         ..Default::default()
     };

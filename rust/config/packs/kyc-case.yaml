@@ -184,12 +184,13 @@ allowed_verbs:
   # Registered + YAML-declared + op-level tested since 2026-06-30/07-01, but
   # never admitted into any pack's allowed_verbs until now — verb_search
   # could never surface them to a live session. First pack-level wiring.
-  - kyc_ubo.assert.edge.control
-  - kyc_ubo.assert.edge.economic-interest
+  # EOP-VS-UBO-GAME-001 T3 (2026-08-27, §3.2/§3.3): control+economic-interest
+  # MERGED into connect; supersession renamed disconnect; reconciliation
+  # DISSOLVED (no successor FQN).
+  - kyc_ubo.assert.edge.connect
   - kyc_ubo.assert.edge.evidence
   - kyc_ubo.assert.edge.verification
-  - kyc_ubo.assert.edge.supersession
-  - kyc_ubo.assert.edge.reconciliation
+  - kyc_ubo.assert.edge.disconnect
   # TS.4 (EOP-DD-KYCUBO-KIT-TS0 §2.6, K-8): added after the block above was
   # first wired — same gap the comment above already describes, just for a
   # verb that didn't exist yet at the time. `freeze` hard-errors while any

@@ -14,8 +14,8 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
-    UboEdgeAttachEvidence, UboEdgeReconcileConflict,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
+    UboEdgeConnect,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -115,7 +115,6 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     let subject = Uuid::new_v4(); // the fund
     let manco = Uuid::new_v4();
     let alice = Uuid::new_v4();
-    let mandate_edge = Uuid::new_v4();
 
     run(
         &KycSubjectPlace,
@@ -137,18 +136,21 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     .await;
 
     // Fund <-ManagementMandate- ManCo <-VotingRights- Alice. The mandate
-    // edge is asserted but NEVER evidenced.
-    run(
-        &UboEdgeAssertControl,
+    // edge is asserted but NEVER evidenced. §8 Q3: connect refuses a
+    // caller-supplied edge id — capture the minted one from the response.
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject, "from_entity_id": manco, "to_entity_id": subject,
-            "kind": "management_mandate", "edge-id": mandate_edge,
+            "kind": "management_mandate",
         }),
         &pool,
     )
     .await;
+    let mandate_edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject, "from_entity_id": alice, "to_entity_id": manco,
             "kind": "voting_rights",
@@ -156,7 +158,6 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
         &pool,
     )
     .await;
-    run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
 
     // Freeze must REFUSE — the pivot computed, but the mandate is unevidenced.
     let refused = run_fallible(

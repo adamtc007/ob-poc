@@ -55,12 +55,13 @@ fn state_with_edge(status: EdgeStatus) -> ControlState {
     state
 }
 
-fn reconciled_and_strategized_state() -> ControlState {
+fn strategized_state() -> ControlState {
     // TS.6 P2: strategy is derived from `structure_class`
     // (`select-strategy` retired) — `PrivateCompany` maps to
     // `ownership_prong_strategy` (`strategy_for_structure_class`).
+    // EOP-VS-UBO-GAME-001 T3: no `reconciliation_event_id` field any more
+    // (§3.3 — the K-14 gate it fed is dissolved with reconciliation itself).
     ControlState {
-        reconciliation_event_id: Some(EventId::new()),
         structure_class: Some(StructureClass::PrivateCompany),
         classify_event_id: Some(EventId::new()),
         ..Default::default()
@@ -78,7 +79,7 @@ fn abstain_always_present() {
         empty_state(),
         state_with_edge(EdgeStatus::Asserted),
         state_with_edge(EdgeStatus::Verified),
-        reconciled_and_strategized_state(),
+        strategized_state(),
     ] {
         let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
         assert!(
@@ -170,7 +171,7 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
         // lexicon entries, so it never reaches that fqn.
         let is_edge_scoped = matches!(
             fqn,
-            "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.supersession"
+            "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.disconnect"
         );
         let targets: Vec<TargetBinding> = if is_edge_scoped {
             state
@@ -239,14 +240,14 @@ fn placement_iff_precondition_verified_edge() {
 fn placement_iff_precondition_reconciled_and_strategized() {
     assert_matches_oracle(
         subject(),
-        &reconciled_and_strategized_state(),
+        &strategized_state(),
         &assembly_lexicon(),
     );
 }
 
 #[test]
 fn placement_iff_precondition_reconciled_strategized_with_verified_edge() {
-    let mut state = reconciled_and_strategized_state();
+    let mut state = strategized_state();
     let e = edge(EdgeStatus::Verified);
     state.edges.insert(e.id, e);
     assert_matches_oracle(subject(), &state, &assembly_lexicon());

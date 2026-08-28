@@ -138,15 +138,18 @@ static KYC_REGISTRY: LazyLock<FoldRegistry> = LazyLock::new(|| {
 
 // ── Edge lifecycle verbs ──────────────────────────────────────────────────────
 
-/// `kyc_ubo.assert.edge.control` — claim a control edge (voting, board, GP statutory,
-/// …). The first stream-backed determination verb; the pattern every other
-/// `dsl.kyc` verb follows.
-pub struct UboEdgeAssertControl;
+/// `kyc_ubo.assert.edge.connect` — a link exists, from this block to that
+/// one, of this kind (EOP-VS-UBO-GAME-001 §3.1). Merges the former
+/// `UboEdgeAssertControl` + `UboEdgeAssertEconomicInterest` (§3.2: they
+/// differ by kind, geometry already validates the classified pipe, their
+/// preconditions are identical). The first stream-backed determination
+/// verb; the pattern every other `dsl.kyc` verb follows.
+pub struct UboEdgeConnect;
 
 #[async_trait]
-impl SemOsVerbOp for UboEdgeAssertControl {
+impl SemOsVerbOp for UboEdgeConnect {
     fn fqn(&self) -> &str {
-        "kyc_ubo.assert.edge.control"
+        "kyc_ubo.assert.edge.connect"
     }
 
     async fn execute(
@@ -174,21 +177,21 @@ impl SemOsVerbOp for UboEdgeAssertControl {
         if let Some(pierced_from) = json_extract_uuid_opt(args, ctx, "pierced-from").map(EdgeId) {
             let events = PgKycEventStore::load_events(scope.executor(), subject)
                 .await
-                .map_err(|e| anyhow!("kyc_ubo.assert.edge.control: load events failed: {e}"))?;
+                .map_err(|e| anyhow!("kyc_ubo.assert.edge.connect: load events failed: {e}"))?;
             let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
             let control = fold_control_versioned(&refs, &KYC_REGISTRY)
-                .map_err(|e| anyhow!("kyc_ubo.assert.edge.control: control fold failed: {e}"))?;
+                .map_err(|e| anyhow!("kyc_ubo.assert.edge.connect: control fold failed: {e}"))?;
             match control.edges.get(&pierced_from) {
                 None => {
                     return Err(anyhow!(
-                        "kyc_ubo.assert.edge.control: pierced-from edge {} not found in the \
+                        "kyc_ubo.assert.edge.connect: pierced-from edge {} not found in the \
                          control graph (EdgeExists)",
                         pierced_from.0
                     ));
                 }
                 Some(e) if !matches!(e.kind, EdgeKind::Nominee) => {
                     return Err(anyhow!(
-                        "kyc_ubo.assert.edge.control: pierced-from edge {} is not a nominee edge \
+                        "kyc_ubo.assert.edge.connect: pierced-from edge {} is not a nominee edge \
                          (kind {:?}) — only EdgeKind::Nominee arrangements can be pierced \
                          (K-8, fail-closed)",
                         pierced_from.0,
@@ -197,7 +200,7 @@ impl SemOsVerbOp for UboEdgeAssertControl {
                 }
                 Some(e) if !e.is_active() => {
                     return Err(anyhow!(
-                        "kyc_ubo.assert.edge.control: pierced-from edge {} is not active \
+                        "kyc_ubo.assert.edge.connect: pierced-from edge {} is not active \
                          (EdgeActive)",
                         pierced_from.0
                     ));
@@ -207,61 +210,27 @@ impl SemOsVerbOp for UboEdgeAssertControl {
         }
 
         let (target, payload, edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.control", subject, args)?;
-        let edge = edge.expect("assert.edge.control always mints or accepts an edge id");
+            canonical_event_shape("kyc_ubo.assert.edge.connect", subject, args)?;
+        let edge = edge.expect("connect always mints an edge id");
 
         let outcome = stream_append(
-            "kyc_ubo.assert.edge.control",
+            "kyc_ubo.assert.edge.connect",
             subject,
             target,
             payload,
-            "analyst.assert-control",
-            Some("kyc_ubo.assert.edge.control"),
+            "analyst.connect",
+            Some("kyc_ubo.assert.edge.connect"),
             ctx,
             scope,
         )
         .await
-        .map_err(|e| anyhow!("kyc_ubo.assert.edge.control append failed: {e}"))?;
+        .map_err(|e| anyhow!("kyc_ubo.assert.edge.connect append failed: {e}"))?;
 
         Ok(VerbExecutionOutcome::Record(json!({
             "edge_id": edge.0,
             "seq": outcome.seq,
             "deduped": outcome.deduped,
         })))
-    }
-}
-
-pub struct UboEdgeAssertEconomicInterest;
-
-#[async_trait]
-impl SemOsVerbOp for UboEdgeAssertEconomicInterest {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.edge.economic-interest"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let (target, payload, edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.economic-interest", subject, args)?;
-        let edge = edge.expect("assert.edge.economic-interest always mints or accepts an edge id");
-        let outcome = stream_append(
-            "kyc_ubo.assert.edge.economic-interest",
-            subject,
-            target,
-            payload,
-            "analyst.assert-economic-interest",
-            Some("kyc_ubo.assert.edge.economic-interest"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "edge_id": edge.0, "seq": outcome.seq }),
-        ))
     }
 }
 
@@ -341,12 +310,15 @@ impl SemOsVerbOp for UboEdgeVerify {
     }
 }
 
-pub struct UboEdgeSupersede;
+/// `kyc_ubo.assert.edge.disconnect` — that link is not on the board
+/// (EOP-VS-UBO-GAME-001 §3.1). Renamed from `UboEdgeSupersede` (§3.2: pure
+/// rename, K-13 supersede-never-delete unchanged).
+pub struct UboEdgeDisconnect;
 
 #[async_trait]
-impl SemOsVerbOp for UboEdgeSupersede {
+impl SemOsVerbOp for UboEdgeDisconnect {
     fn fqn(&self) -> &str {
-        "kyc_ubo.assert.edge.supersession"
+        "kyc_ubo.assert.edge.disconnect"
     }
     async fn execute(
         &self,
@@ -356,19 +328,19 @@ impl SemOsVerbOp for UboEdgeSupersede {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.supersession", subject, args)?;
+            canonical_event_shape("kyc_ubo.assert.edge.disconnect", subject, args)?;
         // T6.2 row 4: EdgeExists + EdgeActive now attached — `Some(fqn)`
         // wires it to the real checker (previously `None` was harmless
         // because the entry declared no preconditions; leaving it `None`
         // now would silently never enforce the new stud — the exact defect
         // class the Part A closure tooth exists to catch).
         let outcome = stream_append(
-            "kyc_ubo.assert.edge.supersession",
+            "kyc_ubo.assert.edge.disconnect",
             subject,
             target,
             payload,
-            "analyst.supersede",
-            Some("kyc_ubo.assert.edge.supersession"),
+            "analyst.disconnect",
+            Some("kyc_ubo.assert.edge.disconnect"),
             ctx,
             scope,
         )
@@ -384,9 +356,9 @@ impl SemOsVerbOp for UboEdgeSupersede {
 // nominee edge (K-13) + assert the disclosed nominator's real edge with
 // `pierced_from` provenance (K-8) — are now two ordinary verb calls composed
 // by the `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/macros/
-// ubo.yaml): `kyc_ubo.assert.edge.control` (extended with an optional
+// ubo.yaml): `kyc_ubo.assert.edge.connect` (extended with an optional
 // `pierced-from` arg — see its op-layer fail-closed check above and
-// `normalize_assert_control_payload` below) followed by `kyc_ubo.assert.edge.supersession`
+// `normalize_assert_control_payload` below) followed by `kyc_ubo.assert.edge.disconnect`
 // (unchanged). Piercing records a real handed-over fact, so it wasn't
 // deleted outright (unlike select-strategy/compute-fold) — it was
 // redesigned because the old shape was a single-purpose verb doing two
@@ -395,40 +367,11 @@ impl SemOsVerbOp for UboEdgeSupersede {
 // Sequencer's one-scope-per-runbook model, same as any other multi-step
 // macro, so the two effects still commit or roll back together.
 
-pub struct UboEdgeReconcileConflict;
-
-#[async_trait]
-impl SemOsVerbOp for UboEdgeReconcileConflict {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.edge.reconciliation"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.edge.reconciliation", subject, args)?;
-        // T6.2 row 5: SubjectRegistered now attached — see the supersede
-        // comment above for why `Some(fqn)` (not `None`) is required.
-        let outcome = stream_append(
-            "kyc_ubo.assert.edge.reconciliation",
-            subject,
-            target,
-            payload,
-            "analyst.reconcile-conflict",
-            Some("kyc_ubo.assert.edge.reconciliation"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
+// `UboEdgeReconcileConflict` / `kyc_ubo.assert.edge.reconciliation` RETIRED
+// (EOP-VS-UBO-GAME-001 T3, §3.3, 2026-08-27, K-G7 full deletion): "No
+// reconcile ... a third path to what two moves [connect/disconnect]
+// already do." No op survives it here — see fold/control.rs's former
+// reconciliation fold arm (deleted) for the full reasoning.
 
 // ── Determination verbs ───────────────────────────────────────────────────────
 
@@ -462,8 +405,9 @@ impl SemOsVerbOp for UboEdgeReconcileConflict {
 // stamping, the `kind` wire-value fail-closed gate, the nominee+pierced-from
 // mutual exclusion, and the `trust-revocable`/`pierced-from` renames they
 // used to duplicate now live once, inside `ob_poc_kyc_seam::canonical_event_shape`
-// — called by `UboEdgeAssertControl`/`UboEdgeAssertEconomicInterest` above
-// instead of each building its own payload.
+// — called by `UboEdgeConnect` (T3: merged from `UboEdgeAssertControl`/
+// `UboEdgeAssertEconomicInterest`) above instead of each building its own
+// payload.
 //
 // TS.6 §5: `normalize_smo_fallback_payload` deleted 2026-08-22 with
 // `ubo.determination.apply-smo-fallback`. It fixed a real kebab/snake

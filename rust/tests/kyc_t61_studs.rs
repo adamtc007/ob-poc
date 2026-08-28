@@ -108,14 +108,13 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 // admits an implemented one.
 //
 // TS.6 P2 (K-G7): `select-strategy` AND `compute-fold` retired —
-// `StructureClassSupported` now lives solely on `freeze`, which also
-// requires `ReconciledProjection`, so every fixture below needs
-// reconciliation set.
-fn control_with_class_reconciled_and_strategized(class: StructureClass) -> ControlState {
+// `StructureClassSupported` now lives solely on `freeze`. EOP-VS-UBO-GAME-001
+// T3 (§3.3, 2026-08-27) removed the `ReconciledProjection` half of that
+// pair entirely — no reconciliation field remains to set.
+fn control_with_class_strategized(class: StructureClass) -> ControlState {
     ControlState {
         registered: true,
         structure_class: Some(class),
-        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         ..Default::default()
     }
 }
@@ -150,7 +149,6 @@ fn precondition_blocks_illegal_placement() {
     let unclassified_ready = ControlState {
         registered: true,
         structure_class: None,
-        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         ..Default::default()
     };
     let freeze_entry = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
@@ -175,7 +173,7 @@ fn precondition_admits_legal_placement() {
     let empty_obligation = ObligationState::default();
 
     // PrivateCompany is in the pinned implemented-strategy set.
-    let pc_state = control_with_class_reconciled_and_strategized(StructureClass::PrivateCompany);
+    let pc_state = control_with_class_strategized(StructureClass::PrivateCompany);
     let freeze_entry = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
     assert!(
         check_preconditions(

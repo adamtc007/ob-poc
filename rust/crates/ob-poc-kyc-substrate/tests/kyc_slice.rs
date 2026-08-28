@@ -7,6 +7,9 @@
 //! Exit criteria (must all pass for the slice to be DONE):
 //! 1. Differential equality: ownership-prong output == today's compute-chains.
 //! 2. Reconcile before fold: conflicting edges fail without reconcile.
+//!    SUPERSEDED (EOP-VS-UBO-GAME-001 T3, §3.3, 2026-08-27) — the gate this
+//!    criterion tested (K-14) is dissolved along with the `reconciliation`
+//!    verb; see `ec2_freeze_precondition_no_longer_gates_on_reconciliation`.
 //! 3. Proof ratchet: verify without evidence is rejected.
 //! 4. SMO never-empty: empty ownership/control → SMO person or waiver.
 //! 5. Replay determinism: append → supersede → recover prior at as_of.
@@ -201,12 +204,13 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             5,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({
+                "kind": "economic_interest",
                 "edge_id": eid("b_a").0,
                 "from_entity_id": b.0,
                 "to_entity_id": a.0,
@@ -219,12 +223,13 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             6,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({
+                "kind": "economic_interest",
                 "edge_id": eid("p1_b").0,
                 "from_entity_id": p1.0,
                 "to_entity_id": b.0,
@@ -237,12 +242,13 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             7,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({
+                "kind": "economic_interest",
                 "edge_id": eid("p2_b").0,
                 "from_entity_id": p2.0,
                 "to_entity_id": b.0,
@@ -255,12 +261,13 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         te(
             8,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({
+                "kind": "economic_interest",
                 "edge_id": eid("p3_a").0,
                 "from_entity_id": p3.0,
                 "to_entity_id": a.0,
@@ -269,19 +276,10 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
             idem("edge-p3-a"),
             t,
         ),
-        // Reconcile conflict.
-        te(
-            9,
-            subject,
-            "kyc_ubo.assert.edge.reconciliation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"note": "single-source; no conflict"}),
-            idem("reconcile"),
-            t,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (EOP-VS-UBO-GAME-001
+        // T3, §3.3, 2026-08-27): the verb dissolved — "no reconcile ... a third
+        // path to what two moves already do" — its fold arm is gone, so this
+        // step was a no-op even before removal here.
         // Select strategy.
         te(
             10,
@@ -377,11 +375,21 @@ fn ec1_ownership_prong_differential_equality() {
 
 // ── Exit criterion 2: Reconcile before fold ───────────────────────────────────
 //
-// "A determination over conflicting source edges reconciles first and never
-// sums >100%" (K-14, gap-report Test 2, V&S Criterion 3).
+// ORIGINAL (K-14, gap-report Test 2, V&S Criterion 3): "A determination over
+// conflicting source edges reconciles first and never sums >100%."
+//
+// SUPERSEDED (EOP-VS-UBO-GAME-001 T3, §3.3, 2026-08-27): K-14's gate —
+// `Precondition::ReconciledProjection` on freeze — is dissolved along with
+// `kyc_ubo.assert.edge.reconciliation`, its sole writer. "No reconcile ...
+// a third path to what two moves [connect/disconnect] already do." Freeze's
+// precondition check no longer refuses an over-100%-claimed structure; the
+// fact that unreconciled sources can still sum past 100% is real and
+// unchanged (asserted below), it is simply no longer a write-time refusal —
+// resolving it is `connect`/`disconnect`'s job (assert the right edges,
+// retract the wrong ones), same as any other correction on this board.
 
 #[test]
-fn ec2_conflicting_edges_fail_without_reconcile() {
+fn ec2_freeze_precondition_no_longer_gates_on_reconciliation() {
     let lexicon = assembly_lexicon();
     let subject = fixture_subject_id();
     let h = dummy_hash();
@@ -417,12 +425,12 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         te(
             2,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": eid("src1_a").0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("src1_a").0,
                 "from_entity_id": Uuid::new_v4(), "to_entity_id": a.0, "percentage": 70.0}),
             idem("e1"),
             t,
@@ -430,12 +438,12 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
         te(
             3,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": eid("src2_a").0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("src2_a").0,
                 "from_entity_id": Uuid::new_v4(), "to_entity_id": a.0, "percentage": 60.0}),
             idem("e2"),
             t,
@@ -446,16 +454,19 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
     let event_refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control(&event_refs);
 
-    // Without reconcile: the total claimed is >100%.
+    // The unreconciled fact still stands: two active sources into A sum
+    // past 100%. Reconciliation used to be a required write-time step
+    // before this could be frozen (K-14); it no longer is (T3, §3.3) — the
+    // over-claim is still visible in state, just not a precondition refusal.
     let total = control.total_claimed_economic_pct(entity_subject());
     assert!(
         total > 100.0,
         "total claimed % should exceed 100: got {total}"
     );
 
-    // Check precondition for freeze: ReconciledProjection must fail.
-    // (`ubo.determination.compute-fold` retired TS.6 P2 — freeze already
-    // independently declares the identical precondition pair.)
+    // Freeze's precondition check no longer refuses this: `StructureClassSupported`
+    // is freeze's sole precondition now (T3, §3.3 removed `ReconciledProjection`
+    // from the pair), and structure_class was asserted above, so it is met.
     let freeze_entry = lexicon
         .get("kyc_ubo.decide.determination.freeze")
         .expect("freeze in lexicon");
@@ -473,7 +484,10 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
     );
     let result =
         check_control_preconditions(freeze_entry, &control, &TypeRegistryState::default(), &dummy_event);
-    assert!(result.is_err(), "freeze without reconcile must fail");
+    assert!(
+        result.is_ok(),
+        "T3 §3.3: freeze's precondition check no longer gates on reconciliation — {result:?}"
+    );
 }
 
 #[test]
@@ -511,12 +525,12 @@ fn ec3_verify_without_evidence_is_rejected() {
         te(
             0,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge.0, "from_entity_id": b.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge.0, "from_entity_id": b.0,
                 "to_entity_id": a.0, "percentage": 60.0}),
             idem("assert"),
             t,
@@ -574,12 +588,12 @@ fn ec3_verify_after_evidence_succeeds() {
         te(
             0,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge.0, "from_entity_id": b.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge.0, "from_entity_id": b.0,
                 "to_entity_id": a.0, "percentage": 60.0}),
             idem("assert"),
             t,
@@ -681,18 +695,8 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
             idem("reg"),
             t,
         ),
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.edge.reconciliation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}),
-            idem("reconcile"),
-            t,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
+        // the note on the first fixture in this file.
         te(
             2,
             subject,
@@ -812,12 +816,12 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             3,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge_b_a.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge_b_a.0,
                 "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
             idem("edge-b-a"),
             t1,
@@ -826,28 +830,18 @@ fn ec5_replay_determinism_after_supersede() {
         te(
             4,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": eid("p1_b").0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("p1_b").0,
                 "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
             idem("edge-p1-b"),
             t1,
         ),
-        te(
-            5,
-            subject,
-            "kyc_ubo.assert.edge.reconciliation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}),
-            idem("reconcile1"),
-            t1,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
+        // the note on the first fixture in this file.
         te(
             6,
             subject,
@@ -905,7 +899,7 @@ fn ec5_replay_determinism_after_supersede() {
     events.push(te(
         8,
         subject,
-        "kyc_ubo.assert.edge.supersession",
+        "kyc_ubo.assert.edge.disconnect",
         h,
         analyst(),
         authority(),
@@ -914,18 +908,8 @@ fn ec5_replay_determinism_after_supersede() {
         idem("supersede-b-a"),
         t2,
     ));
-    events.push(te(
-        9,
-        subject,
-        "kyc_ubo.assert.edge.reconciliation",
-        h,
-        analyst(),
-        authority(),
-        TargetBinding::for_subject(subject),
-        serde_json::json!({}),
-        idem("reconcile2"),
-        t2,
-    ));
+    // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see the
+    // note on the first fixture in this file.
     // No ownership UBOs after restructuring, and no officer appointments for
     // the TS.3 §4a pull to walk → nothing to conclude with.
     //
@@ -1059,12 +1043,12 @@ fn k13_superseded_edges_remain_in_fold() {
         te(
             0,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge.0, "from_entity_id": b.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge.0, "from_entity_id": b.0,
                 "to_entity_id": a.0, "percentage": 60.0}),
             idem("assert"),
             t,
@@ -1072,7 +1056,7 @@ fn k13_superseded_edges_remain_in_fold() {
         te(
             1,
             subject,
-            "kyc_ubo.assert.edge.supersession",
+            "kyc_ubo.assert.edge.disconnect",
             h,
             analyst(),
             authority(),
@@ -1356,12 +1340,13 @@ fn d2_phase3a_two_versions_dispatch_to_different_impls() {
     let v1_event = te(
         0,
         subject,
-        "kyc_ubo.assert.edge.economic-interest",
+        "kyc_ubo.assert.edge.connect",
         v1_hash,
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
         serde_json::json!({
+            "kind": "economic_interest",
             "edge_id": eid("b_a").0,
             "from_entity_id": b.0,
             "to_entity_id": a.0,
@@ -1375,12 +1360,13 @@ fn d2_phase3a_two_versions_dispatch_to_different_impls() {
     let v2_event = te(
         0,
         subject,
-        "kyc_ubo.assert.edge.economic-interest",
+        "kyc_ubo.assert.edge.connect",
         v2_hash,
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
         serde_json::json!({
+            "kind": "economic_interest",
             "edge_id": eid("b_a").0,
             "from_entity_id": b.0,
             "to_entity_id": a.0,
@@ -1534,12 +1520,12 @@ fn axes_diverge_on_correction() {
         te(
             4,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge_p1_a.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge_p1_a.0,
                 "from_entity_id": p1_entity.0, "to_entity_id": a.0, "percentage": 30.0}),
             idem("edge-p1-a"),
             t1,
@@ -1548,28 +1534,18 @@ fn axes_diverge_on_correction() {
         te(
             5,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge_p2_a.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge_p2_a.0,
                 "from_entity_id": p2_entity.0, "to_entity_id": a.0, "percentage": 40.0}),
             idem("edge-p2-a"),
             t1,
         ),
-        te(
-            6,
-            subject,
-            "kyc_ubo.assert.edge.reconciliation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}),
-            idem("reconcile1"),
-            t1,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
+        // the note on the first fixture in this file.
         te(
             7,
             subject,
@@ -1603,7 +1579,7 @@ fn axes_diverge_on_correction() {
         te(
             9,
             subject,
-            "kyc_ubo.assert.edge.supersession",
+            "kyc_ubo.assert.edge.disconnect",
             h,
             analyst(),
             authority(),
@@ -1614,21 +1590,8 @@ fn axes_diverge_on_correction() {
         )
         .with_committed_at(t2),
     );
-    events.push(
-        te(
-            10,
-            subject,
-            "kyc_ubo.assert.edge.reconciliation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}),
-            idem("reconcile2"),
-            t2,
-        )
-        .with_committed_at(t2),
-    );
+    // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see the
+    // note on the first fixture in this file.
     // Second freeze at t2 — P2 remains active alone.
     events.push(
         te(
@@ -1755,12 +1718,12 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             3,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge_b_a.0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge_b_a.0,
                 "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
             idem("edge-b-a"),
             t1,
@@ -1769,28 +1732,18 @@ fn bitemporal_matches_txtime_when_axes_align() {
         te(
             4,
             subject,
-            "kyc_ubo.assert.edge.economic-interest",
+            "kyc_ubo.assert.edge.connect",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": eid("p1_b").0,
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("p1_b").0,
                 "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
             idem("edge-p1-b"),
             t1,
         ),
-        te(
-            5,
-            subject,
-            "kyc_ubo.assert.edge.reconciliation",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}),
-            idem("reconcile1"),
-            t1,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
+        // the note on the first fixture in this file.
         te(
             6,
             subject,
@@ -1892,22 +1845,19 @@ fn r4_legal_set_at_past_time_is_reproducible() {
             idem("r4-reg-p1"), t1,
         ),
         te(
-            3, subject, "kyc_ubo.assert.edge.economic-interest", h, analyst(), authority(),
+            3, subject, "kyc_ubo.assert.edge.connect", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": edge_b_a.0, "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
+            serde_json::json!({"kind": "economic_interest", "edge_id": edge_b_a.0, "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
             idem("r4-edge-b-a"), t1,
         ),
         te(
-            4, subject, "kyc_ubo.assert.edge.economic-interest", h, analyst(), authority(),
+            4, subject, "kyc_ubo.assert.edge.connect", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": eid("r4_p1_b").0, "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("r4_p1_b").0, "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
             idem("r4-edge-p1-b"), t1,
         ),
-        te(
-            5, subject, "kyc_ubo.assert.edge.reconciliation", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}), idem("r4-reconcile1"), t1,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
+        // the note on the first fixture in this file.
         te(
             6, subject, "ubo.determination.select-strategy", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
@@ -1990,16 +1940,13 @@ fn r4_legality_pins_its_ruleset() {
             idem("r4b-reg-p1"), t1,
         ),
         te(
-            3, subject, "kyc_ubo.assert.edge.economic-interest", h, analyst(), authority(),
+            3, subject, "kyc_ubo.assert.edge.connect", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"edge_id": eid("r4b_p1_a").0, "from_entity_id": p1.0, "to_entity_id": a.0, "percentage": 100.0}),
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("r4b_p1_a").0, "from_entity_id": p1.0, "to_entity_id": a.0, "percentage": 100.0}),
             idem("r4b-edge"), t1,
         ),
-        te(
-            4, subject, "kyc_ubo.assert.edge.reconciliation", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({}), idem("r4b-reconcile"), t1,
-        ),
+        // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
+        // the note on the first fixture in this file.
         te(
             5, subject, "ubo.determination.select-strategy", h, analyst(), authority(),
             TargetBinding::for_subject(subject),

@@ -1,7 +1,7 @@
 //! T6.2 gate tests — EOP-PLAN-KYCUBO-KIT-001 §T6.2 (edge family, closes the
 //! ratified EOP-DD-KYCUBO-KIT-T6 matrix rows 1-5).
 //!
-//! Ten gates (5 rows x block/admit), each driven through the REAL governed
+//! Eight gates (4 rows x block/admit — row 5 retired T3, see below), each driven through the REAL governed
 //! append path (live DB) — the real `SemOsVerbOp::execute()` for the verb
 //! under test, not `check_preconditions` called in isolation. This mirrors
 //! `kyc_t61_studs.rs::select_strategy_blocked_end_to_end`'s discipline, one
@@ -11,15 +11,18 @@
 //! layer that actually matters — the real op).
 //!
 //! Row coverage:
-//! - rows 1/2 (`assert-control` / `assert-economic-interest`):
+//! - rows 1/2 (`connect` with `kind: voting_rights` / `kind:
+//!   economic_interest` — EOP-VS-UBO-GAME-001 T3, §3.2, 2026-08-27 merged
+//!   the former `assert-control`/`assert-economic-interest` into one verb):
 //!   `SubjectRegistered` + `NoDuplicateActiveEdge` — block is the duplicate
 //!   case specifically (a *first* assertion on a registered subject must be
 //!   admitted; a *second* identical (from,to,kind) assertion must not).
-//! - rows 3/4 (`attach-evidence` / `supersede`): `EdgeExists` + `EdgeActive`
-//!   — block targets a superseded edge; admit targets an active one.
-//! - row 5 (`reconcile-conflict`): `SubjectRegistered` alone — block targets
-//!   an unregistered subject; admit succeeds even with zero edges (the
-//!   ratified no-amendment reading).
+//! - rows 3/4 (`attach-evidence` / `disconnect`, T3 renamed from
+//!   `supersede`): `EdgeExists` + `EdgeActive` — block targets a disconnected
+//!   edge; admit targets an active one.
+//! - row 5 (`reconcile-conflict`) — RETIRED (EOP-VS-UBO-GAME-001 T3, §3.3,
+//!   2026-08-27, K-G7): "No reconcile ... a third path to what two moves
+//!   already do." No test survives it here.
 //! - row 9 (`kyc_ubo.assert.subject.register`, T6.3 fix, 2026-08-17, corrects
 //!   EOP-DD-KYCUBO-KIT-T6 §5 — see its §6 amendment): `NotAlreadyRegistered`,
 //!   now keyed off the event's `entity_id` (`ControlState.registered_entity_ids`)
@@ -35,8 +38,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectPlace, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
-    UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede,
+    KycSubjectPlace, UboEdgeAttachEvidence, UboEdgeConnect, UboEdgeDisconnect,
 };
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
@@ -113,7 +115,7 @@ async fn row1_assert_control_admits_first_assertion_on_registered_subject() {
     let mut scope = Scope::begin(&pool).await;
     register(&mut scope, subject).await;
 
-    let result = UboEdgeAssertControl
+    let result = UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
@@ -142,7 +144,7 @@ async fn row1_assert_control_blocks_duplicate_active_edge() {
 
     let from = Uuid::new_v4();
     let to = Uuid::new_v4();
-    UboEdgeAssertControl
+    UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
@@ -156,7 +158,7 @@ async fn row1_assert_control_blocks_duplicate_active_edge() {
         .await
         .expect("first assert-control must succeed");
 
-    let dup = UboEdgeAssertControl
+    let dup = UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
@@ -184,12 +186,13 @@ async fn row2_assert_economic_interest_admits_first_assertion_on_registered_subj
     let mut scope = Scope::begin(&pool).await;
     register(&mut scope, subject).await;
 
-    let result = UboEdgeAssertEconomicInterest
+    let result = UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
                 "from_entity_id": Uuid::new_v4(),
                 "to_entity_id": Uuid::new_v4(),
+                "kind": "economic_interest",
                 "percentage": 30.0,
             }),
             &mut VerbExecutionContext::default(),
@@ -214,12 +217,13 @@ async fn row2_assert_economic_interest_blocks_duplicate_active_edge() {
 
     let from = Uuid::new_v4();
     let to = Uuid::new_v4();
-    UboEdgeAssertEconomicInterest
+    UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
                 "from_entity_id": from,
                 "to_entity_id": to,
+                "kind": "economic_interest",
                 "percentage": 30.0,
             }),
             &mut VerbExecutionContext::default(),
@@ -228,12 +232,13 @@ async fn row2_assert_economic_interest_blocks_duplicate_active_edge() {
         .await
         .expect("first assert-economic-interest must succeed");
 
-    let dup = UboEdgeAssertEconomicInterest
+    let dup = UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
                 "from_entity_id": from,
                 "to_entity_id": to,
+                "kind": "economic_interest",
                 "percentage": 45.0,
             }),
             &mut VerbExecutionContext::default(),
@@ -249,15 +254,16 @@ async fn row2_assert_economic_interest_blocks_duplicate_active_edge() {
     cleanup(&pool, subject).await;
 }
 
-// ── rows 3/4 — attach-evidence / supersede ──────────────────────────────────
+// ── rows 3/4 — attach-evidence / disconnect ─────────────────────────────────
 
 async fn assert_control_edge(scope: &mut Scope, subject: SubjectId) -> Uuid {
-    let edge_id = Uuid::new_v4();
-    UboEdgeAssertControl
+    // §8 Q3: connect refuses a caller-supplied edge id — the system mints
+    // it and returns it; capture the minted id from the response instead
+    // of pre-choosing one.
+    let outcome = UboEdgeConnect
         .execute(
             &serde_json::json!({
                 "subject-id": subject.0,
-                "edge-id": edge_id,
                 "from_entity_id": Uuid::new_v4(),
                 "to_entity_id": Uuid::new_v4(),
                 "kind": "voting_rights",
@@ -266,8 +272,12 @@ async fn assert_control_edge(scope: &mut Scope, subject: SubjectId) -> Uuid {
             scope,
         )
         .await
-        .expect("assert-control must succeed");
-    edge_id
+        .expect("connect must succeed");
+    let dsl_runtime::VerbExecutionOutcome::Record(v) = outcome else {
+        panic!("connect must return a Record outcome, got {outcome:?}");
+    };
+    Uuid::parse_str(v["edge_id"].as_str().expect("edge_id must be a string"))
+        .expect("edge_id must be a valid UUID")
 }
 
 #[tokio::test]
@@ -301,7 +311,7 @@ async fn row3_attach_evidence_blocks_superseded_edge() {
     register(&mut scope, subject).await;
     let edge_id = assert_control_edge(&mut scope, subject).await;
 
-    UboEdgeSupersede
+    UboEdgeDisconnect
         .execute(
             &serde_json::json!({ "subject-id": subject.0, "edge-id": edge_id }),
             &mut VerbExecutionContext::default(),
@@ -333,7 +343,7 @@ async fn row4_supersede_admits_active_edge() {
     register(&mut scope, subject).await;
     let edge_id = assert_control_edge(&mut scope, subject).await;
 
-    let result = UboEdgeSupersede
+    let result = UboEdgeDisconnect
         .execute(
             &serde_json::json!({ "subject-id": subject.0, "edge-id": edge_id }),
             &mut VerbExecutionContext::default(),
@@ -356,7 +366,7 @@ async fn row4_supersede_blocks_already_superseded_edge() {
     register(&mut scope, subject).await;
     let edge_id = assert_control_edge(&mut scope, subject).await;
 
-    UboEdgeSupersede
+    UboEdgeDisconnect
         .execute(
             &serde_json::json!({ "subject-id": subject.0, "edge-id": edge_id }),
             &mut VerbExecutionContext::default(),
@@ -365,7 +375,7 @@ async fn row4_supersede_blocks_already_superseded_edge() {
         .await
         .expect("first supersede must succeed");
 
-    let dup = UboEdgeSupersede
+    let dup = UboEdgeDisconnect
         .execute(
             &serde_json::json!({ "subject-id": subject.0, "edge-id": edge_id }),
             &mut VerbExecutionContext::default(),
@@ -381,54 +391,11 @@ async fn row4_supersede_blocks_already_superseded_edge() {
     cleanup(&pool, subject).await;
 }
 
-// ── row 5 — reconcile-conflict ──────────────────────────────────────────────
-
-#[tokio::test]
-async fn row5_reconcile_conflict_blocks_unregistered_subject() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    // Deliberately NOT registered.
-
-    let result = UboEdgeReconcileConflict
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0 }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_err(),
-        "reconcile-conflict must be blocked for an unregistered subject: {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
-
-#[tokio::test]
-async fn row5_reconcile_conflict_admits_registered_subject_with_zero_edges() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let mut scope = Scope::begin(&pool).await;
-    register(&mut scope, subject).await;
-    // Deliberately zero edges — the ratified matrix reading (row 5, no
-    // amendment): reconcile stays callable early.
-
-    let result = UboEdgeReconcileConflict
-        .execute(
-            &serde_json::json!({ "subject-id": subject.0 }),
-            &mut VerbExecutionContext::default(),
-            &mut scope,
-        )
-        .await;
-    assert!(
-        result.is_ok(),
-        "reconcile-conflict must be admitted for a registered subject even with zero edges \
-         (ratified without the optional economic-edge amendment): {result:?}"
-    );
-    scope.tx.rollback().await.unwrap();
-    cleanup(&pool, subject).await;
-}
+// row 5 (reconcile-conflict) RETIRED (EOP-VS-UBO-GAME-001 T3, §3.3,
+// 2026-08-27, K-G7): "No reconcile ... a third path to what two moves
+// already do." Both gates (`row5_reconcile_conflict_blocks_unregistered_
+// subject`, `row5_reconcile_conflict_admits_registered_subject_with_zero_
+// edges`) are deleted with the verb — no successor to test.
 
 // ── row 9 — kyc_ubo.assert.subject.register (T6.3 fix, 2026-08-17) ────────────────────
 

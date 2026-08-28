@@ -17,7 +17,7 @@
 //! separate, already-covered concern — `cargo x registry-graph`); this gate
 //! is purely "does op X's/the workbook's source text call the one function."
 
-/// The 13 assembly-tier (board-buildable) verb FQNs `canonical_event_shape`
+/// The 11 assembly-tier (board-buildable) verb FQNs `canonical_event_shape`
 /// covers. Excludes `kyc_ubo.decide.determination.freeze` (§3.2 — computes a
 /// verdict from live state, not declared args) and the three
 /// `kyc_ubo.decide.{subject.approve,subject.reject,obligation.waiver}`
@@ -28,13 +28,15 @@
 /// into `place` (15→14, one FQN for two); `member-withdrawal` renamed
 /// `remove` (no count change); `type-correction` DISSOLVED (14→13, no
 /// replacement FQN — see `lexicon.rs`'s retirement comment).
+/// T3 (2026-08-27, §3.2/§3.3): `control`+`economic-interest` MERGED into
+/// `connect` (13→12, one FQN for two); `supersession` renamed `disconnect`
+/// (no count change); `reconciliation` DISSOLVED (12→11, no replacement
+/// FQN — see `lexicon.rs`'s retirement comment).
 const ASSEMBLY_VERB_FQNS: &[&str] = &[
-    "kyc_ubo.assert.edge.control",
-    "kyc_ubo.assert.edge.economic-interest",
+    "kyc_ubo.assert.edge.connect",
     "kyc_ubo.assert.edge.evidence",
     "kyc_ubo.assert.edge.verification",
-    "kyc_ubo.assert.edge.supersession",
-    "kyc_ubo.assert.edge.reconciliation",
+    "kyc_ubo.assert.edge.disconnect",
     "kyc_ubo.assert.subject.place",
     "kyc_ubo.assert.subject.structure-class",
     "kyc_ubo.assert.subject.remove",

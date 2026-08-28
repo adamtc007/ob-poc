@@ -485,13 +485,12 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     // K-G5 gap TS.1 closes.
     let untyped_registry = ob_poc_kyc_substrate::TypeRegistryState::default();
     let set_before = enumerate_placement_set(subj, &control, &obligation, &untyped_registry, &lexicon);
+    // EOP-VS-UBO-GAME-001 T3, §3.2: `control` + `economic-interest` merged
+    // into one verb, `connect` — a single membership check now covers what
+    // used to be two.
     assert!(
-        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.control"),
-        "assert-control must be refused before any group member has an asserted type"
-    );
-    assert!(
-        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.economic-interest"),
-        "assert-economic-interest must be refused before any group member has an asserted type"
+        !set_before.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.connect"),
+        "connect must be refused before any group member has an asserted type"
     );
     // `place` no longer appears for person/company (T2 §3.1): they are
     // registered but not currently-withdrawn, so they are not in the
@@ -533,8 +532,8 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
 
     let set_after = enumerate_placement_set(subj, &control, &obligation, &typed_registry, &lexicon);
     assert!(
-        set_after.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.control"),
-        "assert-control must be admitted once a geometrically-possible pair of typed members exists"
+        set_after.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.connect"),
+        "connect must be admitted once a geometrically-possible pair of typed members exists"
     );
     assert!(set_after
         .moves

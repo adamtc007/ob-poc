@@ -6,9 +6,12 @@
 # direct table write. Ops live in domain_ops::kyc_stream_ops.
 #
 # The domain split (four-segment scheme `kyc_ubo.<capability>.<domain>.<intent>`,
-# RATIFIED 2026-08-22): kyc_ubo.assert.edge.* (6 edge lifecycle; nominee-piercing
+# RATIFIED 2026-08-22): kyc_ubo.assert.edge.* (4 edge lifecycle as of T3,
+# EOP-VS-UBO-GAME-001, 2026-08-27 — connect/evidence/verification/disconnect;
+# connect merges the former control+economic-interest, disconnect renames
+# supersession, reconciliation is retired outright (§3.3); nominee-piercing
 # retired as a standalone verb TS.6 P2 — folded into a macro composing
-# assert.edge.control's pierced-from arg + assert.edge.supersession, K-8),
+# assert.edge.connect's pierced-from arg + assert.edge.disconnect, K-8),
 # kyc_ubo.decide.determination.* (1: freeze — the single Assembly verdict;
 # select-strategy/compute-fold/apply-smo-fallback all retired), and
 # kyc_ubo.assert.subject.* (6 subject/entity lifecycle). All are covered by
@@ -23,9 +26,9 @@ domains:
     description: "UBO edge assertions — durable stream-backed verb primitives (dsl.kyc lexicon, Assembly pack)"
 
     verbs:
-      control:
+      connect:
         flavour: instance_adding
-        description: Claim a control edge (voting rights, board appointment, GP statutory, trust role, etc.)
+        description: "A link exists, from this block to that one, of this kind (EOP-VS-UBO-GAME-001 §3.1) — merges assert-control + assert-economic-interest (§3.2: they differ by kind, geometry already validates the classified pipe, their preconditions are identical). The system mints the link id and returns it (§8 Q3); a caller-supplied id is refused."
         effect_class: append_fact
         invocation_phrases:
           - "assert control"
@@ -43,69 +46,7 @@ domains:
           - "add a control assertion"
           - "assert dominant influence"
           - "record GP statutory control"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: control_edge
-          tags: [ubo, control, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root (the subject stream)
-          - name: from_entity_id
-            type: uuid
-            required: true
-            description: Controlling entity
-          - name: to_entity_id
-            type: uuid
-            required: true
-            description: Controlled entity
-          - name: kind
-            type: string
-            required: true
-            description: "Control basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload; canonical wire set: EDGE_KIND_WIRE_VALUES, TS.1 §1a). Trust roles are sub-kind-explicit: trust_settlor / trust_trustee / trust_protector / trust_beneficiary each map to their EdgeKind::TrustRole sub-kind, so distinct roles between the same (from,to) pair derive distinct edge ids and coexist under NoDuplicateActiveEdge. Unrecognized or omitted values are REJECTED at the op-normalizer before append (TS.1 §1b, fail-closed); the fold itself stays infallible — its dominant_influence catch-all remains only as the total-dispatch backstop for historical events."
-            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, nominee, dominant_influence, economic_interest, officer_appointment, management_mandate, membership_rights, statutory_authority, employment, containment]
-          - name: edge-id
-            type: uuid
-            required: false
-            description: Stable edge identity (generated if omitted)
-          - name: percentage
-            type: decimal
-            required: false
-            description: Percentage (for economic_interest edges)
-          - name: trust-revocable
-            type: boolean
-            required: false
-            description: "Whether the trust IS revocable — only meaningful on trust_settlor edges (TS.1 §2.1). Polarity: false = PROVEN irrevocable, the only value that excludes the settlor from trust_role_strategy candidates; true or absent both treat the trust as revocable, so the settlor is INCLUDED (fail-closed toward inclusion: over-identify, never silently drop a controller)."
-          - name: pierced-from
-            type: uuid
-            required: false
-            description: "TS.6 P2 (K-G7): set ONLY by the `kyc_ubo.assert.edge.nominee-piercing` macro (config/verb_schemas/macros/ubo.yaml), which composes this verb with edge.supersede to replace the retired standalone pierce-nominee verb. The referenced edge id — the nominee edge this assertion pierces. Op-layer fail-closed check (no precondition primitive expresses \"edge is of kind X\"): the referenced edge must exist, be EdgeKind::Nominee, and be active. `kind` above may not be `nominee` when this is set (a pierce cannot produce another nominee edge). Fold-side: stamps EdgeState.pierced_from (K-8 traceability)."
-        returns:
-          type: record
-          fields:
-            - name: edge_id
-              type: uuid
-            - name: seq
-              type: integer
-            - name: deduped
-              type: boolean
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-
-      economic-interest:
-        flavour: instance_adding
-        description: Claim an economic-interest edge (shareholding percentage)
-        effect_class: append_fact
-        invocation_phrases:
+          - "connect these two blocks"
           - "assert economic interest"
           - "record shareholding"
           - "add economic interest edge"
@@ -121,31 +62,40 @@ domains:
           tier: intent
           source_of_truth: kyc_stream
           scope: global
-          noun: economic_edge
-          tags: [ubo, economic, ownership, determination, stream-backed, dsl-kyc]
+          noun: edge
+          tags: [ubo, control, economic, ownership, determination, stream-backed, dsl-kyc]
           phase_tags: [kyc]
           side_effects: state_write
         args:
           - name: subject-id
             type: uuid
             required: true
-            description: Determination root
+            description: Determination root (the subject stream)
           - name: from_entity_id
             type: uuid
             required: true
-            description: Owning entity
+            description: The linking entity (controlling entity, or owning entity for an economic_interest kind)
           - name: to_entity_id
             type: uuid
             required: true
-            description: Owned entity
+            description: The linked entity (controlled entity, or owned entity for an economic_interest kind)
+          - name: kind
+            type: string
+            required: true
+            description: "Link basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload; canonical wire set: EDGE_KIND_WIRE_VALUES, TS.1 §1a). Trust roles are sub-kind-explicit: trust_settlor / trust_trustee / trust_protector / trust_beneficiary each map to their EdgeKind::TrustRole sub-kind, so distinct roles between the same (from,to) pair derive distinct edge ids and coexist under NoDuplicateActiveEdge. `economic_interest` is the former assert-economic-interest verb's sole implicit kind, now an explicit value alongside every control basis — one merged verb, geometry-validated the same way (§3.2: \"this merge passes the test\"). Unrecognized or omitted values are REJECTED at the op-normalizer before append (TS.1 §1b, fail-closed); the fold itself stays infallible — its dominant_influence catch-all remains only as the total-dispatch backstop for historical events."
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, nominee, dominant_influence, economic_interest, officer_appointment, management_mandate, membership_rights, statutory_authority, employment, containment]
           - name: percentage
             type: decimal
             required: false
-            description: Economic interest percentage
-          - name: edge-id
+            description: Percentage (for economic_interest edges)
+          - name: trust-revocable
+            type: boolean
+            required: false
+            description: "Whether the trust IS revocable — only meaningful on trust_settlor edges (TS.1 §2.1). Polarity: false = PROVEN irrevocable, the only value that excludes the settlor from trust_role_strategy candidates; true or absent both treat the trust as revocable, so the settlor is INCLUDED (fail-closed toward inclusion: over-identify, never silently drop a controller)."
+          - name: pierced-from
             type: uuid
             required: false
-            description: Stable edge identity (generated if omitted)
+            description: "TS.6 P2 (K-G7): set ONLY by the `kyc_ubo.assert.edge.nominee-piercing` macro (config/verb_schemas/macros/ubo.yaml), which composes this verb with edge.disconnect to replace the retired standalone pierce-nominee verb. The referenced edge id — the nominee edge this assertion pierces. Op-layer fail-closed check (no precondition primitive expresses \"edge is of kind X\"): the referenced edge must exist, be EdgeKind::Nominee, and be active. `kind` above may not be `nominee` when this is set (a pierce cannot produce another nominee edge). Fold-side: stamps EdgeState.pierced_from (K-8 traceability)."
         returns:
           type: record
           fields:
@@ -153,6 +103,8 @@ domains:
               type: uuid
             - name: seq
               type: integer
+            - name: deduped
+              type: boolean
         three_axis:
           state_effect: preserving
           external_effects: []
@@ -261,11 +213,13 @@ domains:
           consequence:
             baseline: reviewable
 
-      supersession:
+      disconnect:
         flavour: attribute_mutating
-        description: Supersede an edge (K-13 supersede-never-delete — edge stays, status flips)
+        description: "That link is not on the board (EOP-VS-UBO-GAME-001 §3.1) — merges supersession (K-13 supersede-never-delete: the edge stays, status flips; R5, nothing is deleted)"
         effect_class: append_fact
         invocation_phrases:
+          - "disconnect this link"
+          - "remove this connection"
           - "supersede edge"
           - "supersede control edge"
           - "supersede this relationship"
@@ -285,7 +239,7 @@ domains:
           tier: intent
           source_of_truth: kyc_stream
           scope: global
-          noun: control_edge
+          noun: edge
           tags: [ubo, supersede, determination, stream-backed, dsl-kyc]
           phase_tags: [kyc]
           side_effects: state_write
@@ -297,7 +251,7 @@ domains:
           - name: edge-id
             type: uuid
             required: true
-            description: The edge to supersede (cannot be deleted per K-13)
+            description: The link to disconnect (cannot be deleted per K-13 — R5, status flips only)
         returns:
           type: record
           fields:
@@ -312,55 +266,29 @@ domains:
       # edge.pierce-nominee RETIRED (TS.6 P2, K-G7, 2026-08-22): folded into
       # the `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/macros/
       # ubo.yaml) composing `edge.assert-control` (with its new optional
-      # `pierced-from` arg, below) + `edge.supersede`. Piercing records a
+      # `pierced-from` arg, below) + `edge.disconnect`. Piercing records a
       # real handed-over fact, so it wasn't deleted outright (unlike
       # select-strategy/compute-fold) — it was redesigned because the old
       # shape was a bespoke single-purpose verb doing two governed effects
       # in one hand-rolled fold arm, with no reusable composition mechanism.
 
-      reconciliation:
-        flavour: attribute_mutating
-        description: Record a conflict-reconciliation event on the subject stream
-        effect_class: append_fact
-        invocation_phrases:
-          - "reconcile conflict"
-          - "resolve edge conflict"
-          - "reconcile ownership conflict"
-          - "resolve conflicting assertions"
-          - "record reconciliation"
-          - "reconcile determination conflict"
-          - "resolve this conflict"
-          - "mark conflict reconciled"
-          - "record conflict resolution"
-          - "reconcile the contradicting edges"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: control_edge
-          tags: [ubo, reconcile, conflict, determination, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root
-          - name: resolution
-            type: string
-            required: false
-            description: Free-text resolution note (captured in payload)
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
+      # reconciliation RETIRED (EOP-VS-UBO-GAME-001 T3, §3.3, 2026-08-27) —
+      # "No reconcile. Two conflicting assertions both stand, each with
+      # provenance. Resolution is disconnect the one that is wrong, or
+      # connect the one that is right. A third path to what two moves
+      # already do is how vocabularies grow." (§7: "REMOVE — a third path
+      # to disconnect the wrong one or connect the right one. Its one
+      # declared argument is read by no fold arm.") K-G7 full deletion,
+      # despite 2 real committed historical events (P0c census) — unlike
+      # register/type/member-withdrawal (T2), whose effects are continued
+      # by place/remove, reconciliation's sole effect (gating freeze via
+      # ReconciledProjection/is_reconciled(), K-14) is dissolved as a
+      # concept in the SAME tranche: nothing survives to read
+      # `reconciliation_event_id` once the K-14 gate is gone, so keeping
+      # the fold arm alive for those 2 historical events would write to a
+      # field nothing ever reads again. Verb, fold arm, precondition, and
+      # the K-14 gate on freeze are gone together; see fold/control.rs and
+      # lexicon.rs for the same reasoning restated at each deletion site.
 
       # TS.6 §5 (K-G7, RATIFIED) - `determination.apply-smo-fallback`
       # RETIRED 2026-08-22. SMO is PULLED on exhaustion, never asserted -

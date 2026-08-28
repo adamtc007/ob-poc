@@ -66,7 +66,7 @@ fn register(subject: SubjectId) -> IntentEvent {
 fn assert_control(subject: SubjectId, to: Uuid, idem: &str) -> IntentEvent {
     event(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         serde_json::json!({
             "from_entity_id": Uuid::new_v4(),
             "to_entity_id": to,

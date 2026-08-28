@@ -18,7 +18,7 @@ use ob_poc_kyc_substrate::{
 };
 use uuid::Uuid;
 
-/// All 14 live dsl.kyc verb FQNs (control-fold verbs, obligation-fold verbs,
+/// All 13 live dsl.kyc verb FQNs (control-fold verbs, obligation-fold verbs,
 /// and determination-layer verbs the pure folds ignore) plus a couple of
 /// deliberately-unknown FQNs, so every fold's total-dispatch fallthrough
 /// (D2) stays hot alongside its real match arms. `fold_control` and
@@ -35,15 +35,22 @@ use uuid::Uuid;
 /// had a dispatch arm for them (this fuzz target only exercises
 /// `apply_one_control_event`/`apply_one_obligation_event`, never
 /// `ob-poc-kyc-decide`'s DB-backed ops).
+/// EOP-VS-UBO-GAME-001 T3 (2026-08-27, §3.2/§3.3): `economic-interest` and
+/// `supersession` dropped from this list — same reasoning as select-strategy/
+/// compute-fold above: their fold arms were deleted outright (K-G7, 0 real
+/// committed events under either FQN), so their strings are now just more
+/// fallthrough noise, superseded by `connect`/`disconnect`, added below.
+/// `control` KEPT (R5, historical-only — 4 real committed events, arm
+/// stays); `reconciliation` DROPPED (K-G7 full deletion, field and arm both
+/// gone — see `fold::control`'s retirement comment).
 const ALL_VERBS: &[&str] = &[
     "kyc_ubo.assert.subject.register",
     "kyc_ubo.assert.subject.structure-class",
-    "kyc_ubo.assert.edge.economic-interest",
     "kyc_ubo.assert.edge.control",
+    "kyc_ubo.assert.edge.connect",
     "kyc_ubo.assert.edge.evidence",
     "kyc_ubo.assert.edge.verification",
-    "kyc_ubo.assert.edge.supersession",
-    "kyc_ubo.assert.edge.reconciliation",
+    "kyc_ubo.assert.edge.disconnect",
     "kyc_ubo.decide.determination.freeze",
     "kyc_ubo.assert.obligation.creation",
     "kyc_ubo.assert.entity.identity",
@@ -176,8 +183,9 @@ fn build_payload(
         "edge_id",
         pick_uuid_like(tape, edge_pool).map(serde_json::Value::from),
     );
-    // TS.6 P2: `kyc_ubo.assert.edge.control`'s new provenance field — the
-    // `pierce-nominee` macro's `pierced-from` arg, normalized to this key.
+    // TS.6 P2: `kyc_ubo.assert.edge.connect`'s (T3-renamed from `control`)
+    // provenance field — the `pierce-nominee` macro's `pierced-from` arg,
+    // normalized to this key.
     put(
         "pierced_from",
         pick_uuid_like(tape, edge_pool).map(serde_json::Value::from),

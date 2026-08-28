@@ -195,7 +195,7 @@ impl PlacementSet {
 fn is_edge_scoped(verb_fqn: &str) -> bool {
     matches!(
         verb_fqn,
-        "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.supersession"
+        "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.disconnect"
     )
 }
 
@@ -225,10 +225,12 @@ fn board_content_hash(moves: &[LegalMove]) -> Hash {
 }
 
 /// Verbs gated by the type-geometry layer (TS.1 §1/§5) — checked BEFORE
-/// `check_preconditions`, and only for these two. Every other verb's
-/// admission is unchanged from before this tranche.
+/// `check_preconditions`. EOP-VS-UBO-GAME-001 T3 merged the former two
+/// FQNs (`control`, `economic-interest`) into one (`connect`) — same gate,
+/// one name now. Every other verb's admission is unchanged from before
+/// this tranche.
 fn is_geometry_gated(verb_fqn: &str) -> bool {
-    matches!(verb_fqn, "kyc_ubo.assert.edge.control" | "kyc_ubo.assert.edge.economic-interest")
+    matches!(verb_fqn, "kyc_ubo.assert.edge.connect")
 }
 
 /// TS.5 R2 (closed 2026-08-22): there is no separate existence scan any more.
@@ -426,16 +428,12 @@ pub fn enumerate_placement_set(
         if is_geometry_gated(fqn) {
             // TS.5 R2: one probe per candidate triple, each carrying the triple
             // in its payload, so `check_preconditions` evaluates THAT triple.
-            // `economic-interest` classifies its kind from the target type and
-            // ignores any `kind` field (`geometry_triple_for_event`), so
-            // enumerating wire values for it would produce 17 identical
-            // triples — pairs only.
+            // EOP-VS-UBO-GAME-001 T3: `connect`'s payload always carries a
+            // real `kind` (including "economic_interest" as an ordinary
+            // value now) — no more single-wire special case; every kind in
+            // `EDGE_KIND_WIRE_VALUES` is enumerated uniformly.
             let members: Vec<EntityId> = state.registered_entity_ids.iter().copied().collect();
-            let wires: &[&str] = if fqn == "kyc_ubo.assert.edge.economic-interest" {
-                &["economic_interest"]
-            } else {
-                crate::fold::control::EDGE_KIND_WIRE_VALUES
-            };
+            let wires: &[&str] = crate::fold::control::EDGE_KIND_WIRE_VALUES;
             for &from in &members {
                 if type_registry.type_of(from).is_none() {
                     continue;

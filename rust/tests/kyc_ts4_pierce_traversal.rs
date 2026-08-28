@@ -22,8 +22,8 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
-    UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAttachEvidence,
+    UboEdgeConnect, UboEdgeDisconnect,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -150,12 +150,12 @@ async fn setup_subject(pool: &PgPool, subject: Uuid, natural_persons: &[Uuid], c
 }
 
 /// `kyc_ubo.assert.edge.nominee-piercing` RETIRED (TS.6 P2, K-G7) — folded into a macro
-/// (`config/verb_schemas/macros/ubo.yaml`) composing `kyc_ubo.assert.edge.control`
-/// (with its `pierced-from` arg) + `kyc_ubo.assert.edge.supersession`. Drives the same two
+/// (`config/verb_schemas/macros/ubo.yaml`) composing `kyc_ubo.assert.edge.connect`
+/// (with its `pierced-from` arg) + `kyc_ubo.assert.edge.disconnect`. Drives the same two
 /// REAL ops the macro expands to, in the same order, mirroring the macro's
 /// static substitution exactly (no derivation trick available at macro
 /// expansion time, so `to_entity_id` is an explicit param here too — same as
-/// the macro's own required slot). Returns the `assert-control` outcome so
+/// the macro's own required slot). Returns the `connect` outcome so
 /// callers can read the real (now randomly-generated, not the old bespoke
 /// op's deterministic `Uuid::new_v5`) replacement edge id off `edge_id`.
 async fn pierce_nominee(
@@ -167,7 +167,7 @@ async fn pierce_nominee(
     kind: &str,
 ) -> serde_json::Value {
     let outcome = run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject, "from_entity_id": nominator, "to_entity_id": to_entity,
             "kind": kind, "pierced-from": nominee_edge,
@@ -176,12 +176,32 @@ async fn pierce_nominee(
     )
     .await;
     run(
-        &UboEdgeSupersede,
+        &UboEdgeDisconnect,
         serde_json::json!({ "subject-id": subject, "edge-id": nominee_edge }),
         pool,
     )
     .await;
     outcome
+}
+
+/// §8 Q3: connect refuses a caller-supplied edge id — mint via the op and
+/// capture the real one from the response instead.
+async fn connect_capturing_edge_id(
+    pool: &PgPool,
+    subject: Uuid,
+    from: Uuid,
+    to: Uuid,
+    kind: &str,
+) -> Uuid {
+    let outcome = run(
+        &UboEdgeConnect,
+        serde_json::json!({
+            "subject-id": subject, "from_entity_id": from, "to_entity_id": to, "kind": kind,
+        }),
+        pool,
+    )
+    .await;
+    Uuid::parse_str(outcome["edge_id"].as_str().expect("edge_id")).expect("edge_id must be a valid UUID")
 }
 
 // ── Headline: mid_chain_nominee_is_pierced_in_every_strategy ───────────────
@@ -197,19 +217,10 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         let manco = Uuid::new_v4();
         let nominee_corp = Uuid::new_v4();
         let alice = Uuid::new_v4();
-        let nominee_edge = Uuid::new_v4();
 
         setup_subject(&pool, subject, &[alice], "investment_fund").await;
-        let mandate_edge = Uuid::new_v4();
-        run(
-            &UboEdgeAssertControl,
-            serde_json::json!({
-                "subject-id": subject, "from_entity_id": manco, "to_entity_id": subject,
-                "kind": "management_mandate", "edge-id": mandate_edge,
-            }),
-            &pool,
-        )
-        .await;
+        let mandate_edge =
+            connect_capturing_edge_id(&pool, subject, manco, subject, "management_mandate").await;
         // Evidenced up front — this test is about the nominee guard (Ruling
         // B), not the evidence stud (Ruling 2f, covered separately in
         // `kyc_ts4_fund_pivot_evidence.rs`).
@@ -219,16 +230,8 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
             &pool,
         )
         .await;
-        run(
-            &UboEdgeAssertControl,
-            serde_json::json!({
-                "subject-id": subject, "from_entity_id": nominee_corp, "to_entity_id": manco,
-                "kind": "nominee", "edge-id": nominee_edge,
-            }),
-            &pool,
-        )
-        .await;
-        run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
+        let nominee_edge =
+            connect_capturing_edge_id(&pool, subject, nominee_corp, manco, "nominee").await;
 
         let refused = run_fallible(
             &UboDeterminationFreeze,
@@ -273,11 +276,10 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         let holdco = Uuid::new_v4();
         let nominee_corp = Uuid::new_v4();
         let carol = Uuid::new_v4();
-        let nominee_edge = Uuid::new_v4();
 
         setup_subject(&pool, subject, &[carol], "llp").await;
         run(
-            &UboEdgeAssertControl,
+            &UboEdgeConnect,
             serde_json::json!({
                 "subject-id": subject, "from_entity_id": holdco, "to_entity_id": subject,
                 "kind": "voting_rights",
@@ -285,16 +287,8 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
             &pool,
         )
         .await;
-        run(
-            &UboEdgeAssertControl,
-            serde_json::json!({
-                "subject-id": subject, "from_entity_id": nominee_corp, "to_entity_id": holdco,
-                "kind": "nominee", "edge-id": nominee_edge,
-            }),
-            &pool,
-        )
-        .await;
-        run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
+        let nominee_edge =
+            connect_capturing_edge_id(&pool, subject, nominee_corp, holdco, "nominee").await;
 
         let refused = run_fallible(
             &UboDeterminationFreeze,
@@ -332,19 +326,10 @@ async fn mid_chain_nominee_is_pierced_in_every_strategy() {
         let subject = Uuid::new_v4();
         let nominee_corp = Uuid::new_v4();
         let dave = Uuid::new_v4();
-        let nominee_edge = Uuid::new_v4();
 
         setup_subject(&pool, subject, &[dave], "trust").await;
-        run(
-            &UboEdgeAssertControl,
-            serde_json::json!({
-                "subject-id": subject, "from_entity_id": nominee_corp, "to_entity_id": subject,
-                "kind": "nominee", "edge-id": nominee_edge,
-            }),
-            &pool,
-        )
-        .await;
-        run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
+        let nominee_edge =
+            connect_capturing_edge_id(&pool, subject, nominee_corp, subject, "nominee").await;
 
         let refused = run_fallible(
             &UboDeterminationFreeze,
@@ -382,47 +367,30 @@ async fn pierce_is_recorded() {
     let manco = Uuid::new_v4();
     let nominee_corp = Uuid::new_v4();
     let alice = Uuid::new_v4();
-    let nominee_edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[alice], "investment_fund").await;
-    let mandate_edge = Uuid::new_v4();
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject, "from_entity_id": manco, "to_entity_id": subject,
-            "kind": "management_mandate", "edge-id": mandate_edge,
-        }),
-        &pool,
-    )
-    .await;
+    let mandate_edge =
+        connect_capturing_edge_id(&pool, subject, manco, subject, "management_mandate").await;
     run(
         &UboEdgeAttachEvidence,
         serde_json::json!({ "subject-id": subject, "edge-id": mandate_edge }),
         &pool,
     )
     .await;
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject, "from_entity_id": nominee_corp, "to_entity_id": manco,
-            "kind": "nominee", "edge-id": nominee_edge,
-        }),
-        &pool,
-    )
-    .await;
-    run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
-    // TS.6 P2 (K-G7): piercing is now the `assert-control` (pierced-from) +
-    // `supersede` macro composition, not a bespoke op with a deterministic
+    let nominee_edge =
+        connect_capturing_edge_id(&pool, subject, nominee_corp, manco, "nominee").await;
+    // TS.6 P2 (K-G7): piercing is now the `connect` (pierced-from) +
+    // `disconnect` macro composition, not a bespoke op with a deterministic
     // `Uuid::new_v5` replacement-edge derivation — the real op assigns the
     // new edge a fresh random id (the SAME convention as any other
-    // assert-control call), so the expected id is read off its outcome
+    // connect call), so the expected id is read off its outcome
     // rather than re-derived by formula.
     let pierce_outcome =
         pierce_nominee(&pool, subject, nominee_edge, alice, manco, "voting_rights").await;
     let replacement_edge_id = pierce_outcome
         .get("edge_id")
         .and_then(|v| v.as_str())
-        .expect("assert-control outcome must carry the new edge's id")
+        .expect("connect outcome must carry the new edge's id")
         .to_string();
 
     let outcome = run(
@@ -470,11 +438,10 @@ async fn determination_never_terminates_at_a_nominee() {
     let subject = Uuid::new_v4();
     let holdco = Uuid::new_v4();
     let nominee_corp = Uuid::new_v4();
-    let nominee_edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[], "private_company").await;
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject, "from_entity_id": holdco, "to_entity_id": subject,
             "kind": "voting_rights",
@@ -482,16 +449,8 @@ async fn determination_never_terminates_at_a_nominee() {
         &pool,
     )
     .await;
-    run(
-        &UboEdgeAssertControl,
-        serde_json::json!({
-            "subject-id": subject, "from_entity_id": nominee_corp, "to_entity_id": holdco,
-            "kind": "nominee", "edge-id": nominee_edge,
-        }),
-        &pool,
-    )
-    .await;
-    run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject }), &pool).await;
+    let nominee_edge =
+        connect_capturing_edge_id(&pool, subject, nominee_corp, holdco, "nominee").await;
 
     let result = run_fallible(
         &UboDeterminationFreeze,

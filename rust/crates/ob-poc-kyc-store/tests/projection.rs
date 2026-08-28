@@ -71,7 +71,7 @@ fn register(subject: SubjectId) -> IntentEvent {
 fn assert_control(subject: SubjectId, edge: Uuid, idem: &str) -> IntentEvent {
     base(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({
             "from_entity_id": Uuid::new_v4(),
@@ -220,7 +220,7 @@ async fn projection_tracks_derived_edge_status() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "kyc_ubo.assert.edge.supersession", edge, "sup"),
+        &edge_op(subject, "kyc_ubo.assert.edge.disconnect", edge, "sup"),
     )
     .await;
     rebuild(&pool, &registry, subject).await;
@@ -352,7 +352,7 @@ async fn projector_rebuilds_from_a_multi_event_stream() {
     append(
         &pool,
         &registry,
-        &edge_op(subject, "kyc_ubo.assert.edge.supersession", e2, "s2"),
+        &edge_op(subject, "kyc_ubo.assert.edge.disconnect", e2, "s2"),
     )
     .await;
     assert_eq!(rebuild(&pool, &registry, subject).await, 2);

@@ -207,7 +207,7 @@ async fn session_roundtrip() {
     // the payload-blind probe.
     workbook.staged.push(manual_staged_move(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({
             "edge_id": edge, "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"
@@ -470,7 +470,7 @@ async fn invalid_workbook_blocks_commit() {
     // K-11 proof ratchet). Move 3: would-be-legal, never gets the chance.
     workbook.staged.push(manual_staged_move(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         TargetBinding::for_subject(subject),
         serde_json::json!({"edge_id": edge, "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"}),
         as_of,
@@ -628,9 +628,9 @@ async fn stale_snapshot_recovers() {
         let mut scope = TestScope::begin(&pool).await;
         let assert_event = IntentEvent::new(
             subject,
-            "kyc_ubo.assert.edge.control",
+            "kyc_ubo.assert.edge.connect",
             Principal::test_analyst(),
-            AuthorityRef("setup.assert-control".into()),
+            AuthorityRef("setup.connect".into()),
             TargetBinding::for_subject(subject),
             serde_json::json!({"edge_id": edge, "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights"}),
             as_of,
@@ -690,9 +690,9 @@ async fn stale_snapshot_recovers() {
         let mut scope2 = TestScope::begin(&pool).await;
         let supersede_event = IntentEvent::new(
             subject,
-            "kyc_ubo.assert.edge.supersession",
+            "kyc_ubo.assert.edge.disconnect",
             Principal::test_analyst(),
-            AuthorityRef("concurrent.supersede".into()),
+            AuthorityRef("concurrent.disconnect".into()),
             TargetBinding::for_edge(subject, EdgeId(edge)),
             serde_json::json!({}),
             as_of,

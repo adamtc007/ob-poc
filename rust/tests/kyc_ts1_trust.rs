@@ -27,8 +27,7 @@ use uuid::Uuid;
 use chrono::{TimeZone, Utc};
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeAssertControl,
-    UboEdgeReconcileConflict,
+    KycSubjectClassifyStructure, KycSubjectPlace, UboDeterminationFreeze, UboEdgeConnect,
 };
 use ob_poc_kyc_substrate::{
     fold_control_versioned, assembly_lexicon, AuthorityRef, EdgeKind, FoldRegistry, IntentEvent,
@@ -157,7 +156,7 @@ fn a_trust_wire_values_fold_to_distinct_sub_kinds_and_edge_ids() {
     let mk = |kind: &str| {
         IntentEvent::new(
             subject,
-            "kyc_ubo.assert.edge.control",
+            "kyc_ubo.assert.edge.connect",
             Principal::test_analyst(),
             AuthorityRef("ts1-test".into()),
             TargetBinding::for_subject(subject),
@@ -222,7 +221,7 @@ async fn b_settlor_and_trustee_coexist_but_second_trustee_is_blocked() {
 
     // Same (from, to) pair: settlor then trustee — distinct kinds, both admitted.
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": from, "to_entity_id": subject.0,
             "kind": "trust_settlor",
@@ -231,7 +230,7 @@ async fn b_settlor_and_trustee_coexist_but_second_trustee_is_blocked() {
     )
     .await;
     let trustee = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": from, "to_entity_id": subject.0,
             "kind": "trust_trustee",
@@ -247,7 +246,7 @@ async fn b_settlor_and_trustee_coexist_but_second_trustee_is_blocked() {
 
     // A SECOND trustee between the same pair is a genuine duplicate.
     let dup = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": from, "to_entity_id": subject.0,
             "kind": "trust_trustee",
@@ -281,7 +280,7 @@ async fn c_normalizer_rejects_unknown_and_absent_kind_listing_wire_values() {
     // Unknown kind — the exact "trust_role" string the pre-TS.1 doc warned
     // silently collapsed to DominantInfluence.
     let unknown = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": Uuid::new_v4(),
             "to_entity_id": subject.0, "kind": "trust_role",
@@ -304,7 +303,7 @@ async fn c_normalizer_rejects_unknown_and_absent_kind_listing_wire_values() {
 
     // Absent kind — same rejection.
     let absent = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": Uuid::new_v4(),
             "to_entity_id": subject.0,
@@ -410,7 +409,7 @@ async fn d_trust_role_strategy_resolves_trustee_protector_and_revocable_settlor(
         (beneficiary, "trust_beneficiary"),
     ] {
         run(
-            &UboEdgeAssertControl,
+            &UboEdgeConnect,
             serde_json::json!({
                 "subject-id": subject.0, "from_entity_id": p, "to_entity_id": subject.0,
                 "kind": kind,
@@ -420,12 +419,6 @@ async fn d_trust_role_strategy_resolves_trustee_protector_and_revocable_settlor(
         .await;
     }
 
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     let candidates = freeze_candidates(&pool, subject, "trust_role_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
@@ -483,7 +476,7 @@ async fn e_settlor_excluded_when_trust_revocable_is_false() {
     // arg `trust-revocable` must reach the fold's snake_case payload key
     // (the exact edge-id kebab/snake defect class, normalized at the op).
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": settlor, "to_entity_id": subject.0,
             "kind": "trust_settlor", "trust-revocable": false,
@@ -492,7 +485,7 @@ async fn e_settlor_excluded_when_trust_revocable_is_false() {
     )
     .await;
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": trustee, "to_entity_id": subject.0,
             "kind": "trust_trustee",
@@ -501,12 +494,6 @@ async fn e_settlor_excluded_when_trust_revocable_is_false() {
     )
     .await;
 
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
 
     // Final leg drives the REAL freeze op (render nested-null defect fixed
     // 2026-08-14).

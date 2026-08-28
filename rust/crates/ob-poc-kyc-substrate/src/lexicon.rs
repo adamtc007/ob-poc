@@ -48,15 +48,21 @@ pub enum FoldId {
 ///
 /// Two verbs with non-trivial preconditions (§3):
 /// - `kyc_ubo.assert.edge.verification`       → `EvidenceCited`
-/// - `kyc_ubo.decide.determination.freeze` → `ReconciledProjection` + `StructureClassSupported`
+/// - `kyc_ubo.decide.determination.freeze` → `StructureClassSupported`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Precondition {
     /// A prior `kyc_ubo.assert.edge.evidence` event must exist in the stream for
     /// the same `target.edge_id` (K-11).  Enforces: evidence before verify.
     EvidenceCited,
-    /// A prior `kyc_ubo.assert.edge.reconciliation` event must exist in the stream
-    /// (K-14).  Enforces: reconcile before fold.
-    ReconciledProjection,
+    // `ReconciledProjection` REMOVED (EOP-VS-UBO-GAME-001 T3, §3.3,
+    // 2026-08-27) alongside `kyc_ubo.assert.edge.reconciliation`, its sole
+    // writer, and the K-14 gate on freeze, its sole reader — "No reconcile.
+    // ... a third path to what two moves [connect/disconnect] already do."
+    // Unlike `NotAlreadyRegistered`/other T2 retirements, the enum variant
+    // itself is deleted (not merely detached from every lexicon entry):
+    // the concept it gated (a canonicalisation step before freeze) is
+    // dissolved, not superseded by a successor precondition, so there is
+    // no reason for the variant to keep compiling.
     // `StrategySelected` RETIRED (TS.6 P2, K-G7) alongside
     // `ubo.determination.select-strategy` — `StructureClassSupported` alone
     // now gates strategy readiness, since the strategy is DERIVED from the
@@ -123,12 +129,13 @@ pub enum Precondition {
     // ── EOP-DD-KYCUBO-TS.5 R1 — geometry becomes a precondition ─────────────
     /// TS.1 §2/§2a's type→linkage matrix, checked against the event's
     /// endpoints and (classified) pipe (`crate::geometry::check_type_geometry`).
-    /// Attached to `kyc_ubo.assert.edge.control` and `ubo.edge.assert-economic-
-    /// interest` — the verbs that introduce or restate an edge's (from,
-    /// kind, to) triple (TS.5 §6 Q1/Q2). (`kyc_ubo.assert.edge.nominee-piercing`'s own
-    /// entry, which also carried this, was retired TS.6 P2 — piercing now
-    /// reaches this precondition via its own `assert-control` step, same
-    /// entry as any other assert-control call.)
+    /// Attached to `kyc_ubo.assert.edge.connect` (T3 merge of the former
+    /// `control` + `economic-interest`) — the verb that introduces or
+    /// restates an edge's (from, kind, to) triple (TS.5 §6 Q1/Q2).
+    /// (`kyc_ubo.assert.edge.nominee-piercing`'s own entry, which also
+    /// carried this, was retired TS.6 P2 — piercing now reaches this
+    /// precondition via its own `connect` step, same entry as any other
+    /// connect call.)
     /// R5/R6: an alleged or untyped endpoint, or an unresolved pipe
     /// classification, ADMITS provisionally — this is the one precondition
     /// that must never fail closed on missing proof (CTN-2e); it fails
@@ -354,32 +361,26 @@ pub fn assembly_lexicon() -> LexiconManifest {
             AuthoritySpec::analyst(),
             vec![],
         ),
+        // EOP-VS-UBO-GAME-001 T3 (§3.2, 2026-08-27): `control` + `economic-
+        // interest` MERGED into `connect` — "they differ by kind, and
+        // geometry already validates the classified pipe. Their
+        // preconditions are the same... This merge passes the test." (P0b
+        // confirmed the two precondition sets were byte-identical before
+        // merging.) Both former FQNs' fold arms survive in
+        // `fold::control` — `control`'s historical-only (4 real events,
+        // R5), `economic-interest`'s deleted outright (0 real events,
+        // K-G7).
         LexiconEntry::build(
-            "kyc_ubo.assert.edge.control",
-            "Claim a control edge (voting, board, GP statutory, etc.)",
+            "kyc_ubo.assert.edge.connect",
+            "A link exists, from this block to that one, of this kind (§3.1) — \
+             merges control + economic-interest (§3.2)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            // T6.2 row 1: subject must be registered; no active edge with the
-            // same (from, to, kind) may already exist — contradicting claims
-            // go through supersede, never a second assert (K-13). TS.5 R1:
-            // the type-geometry layer — TS.1 §1's FIRST constraint, ahead of
-            // these positional studs.
-            vec![
-                Precondition::SubjectRegistered,
-                Precondition::NoDuplicateActiveEdge,
-                Precondition::TypeGeometryPermits,
-            ],
-            AuthoritySpec::analyst(),
-            vec![],
-        ),
-        LexiconEntry::build(
-            "kyc_ubo.assert.edge.economic-interest",
-            "Claim an economic-interest edge (shareholding percentage)",
-            Taxonomy::Control,
-            smallvec![FoldId::ControlGraph],
-            // T6.2 row 2: same two studs as row 1, reused. TS.5 R1/§6 Q1:
-            // geometry checked against the CLASSIFIED pipe (pipe_of), not a
-            // raw kind — economic-interest edges carry no `kind` field.
+            // T6.2 row 1/2 (merged): subject must be registered; no active
+            // edge with the same (from, to, kind) may already exist —
+            // contradicting claims go through disconnect, never a second
+            // assert (K-13). TS.5 R1: the type-geometry layer — TS.1 §1's
+            // FIRST constraint, ahead of these positional studs.
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::NoDuplicateActiveEdge,
@@ -426,13 +427,16 @@ pub fn assembly_lexicon() -> LexiconManifest {
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
+        // EOP-VS-UBO-GAME-001 T3 (§3.2, 2026-08-27): `supersession` renamed
+        // `disconnect` — "that link is not on the board" (§3.1). Pure
+        // rename, identical shape and preconditions.
         LexiconEntry::build(
-            "kyc_ubo.assert.edge.supersession",
-            "Retire an edge and replace with a new one (supersede-never-delete, K-13)",
+            "kyc_ubo.assert.edge.disconnect",
+            "That link is not on the board (K-13 supersede-never-delete — edge stays, status flips)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
             // T6.2 row 4: target edge must exist and not already be
-            // superseded (double-supersede would no-op-pollute the stream).
+            // superseded (double-disconnect would no-op-pollute the stream).
             vec![Precondition::EdgeExists, Precondition::EdgeActive],
             AuthoritySpec::senior_analyst(),
             vec![],
@@ -440,26 +444,20 @@ pub fn assembly_lexicon() -> LexiconManifest {
         // "kyc_ubo.assert.edge.nominee-piercing" LexiconEntry RETIRED (TS.6 P2, K-G7,
         // 2026-08-22): the verb it covered no longer exists — piercing is
         // now the `kyc_ubo.assert.edge.nominee-piercing` MACRO (config/verb_schemas/
-        // macros/ubo.yaml) composing `kyc_ubo.assert.edge.control` (its own
+        // macros/ubo.yaml) composing `kyc_ubo.assert.edge.connect` (its own
         // entry above already carries the equivalent precondition set —
         // SubjectRegistered, NoDuplicateActiveEdge, TypeGeometryPermits —
         // plus a new op-layer-only "referenced edge is EdgeKind::Nominee
         // and active" check when its `pierced-from` arg is present, same
         // no-precondition-primitive discipline the retired verb used) +
-        // `kyc_ubo.assert.edge.supersession` (its entry below: EdgeExists, EdgeActive).
+        // `kyc_ubo.assert.edge.disconnect` (its entry above: EdgeExists, EdgeActive).
         // The decomposition is exact — no precondition was lost or gained.
-        LexiconEntry::build(
-            "kyc_ubo.assert.edge.reconciliation",
-            "Canonicalise conflicting source edges before determination (K-14)",
-            Taxonomy::Control,
-            smallvec![FoldId::ControlGraph],
-            // T6.2 row 5: subject must be registered. Ratified WITHOUT the
-            // matrix's optional "≥1 active economic edge" amendment — kept
-            // callable early, deliberately, per the T6 ratification note.
-            vec![Precondition::SubjectRegistered],
-            AuthoritySpec::senior_analyst(),
-            vec![],
-        ),
+        //
+        // `kyc_ubo.assert.edge.reconciliation` LexiconEntry RETIRED
+        // (EOP-VS-UBO-GAME-001 T3, §3.3, 2026-08-27, K-G7 full deletion):
+        // "No reconcile ... a third path to what two moves already do."
+        // No entry survives it here — see fold/control.rs's former
+        // reconciliation fold arm (deleted) for the full reasoning.
         // ── Phase 2 — determination verbs ────────────────────────────────────
         // TS.6 P2 (K-G7): `ubo.determination.select-strategy` RETIRED —
         // "strategy follows from entity type" (TS.0 §1). The explicit
@@ -506,10 +504,11 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // separate StrategySelected stud it used to pair with — the
             // strategy IS derived from this same guarded structure_class,
             // so the two studs had become one fact checked twice).
-            vec![
-                Precondition::ReconciledProjection,
-                Precondition::StructureClassSupported,
-            ],
+            // EOP-VS-UBO-GAME-001 T3 (§3.3, 2026-08-27): `ReconciledProjection`
+            // removed from this pair — the K-14 gate it enforced is
+            // dissolved with `reconciliation` itself; StructureClassSupported
+            // alone gates freeze now.
+            vec![Precondition::StructureClassSupported],
             AuthoritySpec::senior_analyst(),
             vec![EmitSpec::person_obligation(), EmitSpec::entity_obligation()],
         ),
@@ -605,10 +604,16 @@ pub fn assembly_lexicon() -> LexiconManifest {
             "kyc_ubo.assert.subject.remove",
             "Take a group member off the board — withdraws the placement, never the \
              entity (§2, absorbs member-withdrawal); the entity remains a group member \
-             and can be placed again",
+             and can be placed again. Never refused (§3.4 R8, corrected 2026-08-27): any \
+             active link touching the block is pruned as a fold-time side effect — nothing \
+             propagates past those links, and a block left with no links is an ordinary, \
+             legal board member",
             Taxonomy::Subject,
-            smallvec![FoldId::TypeRegistry],
-            vec![Precondition::EntityRegistered, Precondition::MembershipActive],
+            smallvec![FoldId::TypeRegistry, FoldId::ControlGraph],
+            vec![
+                Precondition::EntityRegistered,
+                Precondition::MembershipActive,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),

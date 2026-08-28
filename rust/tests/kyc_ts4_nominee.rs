@@ -48,8 +48,7 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycSubjectClassifyStructure, KycSubjectPlace,
-    UboDeterminationFreeze, UboEdgeAssertControl, UboEdgeReconcileConflict,
-    UboEdgeSupersede,
+    UboDeterminationFreeze, UboEdgeConnect, UboEdgeDisconnect,
 };
 use ob_poc_kyc_substrate::{
     fold_control_versioned, assembly_lexicon, EdgeKind, EdgeStatus, FoldRegistry, IntentEvent,
@@ -235,27 +234,29 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
     let subject = SubjectId(Uuid::new_v4());
     let nominee = Uuid::new_v4(); // the on-paper holder
     let nominator = Uuid::new_v4(); // the disclosed true holder
-    let nominee_edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[nominator], "nominee").await;
 
-    run(
-        &UboEdgeAssertControl,
+    // §8 Q3: connect refuses a caller-supplied edge id — capture the minted one.
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominee, "to_entity_id": subject.0,
-            "kind": "nominee", "edge-id": nominee_edge,
+            "kind": "nominee",
         }),
         &pool,
     )
     .await;
+    let nominee_edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
 
     // TS.6 P2 (K-G7): `kyc_ubo.assert.edge.nominee-piercing` is now a macro composing
-    // `kyc_ubo.assert.edge.control` (pierced-from) + `kyc_ubo.assert.edge.supersession` — TWO
+    // `kyc_ubo.assert.edge.connect` (pierced-from) + `kyc_ubo.assert.edge.disconnect` — TWO
     // governed events, not one; the macro's two steps commit atomically
     // under the Sequencer's one-scope-per-runbook model, driven here as the
     // real two ops in the same order.
     let assert_out = run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "voting_rights", "pierced-from": nominee_edge,
@@ -263,14 +264,14 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
         &pool,
     )
     .await;
-    assert!(assert_out.get("seq").is_some(), "pierce's assert-control step must append: {assert_out:?}");
-    let supersede_out = run(
-        &UboEdgeSupersede,
+    assert!(assert_out.get("seq").is_some(), "pierce's connect step must append: {assert_out:?}");
+    let disconnect_out = run(
+        &UboEdgeDisconnect,
         serde_json::json!({ "subject-id": subject.0, "edge-id": nominee_edge }),
         &pool,
     )
     .await;
-    assert!(supersede_out.get("seq").is_some(), "pierce's supersede step must append: {supersede_out:?}");
+    assert!(disconnect_out.get("seq").is_some(), "pierce's disconnect step must append: {disconnect_out:?}");
 
     let state = fold_subject(&pool, subject).await;
     let old = state
@@ -307,14 +308,14 @@ async fn a_pierce_supersedes_nominee_and_asserts_nominator_edge() {
         "the new edge carries pierced_from provenance (§2.6)"
     );
     // TS.6 P2: the two effects now originate from TWO SEPARATE governed
-    // events (assert-control's, then supersede's) — the macro composition
+    // events (connect's, then disconnect's) — the macro composition
     // trades the old single-event atomicity-of-record for scope-level
     // transactional atomicity (both commit or both roll back together);
     // neither event id equals the other's by construction.
     assert_ne!(
         new_edge.originating_event_id,
         old.superseded_by.unwrap(),
-        "post-redesign, the assert-control and supersede steps are distinct events"
+        "post-redesign, the connect and disconnect steps are distinct events"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -328,24 +329,25 @@ async fn b_pierce_refuses_non_nominee_target_edge() {
     let subject = SubjectId(Uuid::new_v4());
     let holder = Uuid::new_v4();
     let nominator = Uuid::new_v4();
-    let edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[nominator], "nominee").await;
-    run(
-        &UboEdgeAssertControl,
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": holder, "to_entity_id": subject.0,
-            "kind": "voting_rights", "edge-id": edge,
+            "kind": "voting_rights",
         }),
         &pool,
     )
     .await;
+    let edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
 
     // TS.6 P2 (K-G7): the "target is actually EdgeKind::Nominee" check moved
-    // to `kyc_ubo.assert.edge.control`'s op layer, gated on `pierced-from` —
+    // to `kyc_ubo.assert.edge.connect`'s op layer, gated on `pierced-from` —
     // exercised directly rather than via the retired standalone verb.
     let result = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "voting_rights", "pierced-from": edge,
@@ -355,7 +357,7 @@ async fn b_pierce_refuses_non_nominee_target_edge() {
     .await;
     assert!(
         result.is_err(),
-        "assert-control's pierced-from check must refuse a target edge that is not \
+        "connect's pierced-from check must refuse a target edge that is not \
          EdgeKind::Nominee"
     );
     let msg = result.unwrap_err().to_string();
@@ -375,25 +377,26 @@ async fn b2_pierce_normalizer_rejects_nominee_and_unknown_kinds() {
     let subject = SubjectId(Uuid::new_v4());
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
-    let edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[nominator], "nominee").await;
-    run(
-        &UboEdgeAssertControl,
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominee, "to_entity_id": subject.0,
-            "kind": "nominee", "edge-id": edge,
+            "kind": "nominee",
         }),
         &pool,
     )
     .await;
+    let edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
 
-    // TS.6 P2 (K-G7): both checks moved to `kyc_ubo.assert.edge.control`'s
+    // TS.6 P2 (K-G7): both checks moved to `kyc_ubo.assert.edge.connect`'s
     // normalizer, gated on `pierced-from` — exercised directly.
     //
     // A pierce cannot produce another nominee edge (fail-closed, §2.6).
     let nominee_kind = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "nominee", "pierced-from": edge,
@@ -410,7 +413,7 @@ async fn b2_pierce_normalizer_rejects_nominee_and_unknown_kinds() {
 
     // Unknown kind — the TS.1 §1b wire-normalizer discipline, fail-closed.
     let unknown = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "votng_rights", "pierced-from": edge,
@@ -439,31 +442,32 @@ async fn c_pierce_refuses_superseded_and_missing_targets() {
     let subject = SubjectId(Uuid::new_v4());
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
-    let edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[nominator], "nominee").await;
-    run(
-        &UboEdgeAssertControl,
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominee, "to_entity_id": subject.0,
-            "kind": "nominee", "edge-id": edge,
+            "kind": "nominee",
         }),
         &pool,
     )
     .await;
+    let edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
     run(
-        &UboEdgeSupersede,
+        &UboEdgeDisconnect,
         serde_json::json!({ "subject-id": subject.0, "edge-id": edge }),
         &pool,
     )
     .await;
 
-    // TS.6 P2 (K-G7): both checks moved to `kyc_ubo.assert.edge.control`'s
+    // TS.6 P2 (K-G7): both checks moved to `kyc_ubo.assert.edge.connect`'s
     // pierced-from pre-fold check — exercised directly.
     //
-    // Superseded target — the EdgeActive stud (matrix rows 3/4) refuses.
+    // Disconnected target — the EdgeActive stud (matrix rows 3/4) refuses.
     let inactive = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "voting_rights", "pierced-from": edge,
@@ -473,12 +477,12 @@ async fn c_pierce_refuses_superseded_and_missing_targets() {
     .await;
     assert!(
         inactive.is_err(),
-        "pierce must refuse a superseded (inactive) target edge"
+        "pierce must refuse a disconnected (inactive) target edge"
     );
 
     // Non-existent target — refused before anything appends.
     let missing = run_fallible(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "voting_rights", "pierced-from": Uuid::new_v4(),
@@ -505,33 +509,28 @@ async fn d_freeze_hard_errors_while_unpierced_nominee_edge_active() {
     let subject = SubjectId(Uuid::new_v4());
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
-    let nominee_edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[nominator], "nominee").await;
-    run(
-        &UboEdgeAssertControl,
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominee, "to_entity_id": subject.0,
-            "kind": "nominee", "edge-id": nominee_edge,
+            "kind": "nominee",
         }),
         &pool,
     )
     .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
-        &pool,
-    )
-    .await;
+    let nominee_edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
 
     // The gate widening proven at the REAL op (StructureClassSupported
     // widened at TS.4). Previously probed via `apply-smo-fallback`, which
-    // shared the identical [ReconciledProjection, StructureClassSupported]
-    // pair — retired TS.6 §5 (SMO is pulled on exhaustion, never asserted).
-    // No separate probe is needed: the `freeze` call below must PASS both
-    // preconditions to reach its K-8 unpierced-nominee guard at all, so the
-    // "unpierced" error asserted there is itself the proof that
-    // StructureClassSupported admitted a Nominee-classified subject.
+    // shared the identical StructureClassSupported precondition — retired
+    // TS.6 §5 (SMO is pulled on exhaustion, never asserted). No separate
+    // probe is needed: the `freeze` call below must PASS the precondition
+    // to reach its K-8 unpierced-nominee guard at all, so the "unpierced"
+    // error asserted there is itself the proof that StructureClassSupported
+    // admitted a Nominee-classified subject.
     let result = run_fallible(
         &UboDeterminationFreeze,
         serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
@@ -560,21 +559,22 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
     let subject = SubjectId(Uuid::new_v4());
     let nominee = Uuid::new_v4();
     let nominator = Uuid::new_v4();
-    let nominee_edge = Uuid::new_v4();
 
     setup_subject(&pool, subject, &[nominator], "nominee").await;
-    run(
-        &UboEdgeAssertControl,
+    let connect_out = run(
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominee, "to_entity_id": subject.0,
-            "kind": "nominee", "edge-id": nominee_edge,
+            "kind": "nominee",
         }),
         &pool,
     )
     .await;
+    let nominee_edge = Uuid::parse_str(connect_out["edge_id"].as_str().expect("edge_id"))
+        .expect("edge_id must be a valid UUID");
     // TS.6 P2 (K-G7): pierce via the two real composed ops (macro-equivalent).
     run(
-        &UboEdgeAssertControl,
+        &UboEdgeConnect,
         serde_json::json!({
             "subject-id": subject.0, "from_entity_id": nominator, "to_entity_id": subject.0,
             "kind": "voting_rights", "pierced-from": nominee_edge,
@@ -583,14 +583,8 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
     )
     .await;
     run(
-        &UboEdgeSupersede,
+        &UboEdgeDisconnect,
         serde_json::json!({ "subject-id": subject.0, "edge-id": nominee_edge }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboEdgeReconcileConflict,
-        serde_json::json!({ "subject-id": subject.0 }),
         &pool,
     )
     .await;
