@@ -445,7 +445,11 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // T2 (EOP-VS-UBO-GAME-001, §3.2): register + assert-type retired,
     // merged into place.
     registry.register(Arc::new(kyc_stream_ops::KycSubjectPlace));
-    registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
+    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): `KycSubjectClassifyStructure`
+    // DELETED — 10 real committed events existed (P0 census), the fold-side
+    // parser stays R5-historical for replay, but no op survives it here
+    // (see kyc_stream_ops.rs's retirement comment) — the strategy now
+    // derives from EntityType directly, never separately classified.
     // T2 (EOP-VS-UBO-GAME-001, §8 Q1): type-correction DISSOLVED (2026-08-27)
     // — no op survives it here, not left unregistered (0 real committed
     // events, full K-G7 deletion; see kyc_stream_ops.rs's retirement comment).

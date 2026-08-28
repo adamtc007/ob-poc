@@ -48,7 +48,8 @@ pub enum FoldId {
 ///
 /// Two verbs with non-trivial preconditions (§3):
 /// - `kyc_ubo.assert.edge.verification`       → `EvidenceCited`
-/// - `kyc_ubo.decide.determination.freeze` → `StructureClassSupported`
+/// - `kyc_ubo.decide.determination.freeze` → `EntityTypeSupportsStrategy`
+///   (T4, 2026-08-28 — was `StructureClassSupported`)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Precondition {
     /// A prior `kyc_ubo.assert.edge.evidence` event must exist in the stream for
@@ -79,11 +80,22 @@ pub enum Precondition {
     SubjectRegistered,
     /// `ControlState.registered` must be false (row 9 — no double-registration).
     NotAlreadyRegistered,
-    /// `ControlState.structure_class` must be `Some` (row 6).
-    StructureClassified,
-    /// `ControlState.structure_class` must be a member of the pinned
-    /// implemented-strategy set (rows 6a/8a — the T6.1(c) fail-closed guard).
-    StructureClassSupported,
+    // `StructureClassified`/`StructureClassSupported` RETIRED
+    // (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) alongside the
+    // `kyc_ubo.assert.subject.structure-class` verb and its op — fully
+    // superseded by `EntityTypeSupportsStrategy` below, no reader remains.
+    // Unlike the fold arm (kept R5-historical — 10 real committed events;
+    // P0 census — because a stream replay must still populate
+    // `ControlState.structure_class` for those events), a precondition is
+    // a write-path-only check with no replay role, so there is nothing for
+    // the variants to stay declared FOR. Deleted outright, matching the
+    // `ReconciledProjection`/`select-strategy`/`compute-fold` precedent.
+    /// EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28), replaces `StructureClassSupported`
+    /// on `freeze`: the subject's `EntityType` (`TypeRegistryState`, not
+    /// `ControlState` — crosses fold axes, same as `MembershipActive`) must
+    /// dispatch to `DeterminationDispatch::Strategy(_)`, not
+    /// `NotADeterminationSubject` and not unknown. §4 D1: refuses by name.
+    EntityTypeSupportsStrategy,
     /// No active edge may already exist with the same (from, to, kind) as the
     /// event payload — contradicting claims go through `supersede`, never a
     /// second assert (rows 1,2; K-13).
@@ -349,18 +361,16 @@ pub fn assembly_lexicon() -> LexiconManifest {
             AuthoritySpec::analyst(),
             vec![],
         ),
-        LexiconEntry::build(
-            "kyc_ubo.assert.subject.structure-class",
-            "Set structure class, driving both determination strategy and obligation set",
-            Taxonomy::Subject,
-            smallvec![FoldId::ControlGraph, FoldId::ObligationGraph],
-            // T6.3 row 10: subject must be registered. Reclassification
-            // stays legal (last-wins, per the current fold) — deliberately
-            // NOT freezing the class; reclassify is a real workflow.
-            vec![Precondition::SubjectRegistered],
-            AuthoritySpec::analyst(),
-            vec![],
-        ),
+        // `kyc_ubo.assert.subject.structure-class` LexiconEntry RETIRED
+        // (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) alongside the verb and
+        // its op — the strategy is now derived directly from the subject's
+        // EntityType (`dispatch_for_entity_type`), never separately
+        // classified. 10 real committed events existed for this FQN before
+        // deletion (P0 census); the fold-side parser stays R5-historical
+        // for replay (structure_class_from_payload), but no entry survives
+        // it here — matching the `reconciliation`/`type-correction`
+        // precedent, not the "kept declared, unattached" T6.1(b) shape
+        // (a LexiconEntry has no replay role either).
         // EOP-VS-UBO-GAME-001 T3 (§3.2, 2026-08-27): `control` + `economic-
         // interest` MERGED into `connect` — "they differ by kind, and
         // geometry already validates the classified pipe. Their
@@ -499,16 +509,19 @@ pub fn assembly_lexicon() -> LexiconManifest {
             "Pin an immutable determination; emits PersonObligation for each resolved person",
             Taxonomy::Control,
             smallvec![FoldId::Determination, FoldId::ObligationGraph],
-            // T6.1(c) exemplar (matrix row 8a): StructureClassSupported is
-            // now freeze's sole structure-class gate (TS.6 P2 removed the
+            // T6.1(c) exemplar (matrix row 8a): StructureClassSupported was
+            // freeze's sole structure-class gate (TS.6 P2 removed the
             // separate StrategySelected stud it used to pair with — the
             // strategy IS derived from this same guarded structure_class,
             // so the two studs had become one fact checked twice).
             // EOP-VS-UBO-GAME-001 T3 (§3.3, 2026-08-27): `ReconciledProjection`
             // removed from this pair — the K-14 gate it enforced is
-            // dissolved with `reconciliation` itself; StructureClassSupported
-            // alone gates freeze now.
-            vec![Precondition::StructureClassSupported],
+            // dissolved with `reconciliation` itself.
+            // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): StructureClassSupported
+            // itself superseded by EntityTypeSupportsStrategy — the subject's
+            // `EntityType` (§2's ratified 21-type mapping) is the dispatch
+            // key now, not `structure_class`; see `dispatch_for_entity_type`.
+            vec![Precondition::EntityTypeSupportsStrategy],
             AuthoritySpec::senior_analyst(),
             vec![EmitSpec::person_obligation(), EmitSpec::entity_obligation()],
         ),

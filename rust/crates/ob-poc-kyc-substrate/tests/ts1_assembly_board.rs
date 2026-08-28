@@ -85,7 +85,8 @@ fn expected_target_pipes(target: EntityType) -> &'static [Pipe] {
         CooperativeMutual => &[BoardAppointment, OfficerAppointment, MembershipRights, EmploymentDelegatedAuthority],
         CharityNotForProfit => &[BoardAppointment, OfficerAppointment, TrusteePowers, EmploymentDelegatedAuthority],
         GovernmentDeptStatutoryCorporation => &[BoardAppointment, OfficerAppointment, StatutoryAuthority, EmploymentDelegatedAuthority],
-        SovereignWealthVehicle => &[StatutoryAuthority],
+        // `SovereignWealthVehicle` REMOVED (EOP-DD-UBO-DISPATCH-001 T4, §2
+        // Q4/§3a) — not a single legal entity, never a block.
         NaturalPerson | SoleTrader => &[],
     }
 }
@@ -116,7 +117,9 @@ fn expected_source_permits(pipe: Pipe, source: LinkageSource) -> bool {
         ReservedPowers => NATURAL.contains(&s) || CORPORATES.contains(&s),
         BeneficiaryEntitlement => NATURAL.contains(&s) || CORPORATES.contains(&s) || s == CharityNotForProfit,
         MembershipRights => NATURAL.contains(&s) || CORPORATES.contains(&s),
-        StatutoryAuthority => matches!(s, GovernmentDeptStatutoryCorporation | SovereignWealthVehicle),
+        // `SovereignWealthVehicle` REMOVED (T4, §2 Q4/§3a) — was two
+        // variants here, now one.
+        StatutoryAuthority => s == GovernmentDeptStatutoryCorporation,
         ContractualControl => true,
         EmploymentDelegatedAuthority => NATURAL.contains(&s),
         UnitIssuance => true,
@@ -202,7 +205,9 @@ fn matrix_is_exactly_known() {
     // RED-honest pin: adding a type or pipe changes these constants, which
     // is a compile-visible, conscious edit site (this test and the
     // `ALL_ENTITY_TYPES`/`ALL_PIPES` arrays themselves).
-    assert_eq!(ALL_ENTITY_TYPES.len(), 22, "TS.0 §4 catalogue is 22 types (2+3+3+6+4+4)");
+    // T4 (EOP-DD-UBO-DISPATCH-001, §2 Q4/§3a): `SovereignWealthVehicle`
+    // removed — not a single legal entity, never a block. 22 -> 21.
+    assert_eq!(ALL_ENTITY_TYPES.len(), 21, "TS.0 §4 catalogue is 21 types (2+3+3+6+4+3)");
     assert_eq!(ALL_PIPES.len(), 17, "TS.0 §3 vocabulary is 17 pipes");
 
     let mut admitted: BTreeMap<(String, String, String), bool> = BTreeMap::new();
@@ -231,13 +236,20 @@ fn matrix_is_exactly_known() {
     // transcription that omitted pipe 14 from all 8 rows it belongs on.
     // 530 + (8 targets × 2 admitted sources [NaturalPerson, SoleTrader] ×
     // 1 pipe [EmploymentDelegatedAuthority]) = 546.
+    //
+    // Re-derived again (EOP-DD-UBO-DISPATCH-001 T4, §2 Q4/§3a,
+    // 2026-08-28): `SovereignWealthVehicle` removed from the catalogue —
+    // both its own source_permits row and its membership in
+    // `StatutoryAuthority`'s target set drop out, for 546 - 530 = 16 fewer
+    // admitted triples. Computed by running this test, not hand-derived.
     assert_eq!(count, admitted.len());
     assert_eq!(
-        count, 546,
-        "the ratified §2/§2a grid (TS.1 v0.3) today admits exactly 546 (source,pipe,target) \
-         triples (counting every admitted EntityType source individually, not by category); \
-         if this number changed, a type/pipe/rule was added or removed — confirm the edit \
-         was conscious, name the TS.1 version it was re-derived from, before updating this pin"
+        count, 530,
+        "the ratified §2/§2a grid (T4-adjusted TS.1 v0.3) today admits exactly 530 \
+         (source,pipe,target) triples (counting every admitted EntityType source \
+         individually, not by category); if this number changed, a type/pipe/rule was \
+         added or removed — confirm the edit was conscious, name the TS.1 version it was \
+         re-derived from, before updating this pin"
     );
 }
 

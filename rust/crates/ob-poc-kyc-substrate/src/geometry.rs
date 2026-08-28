@@ -86,10 +86,17 @@ pub enum EntityType {
     CooperativeMutual,
     CharityNotForProfit,
     GovernmentDeptStatutoryCorporation,
-    SovereignWealthVehicle,
+    // `SovereignWealthVehicle` REMOVED (EOP-DD-UBO-DISPATCH-001 T4, §2 Q4/§3a,
+    // 2026-08-28): RULED not an entity type — it is a GROUP (usually funds,
+    // sometimes LLPs and other vehicles), never a single legal entity,
+    // therefore never a block. The vehicles WITHIN it are the blocks, each
+    // dispatching on its own type. "The same category error as
+    // `structure-class`: a description of the shape at the top of a chain,
+    // filed among descriptions of what a single entity is." Catalogue 22→21.
 }
 
-/// All 22 catalogued entity types (TS.0 §4), canonical order matching the
+/// All 21 catalogued entity types (TS.0 §4, less `SovereignWealthVehicle` —
+/// EOP-DD-UBO-DISPATCH-001 T4 §2 Q4/§3a), canonical order matching the
 /// catalogue's own family grouping. Used by `matrix_is_exactly_known`-style
 /// exhaustiveness tests so a new variant forces a conscious edit here too.
 pub const ALL_ENTITY_TYPES: &[EntityType] = &[
@@ -114,7 +121,6 @@ pub const ALL_ENTITY_TYPES: &[EntityType] = &[
     EntityType::CooperativeMutual,
     EntityType::CharityNotForProfit,
     EntityType::GovernmentDeptStatutoryCorporation,
-    EntityType::SovereignWealthVehicle,
 ];
 
 // ── Control pipes (TS.0 §3 vocabulary) ──────────────────────────────────────
@@ -228,7 +234,6 @@ fn target_permits(target: EntityType, pipe: Pipe) -> bool {
         CooperativeMutual => &[BoardAppointment, OfficerAppointment, MembershipRights, EmploymentDelegatedAuthority],
         CharityNotForProfit => &[BoardAppointment, OfficerAppointment, TrusteePowers, EmploymentDelegatedAuthority],
         GovernmentDeptStatutoryCorporation => &[BoardAppointment, OfficerAppointment, StatutoryAuthority, EmploymentDelegatedAuthority],
-        SovereignWealthVehicle => &[StatutoryAuthority],
         NaturalPerson | SoleTrader => &[],
     };
     permitted.contains(&pipe)
@@ -294,10 +299,11 @@ fn source_permits(pipe: Pipe, source: LinkageSource) -> bool {
         }
         // 11: "natural persons and corporates."
         MembershipRights => NATURAL.contains(&source_type) || CORPORATES.contains(&source_type),
-        // 12: "government departments and sovereign bodies only."
-        StatutoryAuthority => {
-            matches!(source_type, GovernmentDeptStatutoryCorporation | SovereignWealthVehicle)
-        }
+        // 12: "government departments and sovereign bodies only." Was two
+        // variants; `SovereignWealthVehicle` REMOVED (T4, §2 Q4/§3a) — it
+        // was never a single legal entity, so it was never a real target
+        // here either.
+        StatutoryAuthority => source_type == GovernmentDeptStatutoryCorporation,
         // 13: "any type."
         ContractualControl => true,
         // 14: "natural persons only (ruled 2026-08-19)." Target side was a
@@ -451,7 +457,10 @@ mod tests {
         for t in ALL_ENTITY_TYPES {
             assert!(seen.insert(*t), "duplicate entity type in ALL_ENTITY_TYPES: {t:?}");
         }
-        assert_eq!(ALL_ENTITY_TYPES.len(), 22);
+        // EOP-DD-UBO-DISPATCH-001 T4 §2 Q4/§3a (2026-08-28): SovereignWealthVehicle
+        // removed — it is a group, never a single legal entity, therefore
+        // never a block. 22 -> 21.
+        assert_eq!(ALL_ENTITY_TYPES.len(), 21);
     }
 
     #[test]

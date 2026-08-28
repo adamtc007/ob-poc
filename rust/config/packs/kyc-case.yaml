@@ -199,7 +199,6 @@ allowed_verbs:
   - kyc_ubo.assert.edge.nominee-piercing
   - kyc_ubo.decide.determination.freeze
   - kyc_ubo.assert.subject.register
-  - kyc_ubo.assert.subject.structure-class
   - kyc_ubo.assert.entity.identity
   - kyc_ubo.assert.entity.screening
   - kyc_ubo.assert.entity.risk

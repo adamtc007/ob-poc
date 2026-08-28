@@ -347,7 +347,7 @@ domains:
             type: string
             required: true
             description: "The entity's type (EOP-DD-KYCUBO-TS.0 §4 catalogue) — the argument that decides which links can reach this block (§3.2). Rejected fail-closed if outside the canonical wire set."
-            valid_values: [natural_person, sole_trader, private_limited_company, public_listed_company, llc_us, general_partnership, limited_partnership, llp, oeic_icvc, sicav, unit_trust, forty_act_fund, lp_fund, umbrella_with_sub_funds, discretionary_trust, fixed_bare_trust, foundation, pension_scheme, cooperative_mutual, charity_not_for_profit, government_dept_statutory_corporation, sovereign_wealth_vehicle]
+            valid_values: [natural_person, sole_trader, private_limited_company, public_listed_company, llc_us, general_partnership, limited_partnership, llp, oeic_icvc, sicav, unit_trust, forty_act_fund, lp_fund, umbrella_with_sub_funds, discretionary_trust, fixed_bare_trust, foundation, pension_scheme, cooperative_mutual, charity_not_for_profit, government_dept_statutory_corporation]
           - name: is_natural_person
             type: boolean
             required: false
@@ -363,54 +363,13 @@ domains:
           consequence:
             baseline: reviewable
 
-      structure-class:
-        flavour: attribute_mutating
-        description: Classify the entity structure for determination purposes (simple, complex, fund, etc.)
-        effect_class: append_fact
-        invocation_phrases:
-          - "classify structure"
-          - "classify subject structure"
-          - "set entity structure"
-          - "classify this entity"
-          - "classify for KYC"
-          - "set structure classification"
-          - "classify the ownership structure"
-          - "set entity type for determination"
-          - "classify structure type"
-          - "set the structure class"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: kyc_stream
-          scope: global
-          noun: kyc_subject
-          tags: [kyc, subject, classification, structure, stream-backed, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root
-          - name: structure-class
-            type: string
-            required: true
-            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4); trust pairs with trust_role_strategy (trust_settlor/trust_trustee/trust_protector/trust_beneficiary wire values, TS.1); investment_fund pairs with fund_control_strategy (manager control, TS.2); foundation pairs with foundation_council_strategy (council control, TS.2); state_owned pairs with state_owned_strategy (rare natural-person controller, else the SMO route, TS.3); cooperative pairs with cooperative_member_strategy (office-based control, never membership per se, TS.3); nominee pairs with nominee_pierce_strategy (pierce via kyc_ubo.assert.edge.nominee-piercing first, then the underlying structure resolves — freeze fail-closes while unpierced nominee edges remain, TS.4 = K-8). The taxonomy is fully served: all 11 classes have an implemented strategy."
-            valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
-          - name: entity-id
-            type: uuid
-            required: false
-            description: The entity being classified, if distinct from subject-id (defaults to subject-id)
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
+      # structure-class RETIRED (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) —
+      # the strategy is now derived directly from the subject's EntityType
+      # (`place`'s entity-type arg, dispatch_for_entity_type, §2's ratified
+      # 21-type/7-strategy mapping), never separately classified/asserted.
+      # 10 real committed events existed for this FQN before deletion — the
+      # fold-side parser stays R5-historical for replay (P0 census); this
+      # declaration (the write path) has nothing left to build for.
 
       # type-correction DISSOLVED (EOP-VS-UBO-GAME-001 T2, §8 Q1,
       # 2026-08-27) — correcting a type is `remove` then `place`, two

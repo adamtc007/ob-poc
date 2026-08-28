@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     EdgeId, EntityId, ObligationId, SubjectId, TargetBinding, EDGE_KIND_WIRE_VALUES,
-    ENTITY_TYPE_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
+    ENTITY_TYPE_WIRE_VALUES,
 };
 
 // ── Pure arg-extraction (no ctx, no @symbol — see the module-level scope note) ──
@@ -114,19 +114,14 @@ pub fn canonical_event_shape(
             Ok((target, payload, None))
         }
 
-        "kyc_ubo.assert.subject.structure-class" => {
-            let entity_id = uuid_arg(args, "entity-id").unwrap_or(subject.0);
-            let class = required_string_arg(verb_fqn, args, "structure-class")?;
-            if !STRUCTURE_CLASS_WIRE_VALUES.contains(&class) {
-                bail!(
-                    "{verb_fqn}: unrecognized structure-class '{class}' — valid wire values: {}",
-                    STRUCTURE_CLASS_WIRE_VALUES.join(", ")
-                );
-            }
-            let payload = serde_json::json!({ "entity_id": entity_id, "structure_class": class });
-            Ok((subj_target, payload, None))
-        }
-
+        // `kyc_ubo.assert.subject.structure-class` RETIRED
+        // (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) — no live arm here, same
+        // as `type`/`type-correction` below. The fold-side parser
+        // (`ob-poc-kyc-substrate::fold::control::structure_class_from_payload`)
+        // stays R5-historical for replay of the 10 real committed events
+        // (P0 census); this write-path constructor has nothing left to
+        // build for.
+        //
         // `kyc_ubo.assert.subject.type` retired by T2 (absorbed into
         // `place`, above) — no longer a live arm here.
         //

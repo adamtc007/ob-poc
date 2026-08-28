@@ -1011,25 +1011,29 @@ mod tests {
             open_test_workbook().await;
         cleanup_capture_rows(&pool, "illegal-utterance").await;
 
-        // `kyc_ubo.assert.subject.structure-class` requires SubjectRegistered
-        // (lexicon.rs) — on a freshly opened, never-registered subject it is
-        // NOT in the frontier placement set.
+        // `kyc_ubo.assert.subject.remove` requires EntityRegistered +
+        // MembershipActive (lexicon.rs) — on a freshly opened,
+        // never-registered subject with no entity ever placed, it is NOT in
+        // the frontier placement set. (EOP-DD-UBO-DISPATCH-001 T4,
+        // 2026-08-28: swapped from `structure-class`, retired — same
+        // NotCurrentlyLegal refusal shape, any verb with an unmet
+        // precondition on a fresh subject demonstrates it equally.)
         pending_proposals.insert(
             session_id,
             PendingProposal {
                 utterance_text: "illegal-utterance".to_string(),
                 placement_set_hash: "deadbeef".to_string(),
-                proposal: "proposal for \"illegal-utterance\": kyc_ubo.assert.subject.structure-class"
+                proposal: "proposal for \"illegal-utterance\": kyc_ubo.assert.subject.remove"
                     .to_string(),
                 disposition: Disposition::Select,
-                candidate_verb_fqns: vec!["kyc_ubo.assert.subject.structure-class".to_string()],
+                candidate_verb_fqns: vec!["kyc_ubo.assert.subject.remove".to_string()],
                 created_at: as_of,
             },
         );
 
         let response = dispatch(
             KycWorkbookCommand::Stage {
-                text: r#"(kyc_ubo.assert.subject.structure-class :structure-class "private_company")"#
+                text: r#"(kyc_ubo.assert.subject.remove :entity-id "00000000-0000-0000-0000-000000000001")"#
                     .to_string(),
             },
             &mut workbooks,

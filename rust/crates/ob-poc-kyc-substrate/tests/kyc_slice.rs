@@ -22,7 +22,7 @@ use chrono::{TimeZone, Utc};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, fold_control, fold_control_versioned,
+    check_control_preconditions, fold_control, fold_control_versioned, fold_type_registry,
     fold_obligations_versioned, freeze_determination, assembly_lexicon, reconciled_economic_edges,
     recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
     DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
@@ -89,8 +89,21 @@ fn dummy_hash() -> Hash {
 }
 
 // Entity IDs for the fixture.
+//
+// EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): `entity_subject()` now shares its
+// UUID with `fixture_subject_id()` (below). `structure-class`'s retirement
+// took with it the only mechanism (`find_subject_entity` scanning that
+// event's own `entity_id` payload) that let a subject's determination
+// target be a DIFFERENT entity from `SubjectId` itself; `find_subject_entity`
+// now derives the target directly as `EntityId(subject_root.0)`, matching
+// `SubjectId`'s own doc comment ("the root entity whose ownership/control is
+// being determined") and `canonical_event_shape`'s `place` arm (an omitted
+// `entity-id` already defaults to `subject.0`). This fixture's graph was
+// always anchored on `entity_subject()` as the determination root; aligning
+// its UUID with `fixture_subject_id()` is what makes that already-true fact
+// discoverable without the retired verb, not a new topology.
 fn entity_subject() -> EntityId {
-    EntityId(Uuid::parse_str("10000000-0000-0000-0000-000000000001").unwrap())
+    EntityId(Uuid::parse_str("30000000-0000-0000-0000-000000000001").unwrap())
 }
 fn entity_b() -> EntityId {
     EntityId(Uuid::parse_str("10000000-0000-0000-0000-000000000002").unwrap())
@@ -160,6 +173,23 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
             idem("cls-a"),
+            t,
+        ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
+        // event — `structure-class` no longer drives freeze's precondition
+        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
+        // ControlState.structure_class); `place`/`type` is the fold arm
+        // that populates it (fold/type_registry.rs).
+        te(
+            1,
+            subject,
+            "kyc_ubo.assert.subject.type",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("typ-a"),
             t,
         ),
         // Register persons as natural persons.
@@ -422,6 +452,23 @@ fn ec2_freeze_precondition_no_longer_gates_on_reconciliation() {
             idem("cls"),
             t,
         ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
+        // event — `structure-class` no longer drives freeze's precondition
+        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
+        // ControlState.structure_class); `place`/`type` is the fold arm
+        // that populates it (fold/type_registry.rs).
+        te(
+            1,
+            subject,
+            "kyc_ubo.assert.subject.type",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("typ"),
+            t,
+        ),
         te(
             2,
             subject,
@@ -482,8 +529,12 @@ fn ec2_freeze_precondition_no_longer_gates_on_reconciliation() {
         idem("fold"),
         t,
     );
+    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): freeze's precondition is now
+    // EntityTypeSupportsStrategy (reads TypeRegistryState, not
+    // ControlState.structure_class) — derive it from the same events.
+    let type_registry = fold_type_registry(&event_refs);
     let result =
-        check_control_preconditions(freeze_entry, &control, &TypeRegistryState::default(), &dummy_event);
+        check_control_preconditions(freeze_entry, &control, &type_registry, &dummy_event);
     assert!(
         result.is_ok(),
         "T3 §3.3: freeze's precondition check no longer gates on reconciliation — {result:?}"
@@ -726,10 +777,12 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
     let control = fold_control(&event_refs);
 
     let det = DeterminationInProgress {
-        strategy: control
-            .structure_class
-            .as_ref()
-            .map(|c| ob_poc_kyc_substrate::strategy_for_structure_class(c).to_string()),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): `strategy_for_structure_class`
+        // retired; this fixture doesn't feed a structure-class event into
+        // the fold anyway (`control.structure_class` is always `None` here),
+        // so the closure never actually ran — a literal preserves the same
+        // shape without the deleted call.
+        strategy: control.structure_class.as_ref().map(|_| "ownership_prong_strategy".to_string()),
         candidates: vec![], // EMPTY
         smo_result: None,   // NO SMO
         compute_event_id: None,
@@ -798,6 +851,23 @@ fn ec5_replay_determinism_after_supersede() {
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
             idem("cls"),
+            t1,
+        ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
+        // event — `structure-class` no longer drives freeze's precondition
+        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
+        // ControlState.structure_class); `place`/`type` is the fold arm
+        // that populates it (fold/type_registry.rs).
+        te(
+            1,
+            subject,
+            "kyc_ubo.assert.subject.type",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("typ"),
             t1,
         ),
         te(
@@ -1492,6 +1562,23 @@ fn axes_diverge_on_correction() {
             idem("cls"),
             t1,
         ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
+        // event — `structure-class` no longer drives freeze's precondition
+        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
+        // ControlState.structure_class); `place`/`type` is the fold arm
+        // that populates it (fold/type_registry.rs).
+        te(
+            1,
+            subject,
+            "kyc_ubo.assert.subject.type",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("typ"),
+            t1,
+        ),
         te(
             2,
             subject,
@@ -1702,6 +1789,23 @@ fn bitemporal_matches_txtime_when_axes_align() {
             idem("cls"),
             t1,
         ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
+        // event — `structure-class` no longer drives freeze's precondition
+        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
+        // ControlState.structure_class); `place`/`type` is the fold arm
+        // that populates it (fold/type_registry.rs).
+        te(
+            1,
+            subject,
+            "kyc_ubo.assert.subject.type",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("typ"),
+            t1,
+        ),
         te(
             2,
             subject,
@@ -1838,6 +1942,13 @@ fn r4_legal_set_at_past_time_is_reproducible() {
             serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
             idem("r4-cls"), t1,
         ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry event.
+        te(
+            1, subject, "kyc_ubo.assert.subject.type", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("r4-typ"), t1,
+        ),
         te(
             2, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
@@ -1932,6 +2043,13 @@ fn r4_legality_pins_its_ruleset() {
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
             idem("r4b-cls"), t1,
+        ),
+        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry event.
+        te(
+            1, subject, "kyc_ubo.assert.subject.type", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
+            idem("r4b-typ"), t1,
         ),
         te(
             2, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),

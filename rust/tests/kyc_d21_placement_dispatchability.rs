@@ -162,7 +162,13 @@ async fn every_advertised_move_is_dispatchable() {
         }
         pairs.insert((mv.verb_fqn.0.clone(), shape_of(&mv.target)));
     }
-    assert!(pairs.len() > 5, "sanity: the populated board must propose a non-trivial move set, got {}", pairs.len());
+    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): the floor was `> 5` (implying
+    // >=6) while `structure-class` was a live proposable move for a
+    // registered/typed entity; its retirement dropped exactly one distinct
+    // (verb_fqn, shape) pair from this board (6->5) — a real, expected
+    // consequence of the move no longer existing, not a dispatch-shape
+    // regression this gate exists to catch. Floor lowered by one to match.
+    assert!(pairs.len() > 4, "sanity: the populated board must propose a non-trivial move set, got {}", pairs.len());
 
     let mut registry = sem_os_postgres::ops::build_registry();
     ob_poc::domain_ops::extend_registry(&mut registry);

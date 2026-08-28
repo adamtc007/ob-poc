@@ -135,12 +135,14 @@ async fn w2_manifest_publishing() {
     // `creation`/`satisfaction` DISSOLVED and `waiver` MOVED to
     // evaluation_lexicon(), D2.0 §5, 2026-08-22). This
     // counts `LexiconEntry::build()` calls in lexicon.rs — NOT the same
-    // number as `declared_verb_universe()` (15, YAML-scanned across BOTH
+    // number as `declared_verb_universe()` (14, YAML-scanned across BOTH
     // packs, `kyc_pack_closure.rs`): lexicon coverage of the declared verb
     // set is intentionally partial (K-G6), so the two counts are expected
     // to differ, not drift-checked against each other. Bump consciously
     // alongside `kyc_pack_closure.rs`'s own lexicon-entry-count assertion.
-    assert_eq!(assembly.entries.len(), 12, "assembly_lexicon universe (see kyc_pack_closure)");
+    // T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `structure-class`'s
+    // LexiconEntry RETIRED (12->11) — no replacement.
+    assert_eq!(assembly.entries.len(), 11, "assembly_lexicon universe (see kyc_pack_closure)");
     clear_prior_state(&pool, &assembly).await;
     assert_publish_roundtrip(&pool, &assembly, |mut conn| async move {
         publish_assembly_manifest(&mut conn, Some("w2-test")).await.unwrap()

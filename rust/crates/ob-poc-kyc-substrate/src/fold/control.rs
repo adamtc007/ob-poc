@@ -25,6 +25,7 @@ use uuid::Uuid;
 use crate::event::IntentEvent;
 use crate::fold::type_registry::TypeRegistryState;
 use crate::types::{EdgeId, EntityId, EventId, PersonId};
+use crate::EntityType;
 
 // ── Edge kind ─────────────────────────────────────────────────────────────────
 
@@ -156,8 +157,19 @@ impl EdgeState {
         self.status == EdgeStatus::Verified
     }
 
+    /// EOP-DD-UBO-DISPATCH-001 §3a (T4, 2026-08-28): `Containment` carries
+    /// economic weight too. Q2 rules an umbrella "holds participation
+    /// shares in the funds it pools" — a holding, economic, no control —
+    /// and P0's trace confirmed T3 had encoded pipe 16
+    /// (`Pipe::PooledAssetContainment`) as a pure scoping boundary
+    /// (excluded here, `NotControl` in `control_admission`), matching
+    /// TS.0's description but contradicting Q2. The pipe keeps its name and
+    /// position in TS.0's 17-pipe catalogue — only what it economically
+    /// MEANS changes ("it changes what the pipe IS rather than what it is
+    /// called," §3a). `control_admission`'s `NotControl` classification
+    /// for `Containment` is unchanged (Q2: "carries no control").
     pub fn is_economic(&self) -> bool {
-        matches!(self.kind, EdgeKind::EconomicInterest)
+        matches!(self.kind, EdgeKind::EconomicInterest | EdgeKind::Containment)
     }
 }
 
@@ -237,18 +249,12 @@ impl ControlState {
     // `is_reconciled()` REMOVED (EOP-VS-UBO-GAME-001 T3, §3.3) with
     // `reconciliation_event_id` above — see that field's retirement comment.
 
-    /// True if a supported strategy is derivable from the structure class
-    /// (K-4 precondition for fold/freeze). TS.6 P2: "strategy follows from
-    /// entity type" (TS.0 §1) — retired `ubo.determination.select-strategy`,
-    /// an explicit confirmation step that was redundant once
-    /// `classify-structure` alone determines the strategy unambiguously
-    /// (`strategy_for_structure_class`, the same 11-class/8-arm mapping
-    /// `implemented_class_split_matches_strategy_arms` already pins).
-    pub fn has_strategy(&self) -> bool {
-        self.structure_class
-            .as_ref()
-            .is_some_and(|c| IMPLEMENTED_STRATEGY_CLASSES.contains(c))
-    }
+    // `has_strategy()` RETIRED (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28)
+    // alongside `IMPLEMENTED_STRATEGY_CLASSES`/`strategy_for_structure_class`
+    // — superseded by `dispatch_for_entity_type` (below), which the
+    // `EntityTypeSupportsStrategy` precondition and
+    // `determination::recover_determination_at` both call directly against
+    // `TypeRegistryState`, not `ControlState.structure_class`.
 }
 
 // ── Fold function ─────────────────────────────────────────────────────────────
@@ -436,27 +442,13 @@ pub(crate) fn evaluate_type_geometry(
     }
 }
 
-/// The canonical `structure-class` wire-string set for
-/// `kyc_ubo.assert.subject.structure-class` — exactly the strings
-/// `structure_class_from_payload` recognizes with a dedicated arm, mirroring
-/// `EDGE_KIND_WIRE_VALUES` (EOP-FUZZ-KYCUBO-001 §5 finding #2: this table
-/// didn't exist before, so `structure-class` had no op-side fail-closed gate
-/// the way `kind` does — the op-normalizer now rejects any `structure-class`
-/// outside this set BEFORE append, closing the same defect class TS.1 closed
-/// for `EdgeKind`).
-pub const STRUCTURE_CLASS_WIRE_VALUES: &[&str] = &[
-    "private_company",
-    "multi_tier_holding",
-    "listed_entity",
-    "lp_fund",
-    "llp",
-    "trust",
-    "foundation",
-    "investment_fund",
-    "state_owned",
-    "cooperative",
-    "nominee",
-];
+// `STRUCTURE_CLASS_WIRE_VALUES` RETIRED (EOP-DD-UBO-DISPATCH-001 T4,
+// 2026-08-28) alongside the `kyc_ubo.assert.subject.structure-class` verb —
+// it gated ONLY the op-side write-path validation in
+// `ob-poc-kyc-seam::canonical`, which is gone with the verb. The fold-side
+// parser below (`structure_class_from_payload`) stays — R5-historical, 10
+// real committed events (P0 census) — but has its own literal match arms,
+// never read this table as data.
 
 fn structure_class_from_payload(payload: &serde_json::Value) -> Option<StructureClass> {
     match payload.get("structure_class")?.as_str()? {
@@ -730,72 +722,95 @@ use crate::error::KycError;
 use crate::fold::obligation::{obligation_id_from_payload, ObligationState};
 use crate::lexicon::{LexiconEntry, Precondition};
 
-/// The structure classes with an implemented `DeterminationStrategy` **today**
-/// (T6.1(c) exemplar — `StructureClassSupported`, matrix rows 6a/8a).
-///
-/// **TOTAL as of TS.4** — every one of the 11 `StructureClass` variants is
-/// served; no class remains fail-closed. Derived, not guessed:
-/// `kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute` dispatch
-/// recognises exactly eight strategy names (`ownership_prong_strategy`,
-/// `control_prong_strategy`, `trust_role_strategy`, `fund_control_strategy`,
-/// `foundation_council_strategy`, `state_owned_strategy`,
-/// `cooperative_member_strategy`, `nominee_pierce_strategy`). Build-out
-/// history: `Trust` joined at TS.1 (`TrustRoleStrategy`,
-/// EOP-DD-KYCUBO-KIT-TS0 §2.1); `InvestmentFund`/`Foundation` at TS.2
-/// (§2.2/§2.3); `StateOwned`/`Cooperative` at TS.3 (§2.4/§2.5); `Nominee`
-/// at TS.4 (§2.6 = K-8 — piercing via the `kyc_ubo.assert.edge.nominee-piercing` macro
-/// (assert-control + supersede, TS.6 P2 — see `config/verb_schemas/macros/
-/// ubo.yaml`) + `NomineePierceStrategy`, whose unpierced-nominee guard
-/// fail-closes at the freeze dispatch site). The guard itself
-/// (`StructureClassSupported`)
-/// is retained: it now fail-closes the UNKNOWN-class case (a garbage wire
-/// string folds to `None`) and any future `StructureClass` widening that
-/// lands without a strategy. Widen this set ONLY when a new
-/// `DeterminationStrategy` impl lands for the class — two teeth pin the
-/// lockstep: the "seventh tooth"
-/// (`tests/kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`,
-/// strategy count) and the TS.1 split pin
-/// (`implemented_class_split_matches_strategy_arms`, arm↔classes-served
-/// mapping) — both must be consciously updated together with this const.
-pub const IMPLEMENTED_STRATEGY_CLASSES: &[StructureClass] = &[
-    StructureClass::PrivateCompany,
-    StructureClass::MultiTierHoldingGroup,
-    StructureClass::ListedEntity,
-    StructureClass::LimitedPartnershipFund,
-    StructureClass::Llp,
-    StructureClass::Trust,
-    StructureClass::InvestmentFund,
-    StructureClass::Foundation,
-    StructureClass::StateOwned,
-    StructureClass::Cooperative,
-    StructureClass::Nominee,
-];
+// `IMPLEMENTED_STRATEGY_CLASSES`/`strategy_for_structure_class` RETIRED
+// (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) — the 11-class/8-arm
+// `StructureClass` mapping they encoded is superseded by
+// `dispatch_for_entity_type` (below), the ratified 21-type/7-strategy
+// mapping (§2). `StructureClass` the TYPE and its fold arm
+// (`apply_one_control_event`, `structure_class_from_payload`) stay —
+// R5-historical, 10 real committed `structure-class` events (P0 census) —
+// but nothing dispatches off it any longer.
 
-/// TS.6 P2 — "strategy follows from entity type" (TS.0 §1), realised: the
-/// SAME class→strategy mapping already ratified and pinned by
-/// `tests/kyc_pack_closure.rs::implemented_class_split_matches_strategy_arms`
-/// (11 classes, 8 arms, TOTAL — every class implemented has exactly one
-/// strategy), now promoted from test-only pinned data into the actual
-/// freeze-dispatch source. Retires `ubo.determination.select-strategy`
-/// (TS.6 §5, K-G7): an explicit human "confirm the strategy" step is
-/// redundant once `classify-structure` alone determines it unambiguously —
-/// there was never a second legitimate strategy for any of the 11 classes
-/// to choose between. `IMPLEMENTED_STRATEGY_CLASSES` still gates the
-/// fail-closed guard for any class with no arm; this function is total only
-/// over that guarded set, by construction (an unimplemented class never
-/// reaches here — `StructureClassSupported` refuses first).
-pub fn strategy_for_structure_class(class: &StructureClass) -> &'static str {
-    match class {
-        StructureClass::PrivateCompany
-        | StructureClass::MultiTierHoldingGroup
-        | StructureClass::ListedEntity => "ownership_prong_strategy",
-        StructureClass::LimitedPartnershipFund | StructureClass::Llp => "control_prong_strategy",
-        StructureClass::Trust => "trust_role_strategy",
-        StructureClass::InvestmentFund => "fund_control_strategy",
-        StructureClass::Foundation => "foundation_council_strategy",
-        StructureClass::StateOwned => "state_owned_strategy",
-        StructureClass::Cooperative => "cooperative_member_strategy",
-        StructureClass::Nominee => "nominee_pierce_strategy",
+// ── EOP-DD-UBO-DISPATCH-001 — the type is the dispatch key ────────────────────
+
+/// The outcome of dispatching a determination by the subject's `EntityType`
+/// (§2). Two variants, not a bare `Option<&str>`: §4 D2 requires the
+/// terminal case to be an explicit, distinguishable arm — never an omission
+/// that happens to read the same as "no strategy" would.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeterminationDispatch {
+    /// §2: this type resolves via the named `DeterminationStrategy`
+    /// (`kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute` dispatch
+    /// recognises exactly these 7 names post-T4: `ownership_prong_strategy`,
+    /// `control_prong_strategy`, `trust_role_strategy`, `fund_control_strategy`,
+    /// `foundation_council_strategy`, `state_owned_strategy`,
+    /// `cooperative_member_strategy`. `nominee_pierce_strategy` is retired as
+    /// a dispatch TARGET — no `EntityType` produces it (§2 "Where nominee_
+    /// pierce_strategy went. Nowhere — deliberately"); the struct and its
+    /// freeze-dispatch arm stay, unreachable from here, keeping the
+    /// unconditional pre-freeze unpierced-nominee guard (TS.4 §3 Ruling B)
+    /// and the traversal rule intact.
+    Strategy(&'static str),
+    /// §4 D2: `NaturalPerson`/`SoleTrader` — a person is never a
+    /// determination subject; a sole trader collapses to the person. An
+    /// explicit arm, never an omission a future type could silently inherit.
+    NotADeterminationSubject,
+}
+
+/// EOP-DD-UBO-DISPATCH-001 §2 — the ratified 21-type mapping, exhaustive
+/// over `EntityType` (§4 D3: a new variant is a compile error here, not a
+/// silent fallthrough — no catch-all arm exists). §4 D4 pins this same
+/// table independently in `tests/kyc_t4_dispatch.rs::mapping_matches_the_
+/// ratified_table` as data, so a drift here is caught by a second,
+/// hand-authored copy, not by trusting this match's own arms.
+///
+/// Five types dispatch differently than the old 11-`StructureClass`/8-arm
+/// mapping would have bucketed them (identified in T4's P0 recon — 3 are
+/// explicit "RULED 2026-08-27" rows in §2, 2 more are explicit "tension"
+/// callouts in the table text): `LlcUs` (control_prong, not the ownership
+/// bucket an LLC would default to absent its own class), `LpFund` (splits
+/// off the old singular "lp_fund" bucket into fund_control, distinct from
+/// plain `LimitedPartnership`'s control_prong), `UnitTrust` (fund_control,
+/// not trust_role, despite the superficial trustee framing), `UmbrellaWithSubFunds`
+/// (newly a determination subject at all — fund_control), and
+/// `CharityNotForProfit` (trust_role, not foundation_council).
+pub fn dispatch_for_entity_type(entity_type: &EntityType) -> DeterminationDispatch {
+    use DeterminationDispatch::*;
+    use EntityType::*;
+    match entity_type {
+        // §2 rows 1-2, D2: terminal by design, not by omission.
+        NaturalPerson | SoleTrader => NotADeterminationSubject,
+        // §2 rows 3-4: control follows equity.
+        PrivateLimitedCompany | PublicListedCompany => Strategy("ownership_prong_strategy"),
+        // §2 rows 5-8: control by designation/appointment, not equity.
+        // `LlcUs` RULED 2026-08-27 (§3 Q1) — partners/appointed officers,
+        // same mechanism as a partnership.
+        LlcUs | GeneralPartnership | LimitedPartnership | Llp => Strategy("control_prong_strategy"),
+        // §2 rows 9-14: the directing mind sits outside the vehicle, under a
+        // governing mandate — pivot and re-anchor there (TS.4 Ruling A).
+        // `UnitTrust` (row 11) is trust-SHAPED but fund-DIRECTED: the
+        // trustee holds legal title, does not direct. `LpFund` (row 13) is
+        // distinguished from plain `LimitedPartnership` by being a fund —
+        // GP AND ManCo, the mandate pivot is the meaningful path.
+        // `UmbrellaWithSubFunds` RULED 2026-08-27 (§3 Q2) — a fund like any
+        // other, directed by a ManCo exactly as its sub-funds are.
+        OeicIcvc | Sicav | UnitTrust | FortyActFund | LpFund | UmbrellaWithSubFunds => {
+            Strategy("fund_control_strategy")
+        }
+        // §2 rows 15-16, 18, 20: role enumeration, no owners by construction.
+        // `CharityNotForProfit` RULED 2026-08-27 (§3 Q3) — charities are
+        // trusts, not foundation-shaped council governance.
+        DiscretionaryTrust | FixedBareTrust | PensionScheme | CharityNotForProfit => {
+            Strategy("trust_role_strategy")
+        }
+        // §2 row 17: founder/council/beneficiaries — distinct from trust
+        // role enumeration (Foundation has no settlor/trustee shape).
+        Foundation => Strategy("foundation_council_strategy"),
+        // §2 row 19: one member one vote; economic percentage is meaningless.
+        CooperativeMutual => Strategy("cooperative_member_strategy"),
+        // §2 row 21: traversal terminates in a public body; record the stop
+        // and fall to officials.
+        GovernmentDeptStatutoryCorporation => Strategy("state_owned_strategy"),
     }
 }
 
@@ -859,38 +874,44 @@ pub fn check_preconditions(
                     }
                 }
             }
-            Precondition::StructureClassified => {
-                if control.structure_class.is_none() {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "structure class must be set (kyc_ubo.assert.subject.structure-class) \
-                                 before this verb"
-                            .into(),
-                    });
+            // `StructureClassified`/`StructureClassSupported` RETIRED
+            // (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) — see the enum
+            // declaration in `lexicon.rs` for the reasoning. Superseded by
+            // `EntityTypeSupportsStrategy` below.
+            // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): the subject's own
+            // `EntityType` is `EntityId(event.subject_root.0)` by construction
+            // (`canonical_event_shape`'s `place` arm already defaults an
+            // omitted `entity-id` to `subject.0` — no event scan needed, the
+            // same fact `determination::find_subject_entity` now derives
+            // directly instead of hunting for a retired `structure-class`
+            // event). §4 D1: refuses by name; §4 D2: the terminal arm is its
+            // own explicit branch, not folded into "unknown".
+            Precondition::EntityTypeSupportsStrategy => {
+                let subject_entity = EntityId(event.subject_root.0);
+                match type_registry.type_of(subject_entity) {
+                    None => {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: "no entity type known for the subject — place it with an \
+                                     entity-type before freezing"
+                                .into(),
+                        });
+                    }
+                    Some(t) => match dispatch_for_entity_type(&t) {
+                        DeterminationDispatch::Strategy(_) => {}
+                        DeterminationDispatch::NotADeterminationSubject => {
+                            return Err(KycError::PreconditionFailed {
+                                verb: lexicon_entry.fqn.clone(),
+                                reason: format!(
+                                    "{t:?} is not a determination subject (EOP-DD-UBO-DISPATCH-001 \
+                                     §4 D2) — a person is never frozen; a sole trader collapses to \
+                                     the person"
+                                ),
+                            });
+                        }
+                    },
                 }
             }
-            Precondition::StructureClassSupported => match &control.structure_class {
-                Some(class) if IMPLEMENTED_STRATEGY_CLASSES.contains(class) => {}
-                Some(class) => {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: format!(
-                            "structure class {class:?} has no implemented determination \
-                             strategy yet — fail-closed guard (see \
-                             OwnershipProngStrategy/ControlProngStrategy scope notes; \
-                             TS.0-TS.4 tracks the build-out)"
-                        ),
-                    });
-                }
-                None => {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "structure class must be set before this verb — no class means \
-                                 no strategy can be confirmed supported"
-                            .into(),
-                    });
-                }
-            },
             Precondition::NoDuplicateActiveEdge => {
                 let (from, to) = (
                     entity_id(&event.payload, "from_entity_id"),

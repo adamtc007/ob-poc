@@ -149,11 +149,13 @@ pub struct PierceRecord {
 
 // ── Strategy interface (K-4) ─────────────────────────────────────────────────
 
-/// The determination strategy derived from the subject's structure class via
-/// `strategy_for_structure_class` (K-4; `select-strategy`/`compute-fold`
-/// retired TS.6 P2 — neither a separate assertion nor a separate verb).
+/// The determination strategy derived from the subject's `EntityType` via
+/// `dispatch_for_entity_type` (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28 —
+/// replaces `strategy_for_structure_class`; K-4; `select-strategy`/
+/// `compute-fold` retired TS.6 P2 — neither a separate assertion nor a
+/// separate verb).
 ///
-/// One strategy per structure class; composable: `freeze` calls
+/// One strategy per entity type; composable: `freeze` calls
 /// ownership prong + control prong + SMO-fallback in sequence and merges.
 pub trait DeterminationStrategy: Send + Sync {
     fn name(&self) -> &'static str;
@@ -1463,7 +1465,7 @@ pub struct DeterminationInProgress {
 // ── freeze_determination ──────────────────────────────────────────────────────
 
 /// Execute `kyc_ubo.decide.determination.freeze`:
-/// - Requires `state.is_reconciled()` and `state.has_strategy()` (pre-checked).
+/// - Requires `state.is_reconciled()` and a live `EntityType` dispatch (pre-checked).
 /// - Pins policy + lexicon + reference + import runs + graph hash + as_of.
 /// - Returns `FrozenDetermination` (immutable).
 /// - K-5: if candidates is empty AND no SMO was applied, returns Err.
@@ -1558,13 +1560,22 @@ pub fn recover_determination_at(
     // determination frozen under the new (reconciliation-free) rules must
     // still be replayable; keeping this half of the check would refuse to
     // recover a validly-frozen determination.
-    if !control.has_strategy() {
-        return None;
-    }
     let type_registry = fold_type_registry(events);
 
-    // Find the subject entity from the first classify event.
+    // Find the subject entity from the subject's own root id.
     let subject_entity = find_subject_entity(events)?;
+
+    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): the strategy gate (formerly
+    // `has_strategy()`) and the informational `det.strategy` label (below)
+    // are both now derived from the subject's `EntityType` — mirrors
+    // `kyc_stream_ops.rs::UboDeterminationFreeze`'s live-path gate. Anything
+    // short of a live `Strategy(_)` (unknown type, or a terminal
+    // `NotADeterminationSubject`) means recovery can't proceed.
+    let entity_type = type_registry.type_of(subject_entity)?;
+    let strategy_name = match crate::fold::control::dispatch_for_entity_type(&entity_type) {
+        crate::fold::control::DeterminationDispatch::Strategy(name) => name,
+        crate::fold::control::DeterminationDispatch::NotADeterminationSubject => return None,
+    };
 
     let mut candidates =
         strategy.resolve(&control, subject_entity, natural_persons, threshold_pct);
@@ -1603,16 +1614,14 @@ pub fn recover_determination_at(
         .rev()
         .find(|e| e.verb_fqn.as_str() == "kyc_ubo.decide.determination.freeze")?;
 
-    // TS.6 P2: strategy is derived from `structure_class`, never asserted
-    // (`select-strategy` retired). `classify_event_id` — the event that
-    // determines the strategy now that no separate confirmation step exists
-    // — replaces the removed `strategy_event_id` as this preview's
-    // provenance pointer.
+    // TS.6 P2: strategy is derived from the subject's type, never asserted
+    // (`select-strategy` retired). EOP-DD-UBO-DISPATCH-001 T4: now via
+    // `EntityType`, not `structure_class` (computed above as
+    // `strategy_name`). `classify_event_id` — retained for the historical
+    // `structure-class` event's provenance pointer where one exists; no
+    // longer load-bearing for strategy selection.
     let det = DeterminationInProgress {
-        strategy: control
-            .structure_class
-            .as_ref()
-            .map(|c| crate::fold::control::strategy_for_structure_class(c).to_string()),
+        strategy: Some(strategy_name.to_string()),
         candidates,
         smo_result,
         compute_event_id: control.classify_event_id,
@@ -1676,19 +1685,21 @@ pub fn recover_determination_bitemporal(
     recover_determination_at(&filtered, strategy, natural_persons, threshold_pct, pin)
 }
 
-/// Find the subject's own `EntityId`, recorded on `kyc_ubo.assert.subject.structure-class`
-/// (payload field `entity_id`). Shared by `recover_determination_at` (replay) and
-/// the live `kyc_ubo.decide.determination.freeze` verb (EOP-DD-KYCUBO-003 remediation) so
-/// both paths resolve the subject entity identically.
+/// Find the subject's own `EntityId`. Shared by `recover_determination_at`
+/// (replay) and the live `kyc_ubo.decide.determination.freeze` verb so both
+/// paths resolve the subject entity identically.
+///
+/// EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): previously scanned for the first
+/// `kyc_ubo.assert.subject.structure-class` event and read its `entity_id`
+/// payload field — a real gap the ratified mapping doc never named (found
+/// while tracing `structure-class`'s consumers in P0): once that verb stops
+/// being asserted, this unconditionally returned `None` and every LIVE
+/// freeze would hard-error. The scan was never necessary — `canonical_
+/// event_shape`'s `place` arm already defaults an omitted `entity-id` to
+/// `subject.0` (`EntityId(uuid_arg(args, "entity-id").unwrap_or(subject.0))`),
+/// so the subject's own entity is `EntityId(subject_root.0)` by construction,
+/// for every event in the stream — no scan, no dependency on any verb
+/// having fired at all.
 pub fn find_subject_entity(events: &[&IntentEvent]) -> Option<EntityId> {
-    events
-        .iter()
-        .find(|e| e.verb_fqn.as_str() == "kyc_ubo.assert.subject.structure-class")
-        .and_then(|e| {
-            e.payload
-                .get("entity_id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok())
-                .map(EntityId)
-        })
+    events.first().map(|e| EntityId(e.subject_root.0))
 }

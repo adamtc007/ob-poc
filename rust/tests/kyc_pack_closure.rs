@@ -53,10 +53,11 @@ use ob_poc_kyc_substrate::{
     check_control_preconditions, check_preconditions, fold_control_versioned, assembly_lexicon,
     evaluation_lexicon,
     AuthorityRef, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
-    DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId, EventId, FoldRegistry,
-    FoundationCouncilStrategy, FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy,
-    ObligationState, OwnershipProngStrategy, PersonId, Precondition, Principal, Prong,
-    StateOwnedStrategy, StructureClass, SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy,
+    DeterminationDispatch, DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId,
+    EntityType, EntityTypeRecord, EventId, FoldRegistry, FoundationCouncilStrategy,
+    FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy, ObligationState,
+    OwnershipProngStrategy, PersonId, Precondition, Principal, Prong, StateOwnedStrategy,
+    SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy, TypeProofStatus,
     TypeRegistryState, V1FoldImpl,
 };
 
@@ -221,7 +222,7 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_15() {
+fn verb_universe_is_exactly_14() {
     // TS.6 P1/P2: kyc.person.approve/.reject renamed kyc_ubo.decide.subject.approve/.reject
     // and moved to a new `decide:` domain block in the SAME YAML file
     // (dsl-kyc-obligation.yaml) — a rename+relocation, not a retirement, so
@@ -243,11 +244,15 @@ fn verb_universe_is_exactly_15() {
     // (P2, R8's fold-time-pruning correction touches `remove`'s behavior,
     // not the verb count). `reconciliation` DISSOLVED (16→15, P3) — no
     // replacement.
+    //
+    // T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `structure-class` RETIRED
+    // (15→14) — no replacement.
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        15,
-        "dsl.kyc verb count drifted from the post-T3 15 (17 post-T2, \
+        14,
+        "dsl.kyc verb count drifted from the post-T4 14 (post-T3 15, minus \
+         structure-class RETIRED) (17 post-T2, \
          minus control+economic-interest MERGED into connect, minus \
          reconciliation DISSOLVED; supersession renamed disconnect is net \
          zero) (18 post-P1/P2, minus type-correction DISSOLVED) (19 \
@@ -272,9 +277,11 @@ fn assembly_pack_is_exactly_known() {
     // into `connect` (14→13, P1); `supersession` renamed `disconnect`
     // (net zero, P2); `reconciliation` DISSOLVED (13→12, P3) — no
     // replacement entry.
+    // T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `structure-class` RETIRED
+    // (12→11) — the strategy is now derived from EntityType directly, no
+    // replacement entry.
     let expected: BTreeSet<String> = [
         "kyc_ubo.assert.subject.place",
-        "kyc_ubo.assert.subject.structure-class",
         "kyc_ubo.assert.subject.remove",
         "kyc_ubo.assert.subject.enquiry",
         "kyc_ubo.assert.edge.connect",
@@ -410,6 +417,7 @@ fn retired_verbs_are_gone() {
         "determination.select-strategy:",
         "determination.compute-fold:",
         "edge.pierce-nominee:",
+        "structure-class:",
     ] {
         assert!(
             !DSL_KYC_YAML.contains(needle),
@@ -431,6 +439,7 @@ fn retired_verbs_are_gone() {
         "struct UboDeterminationSelectStrategy",
         "struct UboDeterminationComputeFold",
         "struct UboEdgePierceNominee",
+        "struct KycSubjectClassifyStructure",
     ] {
         assert!(
             !KYC_STREAM_OPS_SRC.contains(needle),
@@ -447,6 +456,7 @@ fn retired_verbs_are_gone() {
     for needle in [
         "\"ubo.determination.select-strategy\"",
         "\"ubo.determination.compute-fold\"",
+        "\"kyc_ubo.assert.subject.structure-class\"",
     ] {
         assert!(
             !LEXICON_SRC.contains(needle),
@@ -577,14 +587,17 @@ fn every_declared_verb_has_a_registered_op() {
     // renamed `UboEdgeDisconnect` — still counted once, no further change
     // (P2). `UboEdgeReconcileConflict` DELETED (18→17, P3) — no op
     // survives it.
+    //
+    // T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `KycSubjectClassifyStructure`
+    // DELETED (17→16) — no op survives it.
     let declared = kyc_stream_ops_declared_universe();
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        17,
+        16,
         "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
          ops co-hosted in kyc_stream_ops.rs, and kyc_ubo.decide.subject.approve/kyc_ubo.decide.subject.reject/ \
-         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 17: {registered:#?}"
+         kyc_ubo.decide.obligation.waiver in ob-poc-kyc-decide) drifted from 16: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -763,20 +776,6 @@ fn freeze_strategy_arms() -> BTreeSet<String> {
     arms
 }
 
-/// `structure-class`'s `valid_values: [...]` bracketed list from dsl-kyc.yaml.
-fn structure_class_valid_values() -> Vec<String> {
-    let marker_line = DSL_KYC_YAML
-        .lines()
-        .find(|l| l.trim_start().starts_with("valid_values:") && l.contains("private_company"))
-        .expect("structure-class valid_values line must exist in dsl-kyc.yaml");
-    let inner = marker_line
-        .split('[')
-        .nth(1)
-        .and_then(|s| s.split(']').next())
-        .expect("valid_values must be a bracketed list");
-    inner.split(',').map(|s| s.trim().to_string()).collect()
-}
-
 /// Pin (K-G5): as of the T6 row-9 fix (2026-08-17) the map was fully
 /// studded — every stud-bearing verb, including `kyc_ubo.assert.subject.register`,
 /// carries a stud — and ALL 11 structure classes have a strategy behind
@@ -806,23 +805,26 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // T6.1(c) (2026-08-12): the fail-closed strategy guard (matrix rows
     // 6a/8a), originally split across `select-strategy` (6a) and `freeze`
     // (8a, defense in depth). TS.6 P2 (K-G7) RETIRED `select-strategy` —
-    // the strategy is now DERIVED from `structure_class`
-    // (`strategy_for_structure_class`), never separately asserted, so
-    // `StructureClassSupported` alone gates readiness on `freeze`.
+    // the strategy was DERIVED from `structure_class`, never separately
+    // asserted. EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28) RETIRED
+    // `structure_class`/`StructureClassSupported` in turn — the strategy
+    // is now derived directly from the subject's `EntityType`
+    // (`dispatch_for_entity_type`, §2's ratified 21-type/7-strategy
+    // mapping), gated by `EntityTypeSupportsStrategy`.
     // `ubo.determination.compute-fold` (which also carried this pair) was
     // ITSELF retired TS.6 P2 as a derivation dressed as a verb, redundant
     // with `freeze`'s own independent declaration — no entry survives it
     // here. EOP-VS-UBO-GAME-001 T3 (§3.3, 2026-08-27) removed the
     // `ReconciledProjection` half of the pair entirely, alongside
-    // `reconciliation` itself — `StructureClassSupported` is now freeze's
-    // sole precondition. The strategy-COUNT pin below (2) is unchanged —
-    // this is a precondition-map change, not a new `DeterminationStrategy`.
-    // The `StructureClassified`/bare `SubjectRegistered` variants that used
-    // to attach to `select-strategy` remain evaluable T6.1(b) machinery,
-    // unattached to any entry today.
+    // `reconciliation` itself — `EntityTypeSupportsStrategy` is now
+    // freeze's sole precondition. The strategy-COUNT pin below (2) is
+    // unchanged — this is a precondition-map change, not a new
+    // `DeterminationStrategy`. `StructureClassified`/`StructureClassSupported`
+    // are DELETED (T4) — nothing left to keep them declared for; a
+    // precondition has no replay role the way the fold arm does.
     expected.insert(
         "kyc_ubo.decide.determination.freeze".to_string(),
-        vec![Precondition::StructureClassSupported],
+        vec![Precondition::EntityTypeSupportsStrategy],
     );
     // T6.2 (2026-08-12, edge family — EOP-DD-KYCUBO-KIT-T6 matrix rows 1-5):
     // 5 more verbs go from geometry-free to studded. Rows 1/2 share the same
@@ -900,10 +902,9 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "kyc_ubo.assert.subject.place".to_string(),
         vec![Precondition::NotCurrentlyPlaced],
     );
-    expected.insert(
-        "kyc_ubo.assert.subject.structure-class".to_string(),
-        vec![Precondition::SubjectRegistered],
-    );
+    // `kyc_ubo.assert.subject.structure-class` entry RETIRED
+    // (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) — no entry survives it here,
+    // same as `type-correction`/`reconciliation` above.
 
     // T6.4 (2026-08-12, obligation/person family — EOP-DD-KYCUBO-KIT-T6
     // matrix rows 11-18, every row cross-fold via the T6.1 unified checker).
@@ -954,8 +955,10 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
 
     assert_eq!(
         actual.len(),
-        12,
-        "assembly_lexicon() entry count drifted from the post-T3 12 \
+        11,
+        "assembly_lexicon() entry count drifted from the post-T4 11 \
+         (post-T3 12, minus structure-class RETIRED — EOP-DD-UBO-DISPATCH-001, \
+         2026-08-28, the strategy is now derived from EntityType directly) \
          (14 post-T2, minus control+economic-interest MERGED into connect, \
          minus reconciliation DISSOLVED; supersession renamed disconnect is \
          net zero) (15 post-P1/P2, minus type-correction DISSOLVED) \
@@ -968,27 +971,26 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of T3 (2026-08-27, §3.2/§3.3/§3.4 R8: \
-         control+economic-interest MERGED into connect, supersession renamed \
-         disconnect, reconciliation DISSOLVED taking freeze's ReconciledProjection \
-         with it; remove's precondition set is unchanged — R8 is enforced by \
-         fold-time pruning, not a precondition refusal), every one of the 12 \
+        "K-G5 precondition map changed — as of T4 (2026-08-28, \
+         EOP-DD-UBO-DISPATCH-001: structure-class RETIRED, freeze's \
+         StructureClassSupported superseded by EntityTypeSupportsStrategy; \
+         T3, 2026-08-27, §3.2/§3.3/§3.4 R8: control+economic-interest MERGED \
+         into connect, supersession renamed disconnect, reconciliation \
+         DISSOLVED taking freeze's ReconciledProjection with it; remove's \
+         precondition set is unchanged — R8 is enforced by fold-time \
+         pruning, not a precondition refusal), every one of the 11 \
          remaining dsl.kyc verbs with a stud carries it \
          (verify, freeze, connect, evidence, disconnect, place, remove, \
-         classify-structure, and the 3 obligation verbs — piercing's precondition \
-         pair now reaches the stream via connect's and disconnect's own \
-         entries); any other change is either matrix progress (update the T0.3 \
+         and the 3 obligation verbs — piercing's precondition pair now \
+         reaches the stream via connect's and disconnect's own entries); \
+         any other change is either matrix progress (update the T0.3 \
          audit) or a regression"
     );
 
-    let classes = structure_class_valid_values();
-    assert_eq!(
-        classes.len(),
-        11,
-        "kyc_ubo.assert.subject.structure-class's structure-class valid_values count \
-         drifted from the audited 11: {classes:#?}"
-    );
-
+    // `structure_class_valid_values()`'s 11-count check RETIRED
+    // (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) alongside the
+    // `kyc_ubo.assert.subject.structure-class` verb's YAML declaration —
+    // there is no longer a structure-class valid_values list to audit.
     let strategies = freeze_strategy_arms();
     assert_eq!(
         strategies.len(),
@@ -1074,95 +1076,7 @@ fn edge_kind_wire_values_are_exactly_known() {
     );
 }
 
-/// TS.1 split pin (closes R4 fact 5's second half): the freeze dispatch's
-/// strategy arms and `IMPLEMENTED_STRATEGY_CLASSES` must stay in lockstep
-/// via an explicit arm → classes-served mapping. Widening
-/// `IMPLEMENTED_STRATEGY_CLASSES` without a real strategy arm landing (or
-/// landing an arm that serves no class) fails here: every implemented class
-/// must be served by exactly the strategy this map says, and every arm must
-/// serve at least one class.
-#[test]
-fn implemented_class_split_matches_strategy_arms() {
-    use ob_poc_kyc_substrate::IMPLEMENTED_STRATEGY_CLASSES;
-
-    // The ruled mapping (EOP-DD-KYCUBO-KIT-TS0 §2 + kyc_stream_ops dispatch):
-    // which structure classes each freeze-dispatch arm serves.
-    let classes_served: BTreeMap<&str, Vec<StructureClass>> = BTreeMap::from([
-        (
-            "ownership_prong_strategy",
-            vec![
-                StructureClass::PrivateCompany,
-                StructureClass::MultiTierHoldingGroup,
-                StructureClass::ListedEntity,
-            ],
-        ),
-        (
-            "control_prong_strategy",
-            vec![StructureClass::LimitedPartnershipFund, StructureClass::Llp],
-        ),
-        ("trust_role_strategy", vec![StructureClass::Trust]),
-        // TS.2 (EOP-DD-KYCUBO-KIT-TS0 §2.2/§2.3): fund control sits with the
-        // manager; foundation control sits with the council.
-        (
-            "fund_control_strategy",
-            vec![StructureClass::InvestmentFund],
-        ),
-        (
-            "foundation_council_strategy",
-            vec![StructureClass::Foundation],
-        ),
-        // TS.3 (EOP-DD-KYCUBO-KIT-TS0 §2.4/§2.5): state-owned control is
-        // usually SMO (the strategy legitimizes the fallback route);
-        // cooperative control arises from office, never membership.
-        ("state_owned_strategy", vec![StructureClass::StateOwned]),
-        (
-            "cooperative_member_strategy",
-            vec![StructureClass::Cooperative],
-        ),
-        // TS.4 (EOP-DD-KYCUBO-KIT-TS0 §2.6): post-piercing the subject
-        // resolves by the UNDERLYING structure — the strategy delegates to
-        // the control prong; the "no unpierced nominee edges" guard lives at
-        // the freeze dispatch site (resolve() cannot error). The guard set
-        // is now TOTAL: 11/11 classes served, none fail-closed.
-        ("nominee_pierce_strategy", vec![StructureClass::Nominee]),
-    ]);
-
-    // Every dispatch arm appears in the mapping and vice versa.
-    let arms = freeze_strategy_arms();
-    let mapped: BTreeSet<String> = classes_served.keys().map(|s| s.to_string()).collect();
-    assert_eq!(
-        arms, mapped,
-        "freeze's dispatch arms and the arm→classes-served mapping diverged — \
-         a new DeterminationStrategy arm must land WITH the classes it serves \
-         (and a mapping entry must never exist without a real arm): lockstep \
-         rule, EOP-DD-KYCUBO-KIT-TS0 §1c"
-    );
-
-    // Every arm serves at least one class; the union of served classes is
-    // EXACTLY IMPLEMENTED_STRATEGY_CLASSES (no class implemented without a
-    // strategy, no strategy arm serving a class outside the guard set).
-    let mut served: BTreeSet<String> = BTreeSet::new();
-    for (arm, classes) in &classes_served {
-        assert!(
-            !classes.is_empty(),
-            "strategy arm {arm} serves no structure class — an arm with no \
-             class behind it is dead dispatch (lockstep rule)"
-        );
-        served.extend(classes.iter().map(|c| format!("{c:?}")));
-    }
-    let implemented: BTreeSet<String> = IMPLEMENTED_STRATEGY_CLASSES
-        .iter()
-        .map(|c| format!("{c:?}"))
-        .collect();
-    assert_eq!(
-        served, implemented,
-        "IMPLEMENTED_STRATEGY_CLASSES and the arm→classes-served mapping \
-         diverged — widening the guard set without a strategy arm (or vice \
-         versa) is exactly what this pin fail-closes; after TS.4 the split \
-         is 8 arms serving all 11 classes — TOTAL (lockstep rule, \
-         EOP-DD-KYCUBO-KIT-TS0 §1c)"
-    );
-}
+// `implemented_class_split_matches_strategy_arms` DELETED (EOP-DD-UBO-DISPATCH-001 T4, 2026-08-28) — it pinned the retired 11-class/8-arm `IMPLEMENTED_STRATEGY_CLASSES` lockstep, which no longer exists (StructureClass dispatch retired). `kyc_t4_dispatch.rs`'s `mapping_matches_the_ratified_table` is its successor: an independent hand-authored copy of §2's 21-type/7-strategy mapping, diffed against `dispatch_for_entity_type` (D4 — data with a test, not trust in the function's own arms).
 
 // ── K-G1/K-G2: EdgeStatus reachability (real fold-chain behavior) ─────────
 
@@ -1482,84 +1396,76 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         "verify must admit an edge with evidence attached"
     );
 
-    // kyc_ubo.decide.determination.freeze — ReconciledProjection + StructureClassSupported.
-    // TS.6 P2 (K-G7) retired `select-strategy` AND `compute-fold`;
-    // `StructureClassSupported` (the T6.1(c)/TS.4 fail-closed guard) now
-    // lives solely on `freeze`. This sub-test pins (i) totality — every one
-    // of the 11 StructureClass variants is admitted (given reconciliation
-    // too, since freeze also carries `ReconciledProjection`) — and
-    // (ii) the fail-closed floor — a subject with NO recorded class (which
-    // is exactly what an unknown/garbage wire string folds to,
-    // `structure_class_from_payload` → None) still blocks.
+    // kyc_ubo.decide.determination.freeze — EntityTypeSupportsStrategy.
+    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): `StructureClassSupported`
+    // retired, superseded by `EntityTypeSupportsStrategy` — the exhaustive
+    // 21-type totality + fail-closed-floor proof now lives in
+    // `kyc_t4_dispatch.rs` (`every_entity_type_has_a_ruling`,
+    // `unmapped_type_refuses_freeze_by_name`, `terminal_types_are_explicit`,
+    // `dispatch_is_exhaustive`). This sub-test's job is narrower and
+    // distinct: does the REAL `LexiconEntry` (`assembly_lexicon()`, not a
+    // hand-built one) actually enforce, end-to-end through
+    // `check_control_preconditions` — one admitted type, one terminal type,
+    // one untyped subject.
     let freeze_entry_for_totality = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
-    let all_classes = [
-        StructureClass::PrivateCompany,
-        StructureClass::MultiTierHoldingGroup,
-        StructureClass::ListedEntity,
-        StructureClass::LimitedPartnershipFund,
-        StructureClass::Llp,
-        StructureClass::Trust,
-        StructureClass::Foundation,
-        StructureClass::InvestmentFund,
-        StructureClass::StateOwned,
-        StructureClass::Cooperative,
-        StructureClass::Nominee,
-    ];
-    assert_eq!(
-        all_classes.len(),
-        ob_poc_kyc_substrate::IMPLEMENTED_STRATEGY_CLASSES.len(),
-        "the implemented set must be TOTAL post-TS.4 (11/11 classes)"
-    );
-    for class in all_classes {
-        let supported = ControlState {
-            registered: true,
-            structure_class: Some(class.clone()),
-            ..Default::default()
-        };
-        assert!(
-            check_control_preconditions(
-                freeze_entry_for_totality,
-                &supported,
-                &TypeRegistryState::default(),
-                &probe(
-                    "kyc_ubo.decide.determination.freeze",
-                    TargetBinding::for_subject(subject)
-                ),
-            )
-            .is_ok(),
-            "freeze must admit every implemented structure class \
-             post-TS.4 (totality); {class:?} was blocked"
+    let typed = |t: EntityType| -> TypeRegistryState {
+        let mut tr = TypeRegistryState::default();
+        tr.types.insert(
+            EntityId(subject.0),
+            EntityTypeRecord {
+                entity_type: t,
+                proof: TypeProofStatus::Proved,
+                originating_event_id: EventId::new(),
+                proof_event_id: Some(EventId::new()),
+            },
         );
-    }
-    // The fail-closed floor: no class (= what a garbage wire string folds
-    // to) still blocks, even with registration satisfied.
-    let unclassified = ControlState {
-        registered: true,
-        structure_class: None,
-        ..Default::default()
+        tr
     };
+    let registered = ControlState { registered: true, ..Default::default() };
+
+    assert_eq!(
+        ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::PrivateLimitedCompany),
+        DeterminationDispatch::Strategy("ownership_prong_strategy"),
+        "sanity: PrivateLimitedCompany must be a live dispatch target for the admit case below"
+    );
     assert!(
         check_control_preconditions(
             freeze_entry_for_totality,
-            &unclassified,
-            &TypeRegistryState::default(),
+            &registered,
+            &typed(EntityType::PrivateLimitedCompany),
             &probe(
                 "kyc_ubo.decide.determination.freeze",
                 TargetBinding::for_subject(subject)
             ),
         )
-        .is_err(),
-        "freeze must still fail-close on a subject with no recorded \
-         structure class (unknown wire strings fold to None)"
+        .is_ok(),
+        "freeze must admit a subject whose EntityType dispatches to a live strategy"
     );
 
-    // kyc_ubo.decide.determination.freeze — ReconciledProjection alone: an
-    // unreconciled state must block even with a supported class set.
-    let not_ready = ControlState::default();
+    assert_eq!(
+        ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::NaturalPerson),
+        DeterminationDispatch::NotADeterminationSubject,
+        "sanity: NaturalPerson must be terminal for the refuse case below"
+    );
     assert!(
         check_control_preconditions(
             freeze_entry_for_totality,
-            &not_ready,
+            &registered,
+            &typed(EntityType::NaturalPerson),
+            &probe(
+                "kyc_ubo.decide.determination.freeze",
+                TargetBinding::for_subject(subject)
+            ),
+        )
+        .is_err(),
+        "freeze must fail-close on a terminal (NotADeterminationSubject) EntityType"
+    );
+
+    // The fail-closed floor: no recorded type at all still blocks.
+    assert!(
+        check_control_preconditions(
+            freeze_entry_for_totality,
+            &registered,
             &TypeRegistryState::default(),
             &probe(
                 "kyc_ubo.decide.determination.freeze",
@@ -1567,8 +1473,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             ),
         )
         .is_err(),
-        "freeze must block before reconcile-conflict + a supported structure class have \
-         fired (K-14)"
+        "freeze must still fail-close on a subject with no recorded EntityType"
     );
 }
 
@@ -2177,9 +2082,13 @@ async fn retired_verbs_are_gone_from_the_search_index() {
 
     // KYC/UBO scope: this pack's own retirements. `bpmn.*` orphans are a
     // separate, pre-existing finding outside this tranche's fence.
+    // T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): added `kyc_ubo.` — the
+    // RATIFIED 2026-08-22 four-segment prefix this filter predated, so it
+    // silently let every dsl.kyc verb retired since the rename (this
+    // tranche's `structure-class`) through unchecked.
     let kyc_orphans: Vec<String> = orphans
         .iter()
-        .filter(|(fqn, _)| fqn.starts_with("kyc.") || fqn.starts_with("ubo.") || fqn.starts_with("assert.") || fqn.starts_with("decide."))
+        .filter(|(fqn, _)| fqn.starts_with("kyc.") || fqn.starts_with("kyc_ubo.") || fqn.starts_with("ubo.") || fqn.starts_with("assert.") || fqn.starts_with("decide."))
         .filter(|(fqn, _)| !macro_fqns.contains(fqn))
         .map(|(fqn, n)| format!("{fqn} ({n} rows)"))
         .collect();

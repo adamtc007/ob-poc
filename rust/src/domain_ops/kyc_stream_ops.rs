@@ -448,15 +448,29 @@ impl SemOsVerbOp for UboDeterminationFreeze {
         let type_registry = fold_type_registry(&refs);
 
         // 2. Run the actual determination strategy (EOP-DD-KYCUBO-003 R1/M1.2).
-        //    TS.6 P2: `select-strategy` is retired — the strategy is DERIVED
-        //    from `structure_class` (`strategy_for_structure_class`), never
-        //    separately asserted. `StructureClassSupported` (gating
-        //    compute-fold/freeze already) guarantees the class is a member
-        //    of the pinned implemented-strategy set before we get here.
-        let structure_class = control.structure_class.as_ref().ok_or_else(|| {
-            anyhow!("freeze: no structure class set (StructureClassSupported precondition)")
+        //    EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): the strategy is DERIVED
+        //    from the subject's `EntityType` (`dispatch_for_entity_type`),
+        //    replacing `structure_class`/`strategy_for_structure_class`.
+        //    `EntityTypeSupportsStrategy` (gating freeze already) guarantees
+        //    the type dispatches to a real strategy, not `NotADeterminationSubject`
+        //    and not unknown, before we get here. `find_subject_entity` no
+        //    longer scans for a `structure-class` event — the subject's own
+        //    entity is `EntityId(subject.0)` by construction.
+        let subject_entity_id = find_subject_entity(&refs).ok_or_else(|| {
+            anyhow!("freeze: no events for this subject — subject entity unknown")
         })?;
-        let strategy_name = ob_poc_kyc_substrate::strategy_for_structure_class(structure_class);
+        let entity_type = type_registry.type_of(subject_entity_id).ok_or_else(|| {
+            anyhow!("freeze: no entity type known for the subject (EntityTypeSupportsStrategy precondition)")
+        })?;
+        let strategy_name = match ob_poc_kyc_substrate::dispatch_for_entity_type(&entity_type) {
+            ob_poc_kyc_substrate::DeterminationDispatch::Strategy(name) => name,
+            ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => {
+                return Err(anyhow!(
+                    "freeze: {entity_type:?} is not a determination subject \
+                     (EOP-DD-UBO-DISPATCH-001 §4 D2, EntityTypeSupportsStrategy precondition)"
+                ));
+            }
+        };
         // TS.4 §3 Ruling B (widened from §2.6's original nominee_pierce_
         // strategy-only scope): `resolve()` returns `Vec<ProngCandidate>`
         // and cannot signal error, so the unpierced-nominee scan lives
@@ -531,11 +545,6 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             }
         };
 
-        let subject_entity_id = find_subject_entity(&refs).ok_or_else(|| {
-            anyhow!(
-                "freeze: no kyc_ubo.assert.subject.structure-class event found — subject entity unknown"
-            )
-        })?;
         let natural_persons = natural_persons_from_events(&refs);
         // K-6: threshold should be reference-plane data (per jurisdiction/structure
         // class); until that table exists, a caller-suppliable default is the
@@ -760,44 +769,15 @@ impl SemOsVerbOp for KycSubjectPlace {
     }
 }
 
-pub struct KycSubjectClassifyStructure;
-
-#[async_trait]
-impl SemOsVerbOp for KycSubjectClassifyStructure {
-    fn fqn(&self) -> &str {
-        "kyc_ubo.assert.subject.structure-class"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        // EOP-FUZZ-KYCUBO-001 §5 finding #2: the wire-value fail-closed gate
-        // (unknown class must be rejected, never silently fold to
-        // structure_class: None) now lives once, inside canonical_event_shape.
-        let (target, payload, _edge) =
-            canonical_event_shape("kyc_ubo.assert.subject.structure-class", subject, args)?;
-        // T6.3 row 10 finding: `validate_entry_fqn` was `None`, so the
-        // newly-declared SubjectRegistered precondition would be dead at
-        // the real write path without this wire.
-        let outcome = stream_append(
-            "kyc_ubo.assert.subject.structure-class",
-            subject,
-            target,
-            payload,
-            "analyst.classify-structure",
-            Some("kyc_ubo.assert.subject.structure-class"),
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
+// `KycSubjectClassifyStructure` (`kyc_ubo.assert.subject.structure-class`)
+// DELETED — EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28). The strategy is now
+// derived directly from the subject's EntityType (`dispatch_for_entity_type`,
+// §2's ratified 21-type/7-strategy mapping), never separately classified.
+// 10 real committed events existed for this FQN before deletion (P0
+// census) — the fold-side parser
+// (`ob-poc-kyc-substrate::fold::control::structure_class_from_payload`)
+// stays R5-historical for replay; this op struct is deleted, not left
+// unregistered (nothing dispatches to it any longer).
 
 // ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the remaining type-registry moves ─────────
 // `kyc_ubo.assert.subject.type` RETIRED (T2, §3.2) — absorbed into

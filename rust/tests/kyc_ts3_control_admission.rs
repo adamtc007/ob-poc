@@ -147,7 +147,12 @@ fn cooperative_resolves_via_membership() {
 
 #[test]
 fn statutory_authority_stops_with_reason() {
-    // SovereignWealthVehicle <-StatutoryAuthority- GovtDept.
+    // A state body <-StatutoryAuthority- GovtDept. (Previously named for
+    // `SovereignWealthVehicle`; removed T4, EOP-DD-UBO-DISPATCH-001 §2
+    // Q4/§3a — not a single legal entity, never a block. `swv` kept as the
+    // variable name; the fixture now types the stopped-at entity as
+    // `GovernmentDeptStatutoryCorporation`, the one remaining catalogue
+    // type this geometry cell still permits.)
     let swv = eid(6);
     let govt = eid(7);
     let mut state = ControlState {
@@ -546,7 +551,7 @@ fn traversal_decisions_carry_provisionality() {
     let mut type_registry_a = TypeRegistryState::default();
     type_registry_a
         .types
-        .insert(swv, type_record(EntityType::SovereignWealthVehicle, TypeProofStatus::Alleged, 21));
+        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, TypeProofStatus::Alleged, 21));
     let stops_a = detect_statutory_stops(&state_a, swv);
     let assurance_a = compute_assurance(&[], &stops_a, &state_a, &type_registry_a);
     assert!(
@@ -626,7 +631,7 @@ fn statutory_stop_on_alleged_type_is_provisional() {
     let mut alleged_registry = TypeRegistryState::default();
     alleged_registry
         .types
-        .insert(swv, type_record(EntityType::SovereignWealthVehicle, TypeProofStatus::Alleged, 26));
+        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, TypeProofStatus::Alleged, 26));
     let assurance_alleged = compute_assurance(&[], &stops, &state, &alleged_registry);
     assert!(
         assurance_alleged.reasons.iter().any(|r| matches!(
@@ -643,7 +648,7 @@ fn statutory_stop_on_alleged_type_is_provisional() {
     let mut proved_registry = TypeRegistryState::default();
     proved_registry
         .types
-        .insert(swv, type_record(EntityType::SovereignWealthVehicle, TypeProofStatus::Proved, 27));
+        .insert(swv, type_record(EntityType::GovernmentDeptStatutoryCorporation, TypeProofStatus::Proved, 27));
     let assurance_proved = compute_assurance(&[], &stops, &state, &proved_registry);
     assert!(
         !assurance_proved.reasons.iter().any(|r| matches!(

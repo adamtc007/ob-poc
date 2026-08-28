@@ -32,13 +32,14 @@
 /// `connect` (13→12, one FQN for two); `supersession` renamed `disconnect`
 /// (no count change); `reconciliation` DISSOLVED (12→11, no replacement
 /// FQN — see `lexicon.rs`'s retirement comment).
+/// T4 (EOP-DD-UBO-DISPATCH-001, 2026-08-28): `structure-class` RETIRED
+/// (11→10, no replacement FQN — see `lexicon.rs`'s retirement comment).
 const ASSEMBLY_VERB_FQNS: &[&str] = &[
     "kyc_ubo.assert.edge.connect",
     "kyc_ubo.assert.edge.evidence",
     "kyc_ubo.assert.edge.verification",
     "kyc_ubo.assert.edge.disconnect",
     "kyc_ubo.assert.subject.place",
-    "kyc_ubo.assert.subject.structure-class",
     "kyc_ubo.assert.subject.remove",
     "kyc_ubo.assert.subject.enquiry",
     "kyc_ubo.assert.entity.identity",

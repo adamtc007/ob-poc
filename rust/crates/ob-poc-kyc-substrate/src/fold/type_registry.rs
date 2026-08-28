@@ -64,7 +64,8 @@ pub const ENTITY_TYPE_WIRE_VALUES: &[&str] = &[
     "cooperative_mutual",
     "charity_not_for_profit",
     "government_dept_statutory_corporation",
-    "sovereign_wealth_vehicle",
+    // "sovereign_wealth_vehicle" REMOVED (EOP-DD-UBO-DISPATCH-001 T4, §2
+    // Q4/§3a) — not an entity type, never a block; catalogue 22→21.
 ];
 
 pub fn entity_type_from_wire(s: &str) -> Option<EntityType> {
@@ -91,7 +92,8 @@ pub fn entity_type_from_wire(s: &str) -> Option<EntityType> {
         "cooperative_mutual" => CooperativeMutual,
         "charity_not_for_profit" => CharityNotForProfit,
         "government_dept_statutory_corporation" => GovernmentDeptStatutoryCorporation,
-        "sovereign_wealth_vehicle" => SovereignWealthVehicle,
+        // "sovereign_wealth_vehicle" REMOVED (T4, §2 Q4/§3a) — falls through
+        // to the catch-all below, same as any other unrecognized wire value.
         _ => return None,
     })
 }

@@ -44,13 +44,12 @@ pub use evaluation::{
 };
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
-    check_control_preconditions, check_preconditions, control_admission, edges_of_kind_into,
-    fold_control, governing_mandate_edges_into, natural_persons_from_events,
+    check_control_preconditions, check_preconditions, control_admission, dispatch_for_entity_type,
+    edges_of_kind_into, fold_control, governing_mandate_edges_into, natural_persons_from_events,
     reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges,
-    strategy_for_structure_class, unpierced_nominee_edges, ControlAdmission, ControlState,
-    EdgeKind, EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge,
-    ReconciledTrustEdge, StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
-    IMPLEMENTED_STRATEGY_CLASSES, STRUCTURE_CLASS_WIRE_VALUES,
+    unpierced_nominee_edges, ControlAdmission, ControlState, DeterminationDispatch, EdgeKind,
+    EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge,
+    StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
