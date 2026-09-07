@@ -504,21 +504,29 @@ fn run_validations(rows: &BTreeMap<String, AlignmentRow>, dp_ownership: &[Domain
         total
     );
 
-    // 2. 4 board moves in no journey pack.
-    let expect_no_pack = [
-        "kyc_ubo.assert.subject.type",
-        "kyc_ubo.assert.subject.type-correction",
-        "kyc_ubo.assert.subject.member-withdrawal",
+    // 2. The 3 subject moves (place/remove/enquiry) reachable via the
+    //    journey pack — 2026-09-07 fix, audit item 3 ("a human can place
+    //    exactly ONE block ever"). Original check (pre-2026-09-07) named
+    //    a different 4-verb set (`type`/`type-correction`/
+    //    `member-withdrawal`/`enquiry`) drawn from a pre-T2 vocabulary
+    //    generation — those 3 FQNs besides `enquiry` never existed under
+    //    T2's `place`/`remove`/`enquiry` naming and could never appear in
+    //    `rows`; the check could never pass as coded. Rewritten to check
+    //    the LIVE vocabulary is reachable, not that a retired one is
+    //    absent.
+    let expect_in_pack = [
+        "kyc_ubo.assert.subject.place",
+        "kyc_ubo.assert.subject.remove",
         "kyc_ubo.assert.subject.enquiry",
     ];
     let mut v2_detail = Vec::new();
     let mut v2 = true;
-    for fqn in expect_no_pack {
+    for fqn in expect_in_pack {
         match rows.get(fqn) {
-            Some(r) if !r.pack => v2_detail.push(format!("{fqn}: pack=N (expected)")),
+            Some(r) if r.pack => v2_detail.push(format!("{fqn}: pack=Y (expected)")),
             Some(_) => {
                 v2 = false;
-                v2_detail.push(format!("{fqn}: pack=Y (UNEXPECTED — should be absent)"));
+                v2_detail.push(format!("{fqn}: pack=N (UNEXPECTED — should be reachable)"));
             }
             None => {
                 v2 = false;
@@ -527,7 +535,7 @@ fn run_validations(rows: &BTreeMap<String, AlignmentRow>, dp_ownership: &[Domain
         }
     }
     println!(
-        "\n[{}] V2 — 4 board moves absent from the journey pack",
+        "\n[{}] V2 — the 3 subject moves (place/remove/enquiry) are reachable via the journey pack",
         if v2 { "PASS" } else { "FAIL" }
     );
     for d in &v2_detail {
@@ -600,7 +608,20 @@ fn run_validations(rows: &BTreeMap<String, AlignmentRow>, dp_ownership: &[Domain
         println!("       {d}");
     }
 
-    // 5. lexicon/pack count mismatch (16 vs 16 with different membership).
+    // 5. lexicon(assembly) and pack agree exactly on the board-move set —
+    //    2026-09-07 fix, audit item 3. Original check compared
+    //    lexicon(assembly) against the pack's FULL kyc_ubo.* claim
+    //    (including Evaluation-pack verdict verbs like approve/reject/
+    //    waiver, which are never Assembly/board-enumerable by design —
+    //    §1 of this file's own header comment), an apples/oranges count
+    //    that could never reach `same_membership` even once the pack was
+    //    fixed. `pack_fqns` is now scoped to the SAME Assembly-only
+    //    membership as `lexicon_assembly_fqns` before comparing (the
+    //    macro-only `nominee-piercing` FQN — real, ratified, TS.6 §5 — is
+    //    excluded on both sides by construction: it has no `LexiconEntry`,
+    //    so `r.lexicon` is `None` for it, same as the Evaluation verdict
+    //    verbs). PASS now means "the pack claims the board vocabulary
+    //    exactly" — a health check, not a known-anomaly detector.
     let lexicon_assembly_fqns: BTreeSet<&str> = rows
         .values()
         .filter(|r| matches!(r.lexicon, Some(LexiconMembership::Assembly)))
@@ -608,14 +629,13 @@ fn run_validations(rows: &BTreeMap<String, AlignmentRow>, dp_ownership: &[Domain
         .collect();
     let pack_fqns: BTreeSet<&str> = rows
         .values()
-        .filter(|r| r.pack)
+        .filter(|r| r.pack && matches!(r.lexicon, Some(LexiconMembership::Assembly)))
         .map(|r| r.fqn.as_str())
         .collect();
-    let same_count = lexicon_assembly_fqns.len() == pack_fqns.len();
     let same_membership = lexicon_assembly_fqns == pack_fqns;
-    let v5 = same_count && !same_membership;
+    let v5 = same_membership;
     println!(
-        "\n[{}] V5 — lexicon(assembly) and pack have equal counts ({} vs {}) but different membership",
+        "\n[{}] V5 — lexicon(assembly) and pack agree exactly on the board-move set ({} vs {})",
         if v5 { "PASS" } else { "FAIL" },
         lexicon_assembly_fqns.len(),
         pack_fqns.len()

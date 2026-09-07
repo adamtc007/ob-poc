@@ -200,7 +200,14 @@ allowed_verbs:
   # only way to actually clear that state from a live KYC workspace.
   - kyc_ubo.assert.edge.nominee-piercing
   - kyc_ubo.decide.determination.freeze
-  - kyc_ubo.assert.subject.register
+  # `kyc_ubo.assert.subject.register` RETIRED (EOP-VS-UBO-GAME-001 T2,
+  # §3.2, 2026-08-27) — merged into `place` (below). 2026-09-07: place/
+  # remove/enquiry admitted so a human can build more than one block
+  # through this pack (audit item 3, 2026-08-28) — `place` type-level
+  # (EOP-VS-UBO-GAME-001 §3.4 R9), `remove`/`enquiry` entity/subject-scoped.
+  - kyc_ubo.assert.subject.place
+  - kyc_ubo.assert.subject.remove
+  - kyc_ubo.assert.subject.enquiry
   - kyc_ubo.assert.entity.identity
   - kyc_ubo.assert.entity.screening
   - kyc_ubo.assert.entity.risk

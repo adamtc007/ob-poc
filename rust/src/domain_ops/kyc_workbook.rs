@@ -63,11 +63,15 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, canonical_event_shape, map_principal};
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_preconditions, enumerate_placement_set, assembly_lexicon, preview,
+    check_preconditions, entity_type_from_wire, enumerate_placement_set, assembly_lexicon, preview,
     render_intent_event_to_sexpr, AuthorityRef, ControlState, FoldRegistry,
     IntentEvent, KycError, LexiconManifest, MoveId, ObligationState,
     SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
+
+/// Mirrors `placement.rs`'s own private `PLACE` const — `place` is the one
+/// verb `stage()` matches differently (see that method's doc comment).
+const PLACE: &str = "kyc_ubo.assert.subject.place";
 use sem_os_core::principal::Principal as RuntimePrincipal;
 
 // ── Errors ───────────────────────────────────────────────────────────────────
@@ -297,6 +301,22 @@ impl KycWorkbook {
     /// review-fixed bug: committed-only would wrongly refuse a dependent
     /// chain's 2nd/3rd move). Rejection carries the parser diagnostic
     /// verbatim, or the currently-legal move listing — never a guess.
+    ///
+    /// **`place` is matched differently from every other move** (2026-09-07,
+    /// audit item 3). Every other verb's frontier candidate names a
+    /// concrete `TargetBinding` the board already knows about (an existing
+    /// edge, an existing registered entity) — `parsed.target` either equals
+    /// one of those or it doesn't. `place` candidates are type-level
+    /// (`LegalMove::proposed_entity_type` — see `placement.rs`): the board
+    /// offers "this TYPE may be added", never a pre-enumerated entity id,
+    /// because a brand-new entity has no id yet for the board to know
+    /// about. So `place` matches on the TYPE the caller's text asserts,
+    /// then — because the type-level frontier probe couldn't evaluate
+    /// `NotCurrentlyPlaced` without a concrete id (vacuous when probed
+    /// abstractly, `fold::control::check_preconditions`'s documented
+    /// convention) — re-runs the real precondition oracle against the
+    /// caller's ACTUAL id once it is known. Bounded to this one verb: no
+    /// other move's matching changes.
     pub fn stage(
         &mut self,
         text: &str,
@@ -327,32 +347,64 @@ impl KycWorkbook {
             &self.kit,
         );
 
-        let legal_move = placement_set
-            .moves
-            .iter()
-            .find(|m| m.verb_fqn == parsed.verb_fqn && m.target == parsed.target)
-            .map(|m| m.move_id.clone())
-            .ok_or_else(|| RecognitionError::NotCurrentlyLegal {
-                verb_fqn: parsed.verb_fqn.as_str().to_string(),
-                legal: placement_set
-                    .moves
-                    .iter()
-                    .map(|m| m.move_id.0.clone())
-                    .collect(),
-            })?;
-
         let entry = self.kit.get(parsed.verb_fqn.as_str());
         let actor = map_principal(principal);
         let event = IntentEvent::new(
             self.subject,
-            parsed.verb_fqn,
+            parsed.verb_fqn.clone(),
             actor,
             authority,
-            parsed.target,
-            parsed.payload,
+            parsed.target.clone(),
+            parsed.payload.clone(),
             as_of,
         )
         .with_lexicon_hash(self.kit.hash);
+
+        let legal_move = if parsed.verb_fqn.as_str() == PLACE {
+            let entity_type = event
+                .payload
+                .get("entity_type")
+                .and_then(|v| v.as_str())
+                .and_then(entity_type_from_wire);
+            let matched = entity_type.and_then(|et| {
+                placement_set
+                    .moves
+                    .iter()
+                    .find(|m| m.verb_fqn == parsed.verb_fqn && m.proposed_entity_type == Some(et))
+            });
+            let move_id = matched
+                .map(|m| m.move_id.clone())
+                .ok_or_else(|| RecognitionError::NotCurrentlyLegal {
+                    verb_fqn: parsed.verb_fqn.as_str().to_string(),
+                    legal: placement_set
+                        .moves
+                        .iter()
+                        .map(|m| m.move_id.0.clone())
+                        .collect(),
+                })?;
+            // The frontier confirmed the TYPE is legal; now check the REAL
+            // entity id isn't already placed (`NotCurrentlyPlaced` — vacuous
+            // at the type-level probe above, real here against the actual id).
+            if let Some(e) = entry {
+                check_preconditions(e, &frontier, &frontier_obligation, &frontier_type_registry, &event)?;
+            }
+            move_id
+        } else {
+            placement_set
+                .moves
+                .iter()
+                .find(|m| m.verb_fqn == parsed.verb_fqn && m.target == parsed.target)
+                .map(|m| m.move_id.clone())
+                .ok_or_else(|| RecognitionError::NotCurrentlyLegal {
+                    verb_fqn: parsed.verb_fqn.as_str().to_string(),
+                    legal: placement_set
+                        .moves
+                        .iter()
+                        .map(|m| m.move_id.0.clone())
+                        .collect(),
+                })?
+        };
+
         let source_text = render_intent_event_to_sexpr(&event, entry);
 
         self.staged.push(StagedMove {

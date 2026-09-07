@@ -313,3 +313,40 @@ fn enumerate_placement_set_scales_to_200_edges() {
         "T2 §14 Q2 benchmark: enumeration over 200 edges took {elapsed:?}, expected <200ms"
     );
 }
+
+/// 2026-09-07 audit item 3 RED gate: `place` must offer entity TYPES
+/// (EOP-VS-UBO-GAME-001 §3.4 R9 — "place offers the entity types that may
+/// be added"; §2 — "the game writes metadata about entities, never
+/// entities; which specific entity is a lookup"), not a pre-enumerated set
+/// of already-known entity ids. On an empty board there is nothing yet to
+/// connect to, so every catalogued type is a legal first placement — one
+/// candidate per `EntityType` (21). Field-agnostic on purpose: this counts
+/// `place` candidates rather than inspecting move shape, so it does not
+/// presuppose P2's exact `LegalMove` field design. RED today: the current
+/// generator emits exactly ONE `place` candidate (the bare subject-entity
+/// id — `placement.rs`'s `place_and_remove_candidates`, T1's P4 deferral),
+/// never a type.
+#[test]
+fn place_offers_entity_types() {
+    let subj = subject();
+    let lexicon = assembly_lexicon();
+    let set = enumerate_placement_set(
+        subj,
+        &empty_state(),
+        &empty_obligation(),
+        &empty_type_registry(),
+        &lexicon,
+    );
+    let place_candidates = set
+        .moves
+        .iter()
+        .filter(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.subject.place")
+        .count();
+    assert_eq!(
+        place_candidates, 21,
+        "an empty board must offer all 21 catalogued entity types as `place` candidates \
+         (TS.0 §4 catalogue) — got {place_candidates}. `place` candidates are type-level, \
+         not a pre-enumerated set of known entity ids (a brand-new entity has no id yet \
+         for the board to enumerate)"
+    );
+}

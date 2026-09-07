@@ -1932,6 +1932,21 @@ fn op_layer_only_studs_are_exactly_known() {
 /// offers the subject's own entity as a candidate (the checker refuses it
 /// if already placed), and `remove` now always offers every registered
 /// entity (the checker refuses it if already withdrawn).
+///
+/// 2026-09-07 (audit item 3, P2): `place` stopped probing
+/// `check_control_preconditions` at enumeration entirely — it offers entity
+/// TYPES now (`EOP-VS-UBO-GAME-001` §3.4 R9), computed from type geometry
+/// against currently-active board members, not a per-entity-id oracle
+/// probe (there is no id yet for a brand-new entity). Its `is_withdrawn`
+/// call is therefore a NEW, legitimate, structurally different thing from
+/// the T2-era duplication this tooth guards against: it filters WHICH
+/// TYPED MEMBERS ARE CURRENTLY ACTIVE for geometry narrowing, never a
+/// per-candidate "is THIS entity already placed" refusal (that check moved
+/// entirely to `KycWorkbook::stage()`, run once against the caller's real
+/// id — see that method's doc comment). The `NotCurrentlyPlaced` stud
+/// itself has exactly one caller left: `check_preconditions`. This tooth
+/// stays scoped to `remove`, which is unchanged and must still consult the
+/// checker only.
 #[test]
 fn no_stud_is_duplicated() {
     let op_markers = [
@@ -1961,21 +1976,34 @@ fn no_stud_is_duplicated() {
     ))
     .expect("read placement.rs");
     let place_block_start = placement_src
-        .find("if let Some(entry) = place_entry {")
-        .expect("place_entry block must exist in placement.rs");
+        .find("if lexicon.get(PLACE).is_some() {")
+        .expect("place type-level block must exist in placement.rs");
+    // Bounded by the REMOVE COMMENT, not the `if let` line — the comment
+    // sits between the place block's closing brace and the remove code and
+    // itself mentions `check_control_preconditions` (describing REMOVE's
+    // own oracle use), which would otherwise leak into `place_block` and
+    // false-positive the assertion below.
+    let remove_comment_start = placement_src
+        .find("// remove: every registered entity")
+        .expect("remove comment must exist in placement.rs");
     let remove_block_start = placement_src
         .find("if let Some(entry) = remove_entry {")
         .expect("remove_entry block must exist in placement.rs");
     let attach_evidence_start = placement_src
         .find("// attach-evidence, type-scoped half")
         .expect("attach-evidence type-scoped comment must exist in placement.rs");
-    let place_block = &placement_src[place_block_start..remove_block_start];
+    let place_block = &placement_src[place_block_start..remove_comment_start];
     let remove_block = &placement_src[remove_block_start..attach_evidence_start];
+    // `place` no longer probes the oracle at all (2026-09-07, see this
+    // test's doc comment) — pin that directly, rather than banning
+    // `is_withdrawn` (which the block now legitimately calls for geometry
+    // membership, not stud duplication).
     assert!(
-        !place_block.contains("is_withdrawn"),
-        "placement.rs::place_and_remove_candidates (place block): found a \
-         hand-rolled is_withdrawn check — the board-preview side of the stud \
-         duplication has come back; it must consult check_control_preconditions only"
+        !place_block.contains("check_control_preconditions") && !place_block.contains("check_preconditions"),
+        "placement.rs::place_and_remove_candidates (place block): place must never probe the \
+         precondition oracle at enumeration — it offers TYPES (EOP-VS-UBO-GAME-001 §3.4 R9), \
+         evaluated by type geometry only; the real NotCurrentlyPlaced check runs once, later, \
+         against the caller's actual id in KycWorkbook::stage()"
     );
     assert!(
         !remove_block.contains("is_withdrawn"),

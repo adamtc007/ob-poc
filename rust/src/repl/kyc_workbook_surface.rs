@@ -743,7 +743,7 @@ mod tests {
     /// accepts by staging the proposed verb → ordinary `stage()` → the
     /// resulting preview matches real T4 semantics. The "utterance" here is
     /// simulated by feeding `Propose` a real stored embedding for
-    /// `kyc_ubo.assert.subject.register` (fetched from the live
+    /// `kyc_ubo.assert.subject.place` (fetched from the live
     /// `verb_pattern_embeddings` table) rather than tokenizing English
     /// text — this module has no embedder of its own (I-5); production
     /// wiring (`sequencer.rs::handle_kyc_workbook_command`) is what turns
@@ -752,6 +752,25 @@ mod tests {
     /// verb, and staging the operator's own resulting DSL text lands
     /// through the SAME `KycWorkbook::stage()`/`validate()` path T4 always
     /// used — the ramp never bypasses or duplicates it (I-1).
+    ///
+    /// Rewritten 2026-09-07 (P3, journey-pack/frontier tranche) from the
+    /// original `register`-verb fixture: `register` retired
+    /// (EOP-VS-UBO-GAME-001 T2, merged into `place`) and has zero embedding
+    /// rows left to fetch — this test's own `RowNotFound` was one of the
+    /// tranche's 5 carried reds. `place` still flips `control.registered`
+    /// (`fold/control.rs`'s `place` arm — §3.2, absorbed `register`'s
+    /// axis), so the preview assertion below is unchanged in substance.
+    ///
+    /// Disposition changed from `Select` to `Clarify` in the same rewrite
+    /// (P2 of this tranche — audit item 3): `place` candidates are now
+    /// type-level (21 on an empty board, `EOP-VS-UBO-GAME-001` §3.4 R9),
+    /// all sharing one verb_fqn and therefore one embedding score
+    /// (`kyc_ramp::rank_board_with_scores` scores by verb_fqn) — the ramp
+    /// can no longer call a bare "place"-shaped utterance unambiguous, and
+    /// correctly should not: the word "place" alone never says WHICH type.
+    /// This is the honest post-fix behavior, not a workaround. The operator
+    /// still resolves it in one `Stage` with a fully-specified DSL text
+    /// (I-4), same as before.
     #[cfg(feature = "database")]
     #[tokio::test]
     async fn propose_then_stage_matches_frontier_semantics() {
@@ -767,17 +786,17 @@ mod tests {
         // land on — stands in for "an utterance that clearly means this".
         let (embedding,): (pgvector::Vector,) = sqlx::query_as(
             r#"SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-               WHERE verb_name = 'kyc_ubo.assert.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
+               WHERE verb_name = 'kyc_ubo.assert.subject.place' AND embedding IS NOT NULL LIMIT 1"#,
         )
         .fetch_one(&pool)
         .await
-        .expect("kyc_ubo.assert.subject.register must have at least one populated embedding");
+        .expect("kyc_ubo.assert.subject.place must have at least one populated embedding");
 
         // Guard against a stale row from a prior interrupted/failed run of
         // this test (this test's own capture-row assertion below does a
         // `fetch_one`, which is ambiguous if more than one row matches).
         sqlx::query(
-            r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'register this subject'"#,
+            r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'place this entity on the board'"#,
         )
         .execute(&pool)
         .await
@@ -809,7 +828,7 @@ mod tests {
         .expect("open");
 
         let proposal = dispatch(
-            KycWorkbookCommand::Propose { utterance: "register this subject".to_string() },
+            KycWorkbookCommand::Propose { utterance: "place this entity on the board".to_string() },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -821,17 +840,22 @@ mod tests {
         .await
         .expect("propose");
         assert!(
-            proposal.starts_with("proposal for") && proposal.contains("kyc_ubo.assert.subject.register"),
-            "proposal for a register-shaped utterance should SELECT kyc_ubo.assert.subject.register \
-             (not merely mention it in an abstain/clarify listing): {proposal:?}"
+            proposal.starts_with("ambiguous —") && proposal.contains("kyc_ubo.assert.subject.place"),
+            "a bare place-shaped utterance must CLARIFY on kyc_ubo.assert.subject.place — the \
+             type-level candidates (21 on an empty board) all share this verb_fqn and score \
+             identically, so the ramp cannot call it unambiguous; the word \"place\" alone never \
+             says WHICH type (2026-09-07, audit item 3): {proposal:?}"
         );
-        assert!(pending_proposals.contains_key(&session_id), "Propose(Select) must stash a pending proposal");
+        assert!(pending_proposals.contains_key(&session_id), "Propose(Clarify) must stash a pending proposal too");
 
         // The operator reads the proposal and stages the real DSL text
         // themselves (I-4: args are never synthesized by the ramp) —
         // ordinary `Stage`, wholly unmodified by T7.
         dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
+            KycWorkbookCommand::Stage {
+                text: r#"(kyc_ubo.assert.subject.place :entity-type "private_limited_company")"#
+                    .to_string(),
+            },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -861,25 +885,28 @@ mod tests {
         .expect("validate");
         assert!(
             preview.contains("registered=true"),
-            "T4 semantics: staging kyc_ubo.assert.subject.register must flip registered=true in the preview: {preview:?}"
+            "T4 semantics: staging kyc_ubo.assert.subject.place must flip registered=true in the preview: {preview:?}"
         );
 
-        // T7 capture-correlation slice 1: Stage after a matching Select
-        // proposal must have written one accepted, resolved capture row.
+        // T7 capture-correlation slice 1: Stage after a Clarify proposal
+        // whose candidates all name the staged verb must still write one
+        // "applied" (not "corrected") resolved capture row — the operator
+        // supplied the missing type argument, they did not choose a
+        // DIFFERENT verb than what was proposed.
         let (disposition, user_action, staged_move_id): (String, String, Option<Uuid>) =
             sqlx::query_as(
                 r#"SELECT disposition, user_action, staged_move_id FROM "ob-poc".kyc_ramp_capture
-                   WHERE utterance_text = 'register this subject'"#,
+                   WHERE utterance_text = 'place this entity on the board'"#,
             )
             .fetch_one(&pool)
             .await
             .expect("capture row written for this test's utterance");
-        assert_eq!(disposition, "select");
+        assert_eq!(disposition, "clarify");
         assert_eq!(user_action, "applied");
         assert!(staged_move_id.is_some());
 
         sqlx::query(
-            r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'register this subject'"#,
+            r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'place this entity on the board'"#,
         )
         .execute(&pool)
         .await
@@ -970,7 +997,10 @@ mod tests {
         );
 
         dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
+            KycWorkbookCommand::Stage {
+                text: r#"(kyc_ubo.assert.subject.place :entity-type "private_limited_company")"#
+                    .to_string(),
+            },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -1079,9 +1109,9 @@ mod tests {
         let original = PendingProposal {
             utterance_text: "error-utterance".to_string(),
             placement_set_hash: "deadbeef".to_string(),
-            proposal: "proposal for \"error-utterance\": kyc_ubo.assert.subject.register".to_string(),
+            proposal: "proposal for \"error-utterance\": kyc_ubo.assert.subject.place".to_string(),
             disposition: Disposition::Select,
-            candidate_verb_fqns: vec!["kyc_ubo.assert.subject.register".to_string()],
+            candidate_verb_fqns: vec!["kyc_ubo.assert.subject.place".to_string()],
             created_at: as_of,
         };
         pending_proposals.insert(session_id, original.clone());
@@ -1115,7 +1145,10 @@ mod tests {
         // The earlier malformed attempt only deferred resolution — a
         // well-formed follow-up now resolves the SAME pending proposal.
         dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
+            KycWorkbookCommand::Stage {
+                text: r#"(kyc_ubo.assert.subject.place :entity-type "private_limited_company")"#
+                    .to_string(),
+            },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -1150,7 +1183,10 @@ mod tests {
         assert!(pending_proposals.is_empty());
 
         let response = dispatch(
-            KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() },
+            KycWorkbookCommand::Stage {
+                text: r#"(kyc_ubo.assert.subject.place :entity-type "private_limited_company")"#
+                    .to_string(),
+            },
             &mut workbooks,
             &mut pending_proposals,
             session_id,
@@ -1189,11 +1225,11 @@ mod tests {
 
         let (embedding,): (pgvector::Vector,) = sqlx::query_as(
             r#"SELECT embedding FROM "ob-poc".verb_pattern_embeddings
-               WHERE verb_name = 'kyc_ubo.assert.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
+               WHERE verb_name = 'kyc_ubo.assert.subject.place' AND embedding IS NOT NULL LIMIT 1"#,
         )
         .fetch_one(&pool)
         .await
-        .expect("kyc_ubo.assert.subject.register must have at least one populated embedding");
+        .expect("kyc_ubo.assert.subject.place must have at least one populated embedding");
 
         dispatch(
             KycWorkbookCommand::Propose { utterance: "commit-guard-utterance".to_string() },

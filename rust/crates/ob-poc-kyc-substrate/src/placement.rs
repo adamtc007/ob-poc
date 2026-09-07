@@ -84,7 +84,7 @@
 //! `kyc_ubo.assert.subject.register`, the existing `kyc_ubo.assert.edge.evidence` (now
 //! also type-scoped, `fold/type_registry.rs`), and `preview()` respectively.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -93,6 +93,7 @@ use crate::event::IntentEvent;
 use crate::fold::control::{check_control_preconditions, check_preconditions, ControlState};
 use crate::fold::obligation::ObligationState;
 use crate::fold::type_registry::TypeRegistryState;
+use crate::geometry::{check_type_geometry, EntityType, LinkageSource, ALL_ENTITY_TYPES, ALL_PIPES};
 use crate::lexicon::LexiconManifest;
 use crate::types::{
     AuthorityRef, EdgeId, EntityId, Hash, Principal, SubjectId, TargetBinding, VerbFqn,
@@ -143,6 +144,16 @@ pub struct LegalMove {
     /// it in `TargetBinding` would conflate the two and ripple through every
     /// event, the append path and the projections.
     pub proposed_edge: Option<ProposedEdge>,
+    /// `Some(_)` only for `place` candidates (2026-09-07, audit item 3).
+    /// `place` offers the entity TYPES that may legally be added
+    /// (EOP-VS-UBO-GAME-001 §3.4 R9) — never a pre-enumerated set of known
+    /// entity ids, since a brand-new entity has no id yet for the board to
+    /// enumerate (§2: "the game writes metadata about entities, never
+    /// entities; which specific entity is a lookup"). `target.entity_id` is
+    /// `None` on these candidates by construction — the caller supplies the
+    /// real id as an argument to `KycWorkbook::stage()`, matched against
+    /// this field, not against `target`.
+    pub proposed_entity_type: Option<EntityType>,
 }
 
 /// A `(from, kind, to)` triple the board is offering as a legal move.
@@ -324,30 +335,59 @@ fn place_and_remove_candidates(
             verb_fqn: VerbFqn(RECORD_ENQUIRY.to_string()),
             target: subject_target,
             proposed_edge: None,
+            proposed_entity_type: None,
         });
     }
 
-    let place_entry = lexicon.get(PLACE);
     let remove_entry = lexicon.get(REMOVE);
 
-    // place: the subject's own entity + every currently-withdrawn member —
-    // see the function doc for why this is the whole enumerable population.
-    // Whether a candidate is ACTUALLY currently placed (and so refused) is
-    // decided solely by `check_control_preconditions`'s `NotCurrentlyPlaced`
-    // arm below, not a hand-rolled duplicate here (no_stud_is_duplicated).
-    if let Some(entry) = place_entry {
-        let subject_entity = EntityId(subject.0);
-        let mut candidates: BTreeSet<EntityId> = type_registry.withdrawn_members.keys().copied().collect();
-        candidates.insert(subject_entity);
-        for entity in candidates {
-            let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
-            let probe = probe_event(subject, PLACE, target.clone());
-            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
+    // place (2026-09-07, audit item 3 — "a human can place exactly ONE
+    // block ever"): type-level candidates, NOT a pre-enumerated set of
+    // known entity ids (EOP-VS-UBO-GAME-001 §3.4 R9 — "place offers the
+    // entity types that may be added"; §2 — "the game writes metadata
+    // about entities, never entities; which specific entity is a lookup").
+    // A brand-new entity has no id yet for the board to enumerate — the
+    // caller supplies it as an argument to `KycWorkbook::stage()`, matched
+    // against `proposed_entity_type`, not `target`.
+    //
+    // `place`'s only lexicon precondition (`NotCurrentlyPlaced`) is vacuous
+    // without a concrete `entity_id` (`fold::control::check_preconditions`),
+    // so it cannot narrow a type-level probe — that check runs for real
+    // against the caller's actual id at `stage()`/append time instead
+    // (same discipline as every other vacuous-when-probed-abstractly stud;
+    // see that function's doc comments). What DOES narrow the type-level
+    // offer is the type-GEOMETRY layer (TS.1 §1's first constraint layer,
+    // `geometry::check_type_geometry` — the same table `connect`'s own
+    // candidate loop above reads forward): on an empty board nothing exists
+    // yet to connect to, so every catalogued type is a legal first
+    // placement; once the board has typed active members, a candidate type
+    // is offered only if some pipe legally connects it (either direction)
+    // to at least one of them.
+    if lexicon.get(PLACE).is_some() {
+        let active_typed_members: Vec<EntityType> = state
+            .registered_entity_ids
+            .iter()
+            .filter(|&&e| !type_registry.is_withdrawn(e))
+            .filter_map(|&e| type_registry.type_of(e))
+            .collect();
+
+        for &candidate_type in ALL_ENTITY_TYPES {
+            let legal = active_typed_members.is_empty()
+                || active_typed_members.iter().any(|&member_type| {
+                    ALL_PIPES.iter().any(|&pipe| {
+                        check_type_geometry(LinkageSource::Entity(candidate_type), pipe, member_type)
+                            .is_ok()
+                            || check_type_geometry(LinkageSource::Entity(member_type), pipe, candidate_type)
+                                .is_ok()
+                    })
+                });
+            if legal {
                 moves.push(LegalMove {
-                    move_id: entity_move_id(PLACE, entity),
+                    move_id: MoveId(format!("{PLACE}::type:{candidate_type:?}")),
                     verb_fqn: VerbFqn(PLACE.to_string()),
-                    target,
+                    target: TargetBinding::for_subject(subject),
                     proposed_edge: None,
+                    proposed_entity_type: Some(candidate_type),
                 });
             }
         }
@@ -367,6 +407,7 @@ fn place_and_remove_candidates(
                     verb_fqn: VerbFqn(REMOVE.to_string()),
                     target,
                     proposed_edge: None,
+                    proposed_entity_type: None,
                 });
             }
         }
@@ -387,6 +428,7 @@ fn place_and_remove_candidates(
                 verb_fqn: VerbFqn(TYPE_SCOPED_ATTACH_EVIDENCE.to_string()),
                 target,
                 proposed_edge: None,
+                proposed_entity_type: None,
             });
         }
     }
@@ -467,6 +509,7 @@ pub fn enumerate_placement_set(
                                 verb_fqn: entry.fqn.clone(),
                                 target,
                                 proposed_edge: Some(proposed),
+                                proposed_entity_type: None,
                             },
                         );
                     }
@@ -495,6 +538,7 @@ pub fn enumerate_placement_set(
                         verb_fqn: entry.fqn.clone(),
                         target,
                         proposed_edge: None,
+                        proposed_entity_type: None,
                     },
                 );
             }
@@ -513,6 +557,7 @@ pub fn enumerate_placement_set(
             verb_fqn: VerbFqn(NONE_OF_THE_ABOVE.to_string()),
             target: TargetBinding::default(),
             proposed_edge: None,
+            proposed_entity_type: None,
         },
     );
 
