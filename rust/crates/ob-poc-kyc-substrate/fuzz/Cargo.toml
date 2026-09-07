@@ -48,3 +48,24 @@ path = "fuzz_targets/sexpr_roundtrip.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "board_r8"
+path = "fuzz_targets/board_r8.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "board_c2_geometry_determinism"
+path = "fuzz_targets/board_c2_geometry_determinism.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "board_determination_invariants"
+path = "fuzz_targets/board_determination_invariants.rs"
+test = false
+doc = false
+bench = false

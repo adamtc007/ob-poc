@@ -18,6 +18,9 @@ use ob_poc_kyc_substrate::{
 };
 use uuid::Uuid;
 
+pub mod board;
+pub mod properties;
+
 /// All 14 live dsl.kyc verb FQNs (`assembly_lexicon()` + `evaluation_lexicon()`
 /// combined — the determination-layer/evaluation verbs the pure control
 /// fold ignores are still worth generating, so `check_preconditions`
