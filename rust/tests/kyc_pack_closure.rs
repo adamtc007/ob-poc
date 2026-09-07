@@ -829,9 +829,18 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // `DeterminationStrategy`. `StructureClassified`/`StructureClassSupported`
     // are DELETED (T4) — nothing left to keep them declared for; a
     // precondition has no replay role the way the fold arm does.
+    // 2026-09-07 (audit item 2, P2): NoUnpiercedNomineeEdges hoisted from
+    // freeze's op-layer-only hand check (TS.4 §3 Ruling B, K-8) — the RULE
+    // is now declared here too, even though freeze has exactly one live
+    // surface (`canonical_event_shape` bails on this FQN by design, §3.2)
+    // and this promotion doesn't close a two-surface disagreement the way
+    // `PiercedFromIsActiveNominee` (below, on `connect`) does.
     expected.insert(
         "kyc_ubo.decide.determination.freeze".to_string(),
-        vec![Precondition::EntityTypeSupportsStrategy],
+        vec![
+            Precondition::EntityTypeSupportsStrategy,
+            Precondition::NoUnpiercedNomineeEdges,
+        ],
     );
     // T6.2 (2026-08-12, edge family — EOP-DD-KYCUBO-KIT-T6 matrix rows 1-5):
     // 5 more verbs go from geometry-free to studded. Rows 1/2 share the same
@@ -848,12 +857,17 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // interest` MERGED into `connect` — the merge test (P0b) confirmed
     // their precondition sets were already identical, so this row is
     // unchanged in substance, just one name now covering both former rows.
+    // 2026-09-07 (audit item 2, P1): PiercedFromIsActiveNominee hoisted
+    // from `UboEdgeConnect::execute`'s op-layer-only hand check — the
+    // workbook path never ran it, a real R7 defect closed by this
+    // promotion (K-8, §3.4 R7).
     expected.insert(
         "kyc_ubo.assert.edge.connect".to_string(),
         vec![
             Precondition::SubjectRegistered,
             Precondition::NoDuplicateActiveEdge,
             Precondition::TypeGeometryPermits,
+            Precondition::PiercedFromIsActiveNominee,
         ],
     );
     expected.insert(
@@ -884,9 +898,9 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // decomposes exactly across `kyc_ubo.assert.edge.connect`'s entry (above:
     // SubjectRegistered, NoDuplicateActiveEdge, TypeGeometryPermits) and
     // `kyc_ubo.assert.edge.disconnect`'s entry (above: EdgeExists, EdgeActive); the
-    // "target is actually a nominee edge" check (no precondition primitive)
-    // moved to connect's op-layer, gated on its new `pierced-from`
-    // arg.
+    // "target is actually a nominee edge" check, gated on connect's
+    // `pierced-from` arg, is `Precondition::PiercedFromIsActiveNominee`
+    // as of 2026-09-07 (audit item 2, P1) — no longer op-layer-only.
 
     // T6.3 (2026-08-12, determination-family remainder — EOP-DD-KYCUBO-KIT-T6
     // matrix rows 7, 9, 10; row 6 (`select-strategy`) RETIRED by TS.6 P2 and

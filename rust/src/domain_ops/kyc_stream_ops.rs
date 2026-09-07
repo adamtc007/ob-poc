@@ -25,7 +25,7 @@ use ob_poc_kyc_substrate::{
     find_subject_entity, fold_control_versioned, fold_obligations_versioned,
     fold_type_registry, natural_persons_from_events, assembly_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
-    CooperativeMemberStrategy, EdgeId, EdgeKind, FoldRegistry, FoundationCouncilStrategy,
+    CooperativeMemberStrategy, FoldRegistry, FoundationCouncilStrategy,
     FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId,
     ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, TargetBinding,
     TrustRoleStrategy, V1FoldImpl,
@@ -161,53 +161,13 @@ impl SemOsVerbOp for UboEdgeConnect {
         // The determination root this edge belongs to (the subject stream).
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
 
-        // TS.6 P2 (K-G7): `pierced-from` present means this call is the
-        // first half of the `kyc_ubo.assert.edge.nominee-piercing` macro composition
-        // (config/verb_schemas/macros/ubo.yaml), which replaced the retired
-        // standalone verb. Op-layer fail-closed check (no precondition
-        // primitive expresses "edge is of kind X" — the same discipline the
-        // retired bespoke op used): the referenced edge must exist, be
-        // `EdgeKind::Nominee`, and be active. Cheap no-op on the common
-        // non-piercing path (no fold read at all unless the arg is present).
-        //
-        // This check needs a live DB read of `ControlState` — it cannot live
-        // inside `canonical_event_shape` (pure, no state access; same
-        // principle as freeze's exemption, scoped to this one arg-validation
-        // step rather than the whole verb — see that function's doc).
-        if let Some(pierced_from) = json_extract_uuid_opt(args, ctx, "pierced-from").map(EdgeId) {
-            let events = PgKycEventStore::load_events(scope.executor(), subject)
-                .await
-                .map_err(|e| anyhow!("kyc_ubo.assert.edge.connect: load events failed: {e}"))?;
-            let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
-            let control = fold_control_versioned(&refs, &KYC_REGISTRY)
-                .map_err(|e| anyhow!("kyc_ubo.assert.edge.connect: control fold failed: {e}"))?;
-            match control.edges.get(&pierced_from) {
-                None => {
-                    return Err(anyhow!(
-                        "kyc_ubo.assert.edge.connect: pierced-from edge {} not found in the \
-                         control graph (EdgeExists)",
-                        pierced_from.0
-                    ));
-                }
-                Some(e) if !matches!(e.kind, EdgeKind::Nominee) => {
-                    return Err(anyhow!(
-                        "kyc_ubo.assert.edge.connect: pierced-from edge {} is not a nominee edge \
-                         (kind {:?}) — only EdgeKind::Nominee arrangements can be pierced \
-                         (K-8, fail-closed)",
-                        pierced_from.0,
-                        e.kind
-                    ));
-                }
-                Some(e) if !e.is_active() => {
-                    return Err(anyhow!(
-                        "kyc_ubo.assert.edge.connect: pierced-from edge {} is not active \
-                         (EdgeActive)",
-                        pierced_from.0
-                    ));
-                }
-                Some(_) => {}
-            }
-        }
+        // 2026-09-07 (audit item 2, P1): the hand-rolled `pierced-from`
+        // existence/kind/active check that used to live here is GONE — it is
+        // now `Precondition::PiercedFromIsActiveNominee`, declared on this
+        // verb's lexicon entry and evaluated by `check_preconditions` inside
+        // `stream_append` below, under the same append lock every other
+        // stud runs under (K-14). One copy, both surfaces (op + workbook)
+        // enforce it identically — `EOP-VS-UBO-GAME-001` §3.4 R7.
 
         let (target, payload, edge) =
             canonical_event_shape("kyc_ubo.assert.edge.connect", subject, args)?;
@@ -499,6 +459,23 @@ impl SemOsVerbOp for UboDeterminationFreeze {
         // control to the nominee (the exact wrong answer K-8 exists to
         // prevent) or silently drop the arrangement — hard-error instead,
         // regardless of which strategy actually ran.
+        // 2026-09-07 (audit item 2, P2): the RULE is now declared once —
+        // `Precondition::NoUnpiercedNomineeEdges`, on this verb's lexicon
+        // entry, evaluated by `check_preconditions` inside `stream_append`
+        // below (both the op AND, were freeze ever staged through a second
+        // surface, that surface would enforce it identically — R7). This
+        // early call is a SECOND invocation of that same shared
+        // `unpierced_nominee_edges` scan, not a second implementation of
+        // it — same discipline as `TypeGeometryPermits`, whose scan
+        // (`evaluate_type_geometry`) is likewise called both early (board
+        // preview, `placement.rs`) and late (the real checker). Kept here,
+        // not deleted, because a first attempt at deleting it changed
+        // observable behaviour: without the early call, K-5's "would be
+        // silent" refusal fires first whenever the unpierced nominee also
+        // makes the traversal produce zero candidates, masking the real
+        // cause behind a downstream symptom
+        // (`kyc_ts4_nominee.rs::d_freeze_hard_errors_while_unpierced_nominee_edge_active`
+        // caught this on the first attempt).
         let unpierced: Vec<String> = ob_poc_kyc_substrate::unpierced_nominee_edges(&control)
             .into_iter()
             .map(|id| id.0.to_string())
@@ -546,7 +523,9 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             // TS.4: post-piercing the subject resolves by the UNDERLYING
             // structure — a thin delegate to the control-prong traversal;
             // the unpierced-nominee fail-closed guard runs above, before
-            // this dispatch. Scope note lives on NomineePierceStrategy.
+            // this dispatch, backed by `Precondition::NoUnpiercedNomineeEdges`
+            // (declared, re-checked at append too — see the comment above).
+            // Scope note lives on NomineePierceStrategy.
             "nominee_pierce_strategy" => &NomineePierceStrategy,
             other => {
                 return Err(anyhow!(

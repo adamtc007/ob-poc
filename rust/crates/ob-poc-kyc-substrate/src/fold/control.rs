@@ -1231,6 +1231,65 @@ pub fn check_preconditions(
                 // (`ProvisionalityReason::AllegedType`/`GeometryUnevaluable`),
                 // not here — this checker has no side channel to record into.
             }
+            Precondition::PiercedFromIsActiveNominee => {
+                // 2026-09-07 (audit item 2, K-8, §3.4 R7): hoisted from
+                // `UboEdgeConnect::execute`'s hand-rolled check — the
+                // workbook path never called that op struct, so the rule
+                // never ran there. Vacuous when the probe carries no
+                // `pierced_from` (payload-keyed, same convention as
+                // `NoDuplicateActiveEdge`/`TypeGeometryPermits` above).
+                let Some(pf) = event
+                    .payload
+                    .get("pierced_from")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<uuid::Uuid>().ok())
+                    .map(EdgeId)
+                else {
+                    continue;
+                };
+                match control.edges.get(&pf) {
+                    None => {
+                        return Err(KycError::EdgeNotFound(pf));
+                    }
+                    Some(e) if !matches!(e.kind, EdgeKind::Nominee) => {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!(
+                                "pierced-from edge {pf:?} is not a nominee edge (kind \
+                                 {:?}) — only EdgeKind::Nominee arrangements can be \
+                                 pierced (K-8, fail-closed)",
+                                e.kind
+                            ),
+                        });
+                    }
+                    Some(e) if !e.is_active() => {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!("pierced-from edge {pf:?} is not active"),
+                        });
+                    }
+                    Some(_) => {}
+                }
+            }
+            Precondition::NoUnpiercedNomineeEdges => {
+                // 2026-09-07 (audit item 2, P2): hoisted from `freeze`'s
+                // hand-rolled pre-dispatch scan (TS.4 §3 Ruling B, K-8).
+                // Event-independent — a pure `control` scan, same
+                // discipline as `SubjectAllTerminal`.
+                let unpierced = unpierced_nominee_edges(control);
+                if !unpierced.is_empty() {
+                    let ids: Vec<String> = unpierced.iter().map(|id| id.0.to_string()).collect();
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "unpierced nominee edge(s) remain active: [{}] — pierce each via \
+                             kyc_ubo.assert.edge.nominee-piercing before freezing (TS.4 §3 \
+                             Ruling B, K-8, fail-closed)",
+                            ids.join(", ")
+                        ),
+                    });
+                }
+            }
             Precondition::NotCurrentlyPlaced => {
                 // EOP-VS-UBO-GAME-001 §8 Q1 — `place` never carries update
                 // semantics. Vacuous when probed without `entity_id` — same

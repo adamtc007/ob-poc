@@ -173,6 +173,34 @@ pub enum Precondition {
     /// every board-enumerable candidate (T1's P4 deferral, closed for the
     /// re-placeable population — `placement.rs`).
     NotCurrentlyPlaced,
+
+    // ── 2026-09-07 audit item 2 — the K-8 pierce guard hoisted to the chokepoint ─
+    /// §3.4 R7: a rule expressed only in one surface's code is not a rule.
+    /// The event payload's `pierced_from` edge id (present only when a
+    /// `connect` call is the first half of the `kyc_ubo.assert.edge.nominee-piercing`
+    /// macro composition) must reference an edge that EXISTS, is
+    /// `EdgeKind::Nominee`, and is currently active — the underlying kind a
+    /// nominee arrangement is pierced to reveal is asserted by THIS call's
+    /// own `kind`, never carried by the cited edge. Vacuous when the probe
+    /// carries no `pierced_from` — same convention as every other
+    /// payload-keyed precondition above (a real caller always supplies it
+    /// when piercing; absence means either an ordinary non-piercing connect
+    /// or an abstract board-preview probe, never a real pierce attempt with
+    /// the field missing).
+    PiercedFromIsActiveNominee,
+
+    /// TS.4 §3 Ruling B (K-8): a determination may not freeze while ANY
+    /// active `EdgeKind::Nominee` edge remains unpierced anywhere in the
+    /// subject's control graph — pure `ControlState` scan
+    /// (`unpierced_nominee_edges`), independent of `event`/target/payload,
+    /// same discipline as `SubjectAllTerminal`. `freeze` has exactly one
+    /// live surface (the op — `canonical_event_shape` bails on this FQN by
+    /// design, §3.2), so this promotion doesn't close a two-surface
+    /// disagreement the way `PiercedFromIsActiveNominee` does; it is done
+    /// anyway so the single declared checker stays the sole enforcement
+    /// point, fuzzable through one entry point regardless of which surface
+    /// (if any, ever) drives it.
+    NoUnpiercedNomineeEdges,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -395,10 +423,15 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // contradicting claims go through disconnect, never a second
             // assert (K-13). TS.5 R1: the type-geometry layer — TS.1 §1's
             // FIRST constraint, ahead of these positional studs.
+            // 2026-09-07 (audit item 2, K-8): PiercedFromIsActiveNominee —
+            // hoisted from the op-layer-only hand check (was
+            // `UboEdgeConnect::execute`'s own `pierced-from` scan, never run
+            // by the workbook path).
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::NoDuplicateActiveEdge,
                 Precondition::TypeGeometryPermits,
+                Precondition::PiercedFromIsActiveNominee,
             ],
             AuthoritySpec::analyst(),
             vec![],
@@ -530,7 +563,12 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // itself superseded by EntityTypeSupportsStrategy — the subject's
             // `EntityType` (§2's ratified 21-type mapping) is the dispatch
             // key now, not `structure_class`; see `dispatch_for_entity_type`.
-            vec![Precondition::EntityTypeSupportsStrategy],
+            // 2026-09-07 (audit item 2, P2): NoUnpiercedNomineeEdges hoisted
+            // from the op-layer-only hand check (TS.4 §3 Ruling B, K-8).
+            vec![
+                Precondition::EntityTypeSupportsStrategy,
+                Precondition::NoUnpiercedNomineeEdges,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![EmitSpec::person_obligation(), EmitSpec::entity_obligation()],
         ),
