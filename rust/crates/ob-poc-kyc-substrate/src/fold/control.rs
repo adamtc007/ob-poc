@@ -1536,16 +1536,42 @@ pub fn reconciled_trust_edges(state: &ControlState) -> Vec<ReconciledTrustEdge> 
 // ── Entity classification helpers ─────────────────────────────────────────────
 
 /// Returns the set of `PersonId`s that are natural persons in the event stream.
-/// Declared in the event payload (`"is_natural_person": true`).
+///
+/// **The entity type is the single source of truth for personhood** (RULED
+/// 2026-09-07, closing the 2026-08-28 audit's A1b divergence): an entity is
+/// a natural person iff its asserted `EntityType` is `NaturalPerson`. The
+/// old implementation read only the payload flag `is_natural_person` — a
+/// second vocabulary for one concept, which let a correctly-typed 50% owner
+/// placed without the redundant flag vanish silently from a frozen
+/// determination of record (T4's thesis is "the type is the dispatch key";
+/// the traversal terminus was still keying on a parallel boolean that could
+/// contradict it).
+///
+/// **R5-historical fallback, scoped to type-less entities only:** 207
+/// committed register-era events carry ONLY the flag (`register` never had
+/// an entity-type payload key), so for an entity with NO type assertion
+/// anywhere in the stream the historical flag is still read — dropping it
+/// would fabricate non-personhood on replay. Wherever a type exists, the
+/// type wins and the flag is ignored (0 committed events disagree — P0b
+/// census, 2026-09-07). The live path can no longer reach the fallback:
+/// `place` requires a validated entity-type, and the flag is no longer a
+/// declared argument on any verb.
 ///
 /// Returns a `BTreeSet` so iteration order is deterministic (sorted by UUID bytes).
 pub fn natural_persons_from_events(events: &[&IntentEvent]) -> BTreeSet<PersonId> {
-    let mut persons = BTreeSet::new();
+    let type_registry = crate::fold::type_registry::fold_type_registry(events);
+    let mut persons: BTreeSet<PersonId> = type_registry
+        .types
+        .iter()
+        .filter(|(_, rec)| rec.entity_type == crate::geometry::EntityType::NaturalPerson)
+        .map(|(eid, _)| PersonId(eid.0))
+        .collect();
+
+    // R5-historical fallback — the same two FQNs the flag-only
+    // implementation recognized, now guarded on "no type assertion exists":
+    // reachable only by register-era events (no type ever) or a historical
+    // `place` whose wire type failed the fail-closed parse.
     for event in events {
-        // `place` (EOP-VS-UBO-GAME-001 T2) carries `is_natural_person` the
-        // same way `register` (now historical-only, see its fold arm's own
-        // comment) always did — recognizing both keeps this helper correct
-        // for pre-T2 streams and every stream going forward.
         if (event.verb_fqn.as_str() == "kyc_ubo.assert.subject.register"
             || event.verb_fqn.as_str() == "kyc_ubo.assert.subject.place")
             && event
@@ -1555,7 +1581,9 @@ pub fn natural_persons_from_events(events: &[&IntentEvent]) -> BTreeSet<PersonId
                 == Some(true)
         {
             if let Some(pid) = person_id(&event.payload, "entity_id") {
-                persons.insert(pid);
+                if type_registry.type_of(EntityId(pid.0)).is_none() {
+                    persons.insert(pid);
+                }
             }
         }
     }

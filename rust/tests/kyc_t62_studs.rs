@@ -98,7 +98,7 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 async fn register(scope: &mut Scope, subject: SubjectId) {
     KycSubjectPlace
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+            &serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
             &mut VerbExecutionContext::default(),
             scope,
         )
@@ -414,7 +414,7 @@ async fn row9_register_blocks_true_duplicate_entity_id() {
     KycSubjectPlace
         .execute(
             &serde_json::json!({
-                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true, "entity-type": "natural_person"
+                "subject-id": subject.0, "entity-id": entity, "entity-type": "natural_person"
             }),
             &mut VerbExecutionContext::default(),
             &mut scope,
@@ -425,7 +425,7 @@ async fn row9_register_blocks_true_duplicate_entity_id() {
     let result = KycSubjectPlace
         .execute(
             &serde_json::json!({
-                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true, "entity-type": "natural_person"
+                "subject-id": subject.0, "entity-id": entity, "entity-type": "natural_person"
             }),
             &mut VerbExecutionContext::default(),
             &mut scope,
@@ -455,7 +455,7 @@ async fn row9_register_admits_multi_person_distinct_entity_ids() {
         let result = KycSubjectPlace
             .execute(
                 &serde_json::json!({
-                    "subject-id": subject.0, "entity-id": candidate, "is_natural_person": true, "entity-type": "natural_person"
+                    "subject-id": subject.0, "entity-id": candidate, "entity-type": "natural_person"
                 }),
                 &mut VerbExecutionContext::default(),
                 &mut scope,

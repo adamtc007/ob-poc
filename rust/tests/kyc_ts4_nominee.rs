@@ -183,7 +183,7 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
 async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid]) {
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "llc_us" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "llc_us" }),
         pool,
     )
     .await;
@@ -191,7 +191,7 @@ async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid]) {
         run(
             &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
+                "subject-id": subject.0, "entity-id": p, "entity-type": "natural_person",
             }),
             pool,
         )

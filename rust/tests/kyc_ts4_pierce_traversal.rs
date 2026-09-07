@@ -137,14 +137,14 @@ async fn setup_subject(pool: &PgPool, subject: Uuid, natural_persons: &[Uuid], c
     };
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": entity_type }),
+        serde_json::json!({ "subject-id": subject, "entity-type": entity_type }),
         pool,
     )
     .await;
     for p in natural_persons {
         run(
             &KycSubjectPlace,
-            serde_json::json!({ "subject-id": subject, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person" }),
+            serde_json::json!({ "subject-id": subject, "entity-id": p, "entity-type": "natural_person" }),
             pool,
         )
         .await;

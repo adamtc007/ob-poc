@@ -125,13 +125,13 @@ async fn mandate_pivot_without_evidence_computes_but_cannot_freeze() {
     // below).
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject, "is_natural_person": false, "entity-type": "oeic_icvc" }),
+        serde_json::json!({ "subject-id": subject, "entity-type": "oeic_icvc" }),
         &pool,
     )
     .await;
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject, "entity-id": alice, "is_natural_person": true, "entity-type": "natural_person" }),
+        serde_json::json!({ "subject-id": subject, "entity-id": alice, "entity-type": "natural_person" }),
         &pool,
     )
     .await;

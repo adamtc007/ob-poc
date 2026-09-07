@@ -175,16 +175,16 @@ async fn cited_run_id(pool: &PgPool, subject: SubjectId, verb_fqn: &str) -> Uuid
 async fn build_alleged_board(pool: &PgPool, subject: SubjectId) -> (Uuid, Uuid) {
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
         pool,
     )
     .await;
     let co = Uuid::new_v4();
     let p1 = Uuid::new_v4();
-    for (e, t, natural) in [(co, "private_limited_company", false), (p1, "natural_person", true)] {
+    for (e, t) in [(co, "private_limited_company"), (p1, "natural_person")] {
         run(
             &KycSubjectPlace,
-            serde_json::json!({ "subject-id": subject.0, "entity-id": e, "is_natural_person": natural, "entity-type": t }),
+            serde_json::json!({ "subject-id": subject.0, "entity-id": e, "entity-type": t }),
             pool,
         )
         .await;
@@ -245,7 +245,7 @@ async fn checks_run_at_any_board_state_through_production() {
 async fn in_scope_set_is_computed_not_stored_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }), &pool).await;
     run(
         &DecideObligationWaive,
         serde_json::json!({ "subject-id": subject.0, "check-id": "board.every-entity-has-a-proven-type", "reason": "gate probe" }),
@@ -281,7 +281,7 @@ async fn in_scope_set_is_computed_not_stored_through_production() {
 async fn staleness_is_hash_comparison_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }), &pool).await;
 
     run(
         &DecideObligationWaive,
@@ -299,7 +299,7 @@ async fn staleness_is_hash_comparison_through_production() {
     // classification); a second `place` call is an equally real mutation.
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "entity-id": Uuid::new_v4(), "is_natural_person": true, "entity-type": "natural_person" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-id": Uuid::new_v4(), "entity-type": "natural_person" }),
         &pool,
     )
     .await;
@@ -324,7 +324,7 @@ async fn staleness_is_hash_comparison_through_production() {
 async fn run_pins_are_complete_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "natural_person" }), &pool).await;
     run(
         &DecideObligationWaive,
         serde_json::json!({ "subject-id": subject.0, "check-id": "board.every-entity-has-a-proven-type", "reason": "pins probe" }),
@@ -349,7 +349,7 @@ async fn run_pins_are_complete_through_production() {
 async fn runs_are_append_only_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "natural_person" }), &pool).await;
 
     run(
         &DecideObligationWaive,
@@ -364,7 +364,7 @@ async fn runs_are_append_only_through_production() {
     // mutation" substitution as staleness_is_hash_comparison_through_production above.
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "entity-id": Uuid::new_v4(), "is_natural_person": true, "entity-type": "natural_person" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-id": Uuid::new_v4(), "entity-type": "natural_person" }),
         &pool,
     )
     .await;

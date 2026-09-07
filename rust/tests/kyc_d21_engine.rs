@@ -173,7 +173,7 @@ async fn a_check_produces_a_verdict() {
 
     // (2) UNEVALUABLE — an entity registered, no type ever asserted.
     let s_unevaluable = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": s_unevaluable.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": s_unevaluable.0, "entity-type": "natural_person" }), &pool).await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": s_unevaluable.0, "check-id": PROOF_CHECK_ID, "reason": "unevaluable case" }), &pool).await;
     let findings_unevaluable = findings_for(&pool, s_unevaluable).await;
     assert!(
@@ -184,7 +184,7 @@ async fn a_check_produces_a_verdict() {
     // (3) FAIL — a withdrawn, unproven member, via the real production op
     // `kyc_ubo.assert.subject.member-withdrawal` (TS.1 move 6).
     let s_fail = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": s_fail.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": s_fail.0, "entity-type": "natural_person" }), &pool).await;
     withdraw_member(&pool, s_fail).await;
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": s_fail.0, "check-id": PROOF_CHECK_ID, "reason": "fail case" }), &pool).await;
     let findings_fail = findings_for(&pool, s_fail).await;
@@ -420,7 +420,7 @@ async fn unevaluable_flips_to_pass_through_production() {
 async fn work_list_is_derived_from_latest_run_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "natural_person" }), &pool).await;
 
     // Run 1 (older): Unevaluable(FactAbsent).
     run(&DecideObligationWaive, serde_json::json!({ "subject-id": subject.0, "check-id": PROOF_CHECK_ID, "reason": "run 1" }), &pool).await;
@@ -462,7 +462,7 @@ async fn k23_gate_can_fire() {
     // A registered-but-untyped entity produces Unevaluable -> non-empty
     // work list -> approve MUST be refused.
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "natural_person" }), &pool).await;
     let err = run_expect_err(&DecideApprove, serde_json::json!({ "subject-id": subject.0 }), &pool).await;
     assert!(err.contains("K-23"), "approval of a subject with a non-empty work list must be refused citing K-23: {err}");
 
@@ -481,7 +481,7 @@ async fn k23_gate_can_fire() {
 async fn waived_check_was_in_scope() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "is_natural_person": true, "entity-type": "natural_person" }), &pool).await;
+    run(&KycSubjectPlace, serde_json::json!({ "subject-id": subject.0, "entity-type": "natural_person" }), &pool).await;
 
     let err = run_expect_err(
         &DecideObligationWaive,

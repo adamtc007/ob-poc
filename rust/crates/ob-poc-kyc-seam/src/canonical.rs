@@ -107,10 +107,15 @@ pub fn canonical_event_shape(
                 );
             }
             let target = TargetBinding { entity_id: Some(entity), ..subj_target };
-            let mut payload = serde_json::json!({ "entity_id": entity.0, "entity_type": entity_type });
-            if let Some(v) = args.get("is_natural_person") {
-                payload["is_natural_person"] = v.clone();
-            }
+            // `is_natural_person` REMOVED (2026-09-07, audit A1b): the
+            // entity type is the single source of truth for personhood —
+            // the fold's traversal terminus derives it from `entity_type`,
+            // never from a parallel payload flag. A caller still passing
+            // the retired arg is ignored here, same as any other
+            // undeclared argument; the historical flag remains readable on
+            // pre-existing events via `natural_persons_from_events`'s
+            // R5 no-type fallback.
+            let payload = serde_json::json!({ "entity_id": entity.0, "entity_type": entity_type });
             Ok((target, payload, None))
         }
 

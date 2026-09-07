@@ -377,10 +377,8 @@ domains:
             required: true
             description: "The entity's type (EOP-DD-KYCUBO-TS.0 §4 catalogue) — the argument that decides which links can reach this block (§3.2). Rejected fail-closed if outside the canonical wire set."
             valid_values: [natural_person, sole_trader, private_limited_company, public_listed_company, llc_us, general_partnership, limited_partnership, llp, oeic_icvc, sicav, unit_trust, forty_act_fund, lp_fund, umbrella_with_sub_funds, discretionary_trust, fixed_bare_trust, foundation, pension_scheme, cooperative_mutual, charity_not_for_profit, government_dept_statutory_corporation]
-          - name: is_natural_person
-            type: boolean
-            required: false
-            description: Whether the placed entity is a natural person
+          # is_natural_person REMOVED (2026-09-07, audit A1b): personhood is
+          # derived from entity-type (natural_person), never a parallel flag.
         returns:
           type: record
           fields:

@@ -140,7 +140,7 @@ async fn row9_register_admits_fresh_subject() {
 
     let result = KycSubjectPlace
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+            &serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )

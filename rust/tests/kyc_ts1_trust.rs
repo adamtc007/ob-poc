@@ -214,7 +214,7 @@ async fn b_settlor_and_trustee_coexist_but_second_trustee_is_blocked() {
 
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -272,7 +272,7 @@ async fn c_normalizer_rejects_unknown_and_absent_kind_listing_wire_values() {
 
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
@@ -374,7 +374,7 @@ async fn setup_trust_subject(
 ) {
     run(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "discretionary_trust" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "discretionary_trust" }),
         pool,
     )
     .await;
@@ -382,7 +382,7 @@ async fn setup_trust_subject(
         run(
             &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
+                "subject-id": subject.0, "entity-id": p, "entity-type": "natural_person",
             }),
             pool,
         )

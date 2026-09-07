@@ -106,14 +106,14 @@ async fn refused_approval_leaves_its_justifying_run_persisted() {
     // list is non-empty and `DecideApprove` must refuse (K-23).
     run_ok(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;
     let entity = Uuid::new_v4();
     run_ok(
         &KycSubjectPlace,
-        serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "is_natural_person": false, "entity-type": "private_limited_company" }),
+        serde_json::json!({ "subject-id": subject.0, "entity-id": entity, "entity-type": "private_limited_company" }),
         &pool,
     )
     .await;

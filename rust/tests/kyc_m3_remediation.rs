@@ -129,7 +129,7 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
     run(
         &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company",
+            "subject-id": subject.0, "entity-type": "private_limited_company",
         }),
         &pool,
     )
@@ -138,7 +138,7 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
         run(
             &KycSubjectPlace,
             serde_json::json!({
-                "subject-id": subject.0, "entity-id": p, "is_natural_person": true, "entity-type": "natural_person",
+                "subject-id": subject.0, "entity-id": p, "entity-type": "natural_person",
             }),
             &pool,
         )
@@ -283,7 +283,7 @@ async fn m3_3_entity_type_round_trips_through_the_type_registry_fold() {
     run(
         &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false, "entity-type": "private_limited_company",
+            "subject-id": subject.0, "entity-type": "private_limited_company",
         }),
         &pool,
     )
@@ -356,7 +356,7 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
     run(
         &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "is_natural_person": false, "entity-type": "limited_partnership",
+            "subject-id": subject.0, "entity-type": "limited_partnership",
         }),
         &pool,
     )
@@ -364,7 +364,7 @@ async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
     run(
         &KycSubjectPlace,
         serde_json::json!({
-            "subject-id": subject.0, "entity-id": p1, "is_natural_person": true, "entity-type": "natural_person",
+            "subject-id": subject.0, "entity-id": p1, "entity-type": "natural_person",
         }),
         &pool,
     )
