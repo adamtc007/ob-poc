@@ -116,7 +116,7 @@ async fn resolver_resolves_exact() {
     insert_entity(&pool, entity_id, type_id, &name).await;
 
     let mut conn = pool.acquire().await.unwrap();
-    let text = format!(r#"(kyc_ubo.assert.subject.register :subject-id "@{name}")"#);
+    let text = format!(r#"(kyc_ubo.assert.subject.place :entity-id "@{name}")"#);
     let resolved = resolve_handles(&mut conn, &text).await.expect("exact match must resolve");
     assert!(
         resolved.contains(&entity_id.to_string()),
@@ -132,7 +132,7 @@ async fn resolver_resolves_exact() {
 async fn resolver_rejects_unknown() {
     let pool = connect().await;
     let mut conn = pool.acquire().await.unwrap();
-    let text = r#"(kyc_ubo.assert.subject.register :subject-id "@DefinitelyNotARealEntityHandle12345")"#;
+    let text = r#"(kyc_ubo.assert.subject.place :entity-id "@DefinitelyNotARealEntityHandle12345")"#;
     let err = resolve_handles(&mut conn, text).await.expect_err("unknown handle must error");
     assert!(matches!(err, ResolverError::Unknown { .. }), "got: {err:?}");
 }
@@ -148,7 +148,7 @@ async fn resolver_rejects_ambiguous() {
     insert_entity(&pool, id_b, type_b, &shared_name).await;
 
     let mut conn = pool.acquire().await.unwrap();
-    let text = format!(r#"(kyc_ubo.assert.subject.register :subject-id "@{shared_name}")"#);
+    let text = format!(r#"(kyc_ubo.assert.subject.place :entity-id "@{shared_name}")"#);
     let err = resolve_handles(&mut conn, &text).await.expect_err("ambiguous handle must error");
     match err {
         ResolverError::Ambiguous { candidates, .. } => {
@@ -196,19 +196,21 @@ async fn surface_session_end_to_end() {
         .expect("open must succeed");
     assert_info_contains(&open_resp.kind, "opened workbook");
 
-    // Move 0: T6.2 (2026-08-12) — `assert-control` now carries
-    // `SubjectRegistered` (matrix row 1); register first, same fix as the
-    // T4 gate's `session_roundtrip` fixture and `run_prefix_state_
+    // Move 0: `place` carries `SubjectRegistered` for later moves in the
+    // chain (matrix row 1); place first, same fix as the T4 gate's
+    // `session_roundtrip` fixture and `run_prefix_state_
     // matches_intermediate_preview` above. Also staged BY HANDLE, so the
     // resolver is exercised on this move too.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.subject.register :subject-id "@{handle_name}")"#),
+            content: format!(
+                r#"kyc-workbook.stage (kyc_ubo.assert.subject.place :entity-id "@{handle_name}" :entity-type "private_limited_company")"#
+            ),
         },
     )
     .await
-    .expect("move 0 (register, by handle) must succeed");
+    .expect("move 0 (place, by handle) must succeed");
 
     // Move 1, staged BY HANDLE (not raw UUID) — the resolver must rewrite
     // `@<handle>` to the subject's UUID before `KycWorkbook::stage` ever
@@ -292,14 +294,18 @@ async fn surface_rejection_shows_placement_listing() {
         .await
         .unwrap();
 
-    // `verify` with nothing asserted yet is illegal against the empty
-    // frontier — must be REJECTED with the currently-legal placement
-    // listing, never a guess.
+    // `disconnect` of an edge that was never asserted is illegal against
+    // the empty frontier (`EdgeExists`) — must be REJECTED with the
+    // currently-legal placement listing, never a guess. Was
+    // `kyc_ubo.assert.edge.verification` — retired (EOP-DD-UBO-PROOF-001
+    // §3/§4, T5, 2026-08-28); `disconnect`'s `EdgeExists` stud is the
+    // established replacement (same substitution `seam.rs`'s
+    // `lexicon_precondition_rejects_through_the_seam` already uses).
     let resp = orch
         .process(
             session_id,
             UserInputV2::Message {
-                content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.verification :edge-id "{}")"#, Uuid::new_v4()),
+                content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.disconnect :edge-id "{}")"#, Uuid::new_v4()),
             },
         )
         .await
@@ -321,22 +327,22 @@ async fn run_stops_at_first_failure_prefix_stands() {
     let as_of = fixed_ts();
     let edge1 = Uuid::new_v4();
 
-    // Pre-existing committed history: a registered subject (T6.2 —
-    // `assert-control` now carries `SubjectRegistered`, matrix row 1) with
-    // an evidenced edge (edge1).
+    // Pre-existing committed history: a placed subject (`place` carries
+    // `SubjectRegistered` for later moves, matrix row 1) with an evidenced
+    // edge (edge1).
     {
         let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool).await.unwrap();
         let register_event = IntentEvent::new(
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             SubstratePrincipal::test_analyst(),
-            AuthorityRef("setup.register".into()),
+            AuthorityRef("setup.place".into()),
             TargetBinding::for_subject(subject),
-            serde_json::json!({ "entity_id": subject.0 }),
+            serde_json::json!({ "entity_id": subject.0, "entity_type": "private_limited_company" }),
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &register_event, "(setup-register)", |_, _, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &register_event, "(setup-register)", |_, _| Ok(())).await.unwrap();
 
         let assert_event = IntentEvent::new(
             subject,
@@ -348,7 +354,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &assert_event, "(setup-connect)", |_, _, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &assert_event, "(setup-connect)", |_, _| Ok(())).await.unwrap();
 
         let evidence_event = IntentEvent::new(
             subject,
@@ -360,7 +366,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_, _, _| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_, _| Ok(())).await.unwrap();
         scope.commit().await.unwrap();
     }
 
@@ -385,18 +391,24 @@ async fn run_stops_at_first_failure_prefix_stands() {
     .await
     .unwrap();
 
-    // Move B: `verify(edge1)` — legal against the CURRENT frontier
-    // (edge1 is Evidenced in committed history) at stage time.
+    // Move B: `disconnect(edge1)` — legal against the CURRENT frontier
+    // (edge1 is Active in committed history) at stage time. Was
+    // `verify(edge1)` — retired (EOP-DD-UBO-PROOF-001 §3/§4, T5,
+    // 2026-08-28); `disconnect` carries the same shape this gate needs
+    // (legal-at-stage-time, made illegal by a concurrent mutation before
+    // run time), and — deliberately — the concurrent event below is
+    // ALSO a disconnect of the SAME edge, so move B becomes a genuine
+    // double-disconnect: `EdgeActive` fails on the second one.
     orch.process(
         session_id,
         UserInputV2::Message {
-            content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.verification :edge-id "{edge1}")"#),
+            content: format!(r#"kyc-workbook.stage (kyc_ubo.assert.edge.disconnect :edge-id "{edge1}")"#),
         },
     )
     .await
     .unwrap();
 
-    // Concurrent connection supersedes edge1 mid-session — move B's
+    // Concurrent disconnect supersedes edge1 mid-session — move B's
     // precondition will go stale between stage time and run time.
     {
         let mut scope2 = crate::sequencer_tx::PgTransactionScope::begin(&pool).await.unwrap();
@@ -410,7 +422,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-disconnect)", |_, _, _| Ok(()))
+        append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-disconnect)", |_, _| Ok(()))
             .await
             .unwrap();
         scope2.commit().await.unwrap();
@@ -422,7 +434,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
         .expect("run dispatch itself must not error at the transport level");
     let run_msg = expect_info(&run_resp.kind);
     assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.connect"), "got: {run_msg}");
-    assert!(run_msg.contains("FAILED kyc_ubo.assert.edge.verification"), "got: {run_msg}");
+    assert!(run_msg.contains("FAILED kyc_ubo.assert.edge.disconnect"), "got: {run_msg}");
     assert!(run_msg.contains("1 move(s) remain staged"), "got: {run_msg}");
 
     // Prefix stands: move A's append is a real, separate, already-committed
@@ -434,7 +446,7 @@ async fn run_stops_at_first_failure_prefix_stands() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(count, 5, "3 setup (register+assert+evidence) + 1 concurrent supersede + move A; move B must NOT have landed");
+    assert_eq!(count, 5, "3 setup (place+connect+evidence) + 1 concurrent disconnect + move A; move B must NOT have landed");
 
     cleanup_subject(&pool, subject).await;
 }
@@ -453,12 +465,13 @@ async fn run_prefix_state_matches_intermediate_preview() {
     let edge = Uuid::new_v4();
     let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
 
-    // T6.2 (2026-08-12): `assert-control` now carries `SubjectRegistered`
-    // (matrix row 1) — register first, same fix as the T4 gate's
-    // `session_roundtrip` fixture.
+    // `place` carries `SubjectRegistered` for later moves (matrix row 1) —
+    // place first, same fix as the T4 gate's `session_roundtrip` fixture.
     orch.process(
         session_id,
-        UserInputV2::Message { content: "kyc-workbook.stage (kyc_ubo.assert.subject.register)".to_string() },
+        UserInputV2::Message {
+            content: r#"kyc-workbook.stage (kyc_ubo.assert.subject.place :entity-type "private_limited_company")"#.to_string(),
+        },
     )
     .await
     .unwrap();
@@ -474,18 +487,18 @@ async fn run_prefix_state_matches_intermediate_preview() {
     .await
     .unwrap();
 
-    // Intermediate preview: fold(committed=[] ++ [register, the staged
+    // Intermediate preview: fold(committed=[] ++ [place, the staged
     // assert-control move]) — computed independently via the substrate's
     // own `preview`, exactly what staging-time validate() would have shown
     // after these two moves.
     let lexicon = assembly_lexicon();
     let register_event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         SubstratePrincipal::test_analyst(),
         AuthorityRef("preview-only".into()),
         TargetBinding::for_subject(subject),
-        serde_json::json!({ "entity_id": subject.0 }),
+        serde_json::json!({ "entity_id": subject.0, "entity_type": "private_limited_company" }),
         fixed_ts(),
     )
     .with_lexicon_hash(lexicon.hash);
@@ -499,7 +512,7 @@ async fn run_prefix_state_matches_intermediate_preview() {
         fixed_ts(),
     )
     .with_lexicon_hash(lexicon.hash);
-    let (expected_control, _, _) =
+    let (expected_control, _) =
         preview(&[], &[register_event, expected_event], &lexicon).unwrap();
     let expected_status = expected_control.edges.get(&EdgeId(edge)).map(|e| e.status);
 
@@ -508,12 +521,12 @@ async fn run_prefix_state_matches_intermediate_preview() {
         .await
         .expect("run must succeed");
     let run_msg = expect_info(&run_resp.kind);
-    assert!(run_msg.contains("LANDED kyc_ubo.assert.subject.register"), "got: {run_msg}");
+    assert!(run_msg.contains("LANDED kyc_ubo.assert.subject.place"), "got: {run_msg}");
     assert!(run_msg.contains("LANDED kyc_ubo.assert.edge.connect"), "got: {run_msg}");
 
     let mut conn = pool.acquire().await.unwrap();
     let committed = PgKycEventStore::load_events(&mut conn, subject).await.unwrap();
-    let (post_run_control, _, _) = preview(&committed, &[], &lexicon).unwrap();
+    let (post_run_control, _) = preview(&committed, &[], &lexicon).unwrap();
     let post_run_status = post_run_control.edges.get(&EdgeId(edge)).map(|e| e.status);
 
     assert_eq!(

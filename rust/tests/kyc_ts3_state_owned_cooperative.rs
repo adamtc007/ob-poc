@@ -133,7 +133,7 @@ async fn run_fallible(
 }
 
 /// Appends a `kyc_ubo.assert.edge.connect` event directly, bypassing
-/// `check_control_preconditions` (so `TypeGeometryPermits`, TS.5) — for
+/// `check_preconditions` (so `TypeGeometryPermits`, TS.5) — for
 /// test (d) only, which deliberately puts an INCOMPATIBLE-geometry
 /// `gp_statutory` edge onto a typed cooperative subject to prove
 /// `cooperative_member_strategy`'s own kind filter excludes it. Pre-T2,
@@ -172,7 +172,7 @@ async fn append_historical_control_edge(
         chrono::Utc::now(),
     )
     .with_lexicon_hash(assembly_lexicon().hash);
-    append_in_scope(&mut scope, &reg, &event, "", |_, _, _| Ok(()))
+    append_in_scope(&mut scope, &reg, &event, "", |_, _| Ok(()))
         .await
         .unwrap();
     scope.commit().await;

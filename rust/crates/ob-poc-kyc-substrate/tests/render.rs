@@ -120,12 +120,12 @@ fn assert_roundtrips(event: &IntentEvent) {
 }
 
 #[test]
-fn sexpr_roundtrip_property_edge_assert_control() {
+fn sexpr_roundtrip_property_edge_connect() {
     let subject = SubjectId(Uuid::new_v4());
     let edge = EdgeId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         analyst(),
         authority(),
         TargetBinding::for_edge(subject, edge),
@@ -141,24 +141,31 @@ fn sexpr_roundtrip_property_edge_assert_control() {
 }
 
 #[test]
-fn sexpr_roundtrip_property_subject_classify_structure() {
+fn sexpr_roundtrip_property_subject_place() {
     let subject = SubjectId(Uuid::new_v4());
     let entity = EntityId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.structure-class",
+        "kyc_ubo.assert.subject.place",
         analyst(),
         authority(),
         TargetBinding {
             entity_id: Some(entity),
             ..Default::default()
         },
-        json!({"entity_id": entity.0.to_string(), "structure_class": "private_company"}),
+        json!({"entity_id": entity.0.to_string(), "entity_type": "private_limited_company"}),
         ts(),
     );
     assert_roundtrips(&event);
 }
 
+// This exercises the `TargetBinding { person_id, obligation_id }` field pair
+// round-tripping through the s-expr renderer/parser — a shape no live verb's
+// real contract populates (the obligation-track verbs are subject-scoped,
+// per `canonical.rs`), but `render_intent_event_to_sexpr` is generic over
+// whatever `IntentEvent` it is handed, so the property holds independent of
+// which verb produced the shape. FQN is a live label only, not a claim about
+// what `kyc_ubo.assert.entity.identity` actually targets in production.
 #[test]
 fn sexpr_roundtrip_property_obligation_person_bound() {
     let subject = SubjectId(Uuid::new_v4());
@@ -166,7 +173,7 @@ fn sexpr_roundtrip_property_obligation_person_bound() {
     let obligation = ObligationId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.obligation.satisfaction",
+        "kyc_ubo.assert.entity.identity",
         analyst(),
         authority(),
         TargetBinding {
@@ -186,7 +193,7 @@ fn sexpr_roundtrip_property_string_escaping() {
     let subject = SubjectId(Uuid::new_v4());
     let event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.obligation.waiver",
+        "kyc_ubo.decide.obligation.waiver",
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
@@ -303,14 +310,14 @@ fn history_replayable_as_dsl() {
 
     let e1 = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.structure-class",
+        "kyc_ubo.assert.subject.place",
         analyst(),
         authority(),
         TargetBinding {
             entity_id: Some(entity_a),
             ..Default::default()
         },
-        json!({"entity_id": entity_a.0.to_string(), "structure_class": "private_company"}),
+        json!({"entity_id": entity_a.0.to_string(), "entity_type": "private_limited_company"}),
         ts(),
     )
     .with_seq(0)
@@ -318,7 +325,7 @@ fn history_replayable_as_dsl() {
 
     let e2 = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.edge.control",
+        "kyc_ubo.assert.edge.connect",
         analyst(),
         authority(),
         TargetBinding::for_edge(subject, edge1),

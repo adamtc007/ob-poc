@@ -1,12 +1,23 @@
 # EOP-DD-KYCUBO-TS.2 — Investment Fund Determination Strategy
 ### Closing the `investment_fund` structure class; the ManCo pivot rule
 
+> **SUPERSEDED (EOP-DD-UBO-CLEANOUT-001 C5, 2026-09-07).** This draft was
+> never ratified. The `TS.2` label was reassigned to a different document
+> (`EOP-DD-KYCUBO-TS.2_Pipe-Vocabulary-Convergence_v0.1.md`, RATIFIED
+> 2026-08-19) before this one closed — a genuine doc-ID collision, not a
+> revision. The `investment_fund` gap this draft set out to close was
+> ultimately resolved by a different path: `EOP-DD-KYCUBO-KIT-TS0` §2.2
+> (RATIFIED 2026-08-12) ruled `fund_control_strategy` directly, landed as
+> part of the TS.0–TS.4 tranche (see `EOP-DD-KYCUBO-TS.3`/`TS.4`, both
+> RATIFIED). Nothing below this notice was ever ratified or built as
+> written; kept for history, not as a current design.
+
 | | |
 |---|---|
 | **Document** | EOP-DD-KYCUBO-TS.2 |
 | **Version** | 0.1 — draft for ratification (domain rulings) |
 | **Binds to** | EOP-VS-KYCUBO-001 v0.6 (determination semantics); EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.2; EOP-VS-CONTAINERS-001 v0.1 (CTN-2a edge-kind vocabulary, CTN-2b control basis, CTN-3a cross-container determinations) |
-| **Status** | DRAFT. Every ruling below is a domain decision — Adam ratifies; Sonnet encodes. Gated behind R4 (EdgeKind blast radius) before build. |
+| **Status** | **SUPERSEDED** — see notice above. Was: DRAFT. Every ruling below is a domain decision — Adam ratifies; Sonnet encodes. Gated behind R4 (EdgeKind blast radius) before build. |
 
 ---
 

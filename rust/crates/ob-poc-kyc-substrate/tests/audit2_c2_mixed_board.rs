@@ -16,8 +16,8 @@
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    assembly_lexicon, check_control_preconditions, enumerate_placement_set, fold_control,
-    fold_type_registry, AuthorityRef, EdgeId, EntityId, IntentEvent, KycError, ObligationState,
+    assembly_lexicon, check_preconditions, enumerate_placement_set, fold_control,
+    fold_type_registry, AuthorityRef, EdgeId, EntityId, IntentEvent, KycError,
     Principal, SubjectId, TargetBinding,
 };
 
@@ -92,9 +92,8 @@ fn c2_holds_against_the_single_checker_on_a_mixed_board() {
     let refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control(&refs);
     let type_registry = fold_type_registry(&refs);
-    let obligation = ObligationState::default();
 
-    let placement_set = enumerate_placement_set(subj, &control, &obligation, &type_registry, &lexicon);
+    let placement_set = enumerate_placement_set(subj, &control, &type_registry, &lexicon);
 
     // ── offered ⇒ admitted: every concrete place/remove/enquiry candidate
     // the board offers, probed against the single checker with a REAL
@@ -118,7 +117,7 @@ fn c2_holds_against_the_single_checker_on_a_mixed_board() {
             serde_json::Value::Null,
             as_of(),
         );
-        let result = check_control_preconditions(entry, &control, &type_registry, &probe);
+        let result = check_preconditions(entry, &control, &type_registry, &probe);
         assert!(
             result.is_ok(),
             "C2: the board OFFERED {} against target {:?} but the checker refused it: {result:?}",
@@ -141,7 +140,7 @@ fn c2_holds_against_the_single_checker_on_a_mixed_board() {
         "voting_rights",
         Some(real_voting_edge),
     );
-    let refused = check_control_preconditions(connect_entry, &control, &type_registry, &illegal_pierce);
+    let refused = check_preconditions(connect_entry, &control, &type_registry, &illegal_pierce);
     assert!(
         matches!(refused, Err(KycError::PreconditionFailed { .. })),
         "a pierce citing a genuinely non-nominee edge must be refused; got {refused:?}"
@@ -158,7 +157,7 @@ fn c2_holds_against_the_single_checker_on_a_mixed_board() {
         "voting_rights",
         Some(real_nominee_edge),
     );
-    let admitted = check_control_preconditions(connect_entry, &control, &type_registry, &legal_pierce);
+    let admitted = check_preconditions(connect_entry, &control, &type_registry, &legal_pierce);
     assert!(
         admitted.is_ok(),
         "piercing a genuinely active nominee edge must be admitted; got {admitted:?}"
@@ -178,7 +177,7 @@ fn c2_holds_against_the_single_checker_on_a_mixed_board() {
         serde_json::Value::Null,
         as_of(),
     );
-    let refused2 = check_control_preconditions(remove_entry, &control, &type_registry, &bogus_remove);
+    let refused2 = check_preconditions(remove_entry, &control, &type_registry, &bogus_remove);
     assert!(
         refused2.is_err(),
         "removing an entity that was never placed must be refused; got {refused2:?}"

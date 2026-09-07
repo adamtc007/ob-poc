@@ -9,7 +9,7 @@
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, fold_control, assembly_lexicon, preview, ControlState, EdgeId,
+    check_preconditions, fold_control, assembly_lexicon, preview, ControlState, EdgeId,
     EntityId, IntentEvent, Principal, SubjectId, TargetBinding, TypeRegistryState,
 };
 
@@ -124,7 +124,7 @@ fn per_step_matches_single_move() {
         let prefix_state = fold_control(&prefix);
         let entry = lexicon.get(candidate.verb_fqn.as_str()).expect("verb in lexicon");
         assert!(
-            check_control_preconditions(entry, &prefix_state, &TypeRegistryState::default(), candidate)
+            check_preconditions(entry, &prefix_state, &TypeRegistryState::default(), candidate)
                 .is_ok(),
             "candidate {} must be legal against its own prefix state",
             candidate.verb_fqn.as_str()
@@ -149,7 +149,7 @@ fn committed_line_equals_preview() {
     let committed = vec![assert_control_event(subj, edge, from, to)];
     let candidates = vec![attach_evidence_event(subj, edge)];
 
-    let (previewed, _previewed_obligation, _previewed_type_registry): (ControlState, _, _) =
+    let (previewed, _previewed_type_registry): (ControlState, _) =
         preview(&committed, &candidates, &lexicon).expect("legal chain must preview successfully");
 
     // The stand-in for "the real append path" (T4 hasn't built the store

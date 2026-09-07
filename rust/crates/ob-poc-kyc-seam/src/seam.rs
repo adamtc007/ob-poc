@@ -7,7 +7,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
     AuthorityRef, ControlState, FoldRegistry, Hash, IdemKey, IntentEvent, KycError,
-    ObligationState, Principal, SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
+    Principal, SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
 
@@ -90,12 +90,13 @@ impl IntentEventDraft {
 /// else the verb did in the same scope (the shadow-write, in §6 step 1).
 ///
 /// A thin bridge `scope.executor()` → the store. Holds **no** logic — the
-/// store orchestrates lock/fold/insert; the substrate folds both `ControlState`
-/// and `ObligationState` under the same lock (T6.1(a) unified checker);
-/// `validate` is the precondition policy the caller supplies (typically
-/// `substrate::check_preconditions(entry, control, obligation, type_registry, event)`, or
-/// the `check_control_preconditions` delegate when only the control axis
-/// matters).
+/// store orchestrates lock/fold/insert; the substrate folds `ControlState`
+/// under the same lock; `validate` is the precondition policy the caller
+/// supplies (typically `substrate::check_preconditions(entry, control,
+/// type_registry, event)`). Was a two-fold checker over `ControlState` AND
+/// `ObligationState` (T6.1(a)) — narrowed to control-only
+/// (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07) with the obligation fold's
+/// removal.
 pub async fn append_in_scope<V>(
     scope: &mut dyn TransactionScope,
     registry: &FoldRegistry,
@@ -104,7 +105,7 @@ pub async fn append_in_scope<V>(
     validate: V,
 ) -> Result<AppendOutcome, StoreError>
 where
-    V: FnOnce(&ControlState, &ObligationState, &TypeRegistryState) -> Result<(), KycError>,
+    V: FnOnce(&ControlState, &TypeRegistryState) -> Result<(), KycError>,
 {
     PgKycEventStore::append(scope.executor(), registry, event, source_text, validate).await
 }

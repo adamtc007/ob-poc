@@ -15,12 +15,10 @@
 //! - `flag_cannot_contradict_the_type` — the inverse divergence: an entity
 //!   typed as a company must NOT become a traversal terminus no matter what
 //!   any payload flag claims.
-//! - `register_era_flag_is_still_read_where_no_type_exists` — R5: 207
-//!   committed register-era events carry ONLY the flag (no entity_type
-//!   payload key exists on `register`), so personhood for a type-less
-//!   entity still reads the historical flag rather than fabricating
-//!   non-personhood on replay. Live `place` always carries a type, so this
-//!   arm is unreachable from the current vocabulary.
+//! - `register_era_flag_is_still_read_where_no_type_exists` RETIRED
+//!   (EOP-DD-UBO-CLEANOUT-001 T6 P4, 2026-09-07) — its premise (a
+//!   `register`-FQN event reaching the fold's fallback) no longer exists;
+//!   see its retirement comment in place of the test.
 //! - `personhood_has_one_source` — structural (grep-proof): the live
 //!   vocabulary no longer declares, shapes, or copies `is_natural_person`
 //!   anywhere — YAML arg gone, canonical `place` arm copies nothing,
@@ -204,35 +202,20 @@ fn flag_cannot_contradict_the_type() {
     );
 }
 
-/// R5 — the historical arm reads what is there. 207 committed register-era
-/// events (`kyc.subject.register` / `kyc_ubo.assert.subject.register`) carry
-/// ONLY the flag; no entity_type payload key ever existed on `register`.
-/// Personhood for an entity with NO type assertion anywhere in the stream
-/// still reads the historical flag — dropping it would fabricate
-/// non-personhood on replay. Unreachable from the live vocabulary: `place`
-/// always carries a required, validated entity-type.
-#[test]
-fn register_era_flag_is_still_read_where_no_type_exists() {
-    let s = SubjectId(Uuid::new_v4());
-    let person = Uuid::new_v4();
-
-    let register = IntentEvent::new(
-        s,
-        VerbFqn("kyc_ubo.assert.subject.register".to_string()),
-        Principal::test_analyst(),
-        AuthorityRef("gate".into()),
-        TargetBinding::for_subject(s),
-        serde_json::json!({ "entity_id": person.to_string(), "is_natural_person": true }),
-        chrono::Utc::now(),
-    );
-    let events = [&register];
-    let persons = natural_persons_from_events(&events);
-    assert!(
-        persons.contains(&PersonId(person)),
-        "a register-era entity with no type assertion and a true historical flag \
-         must remain a natural person on replay (R5: nothing is fabricated)"
-    );
-}
+// `register_era_flag_is_still_read_where_no_type_exists` RETIRED
+// (EOP-DD-UBO-CLEANOUT-001 T6 P4, 2026-09-07): its whole premise was that
+// `natural_persons_from_events`'s R5-historical fallback recognized events
+// under the retired `kyc_ubo.assert.subject.register` FQN — but `register`'s
+// own R5 fold arm was deleted in the same tranche's P2 (Adam's Q2 ruling:
+// "register, structure-class and the old control arm all go"), and the
+// fallback loop itself now filters on `verb_fqn == "kyc_ubo.assert.subject.place"`
+// only (`fold/control.rs::natural_persons_from_events`) — a `register`-FQN
+// event can no longer reach either the type registry or the fallback loop,
+// by construction. There is no state left for this test to construct; the
+// property it proved (the flag survives on type-less replay) is now proved
+// by `personhood_has_one_source` below via the `place`-scoped fallback
+// instead. Same retirement shape as `checker_sees_both_folds`
+// (`kyc_t61_studs.rs`): no rewrite target survives.
 
 /// Structural, grep-proof: the live vocabulary has exactly one source of
 /// personhood — the entity type. The flag survives only as (a) the fold's

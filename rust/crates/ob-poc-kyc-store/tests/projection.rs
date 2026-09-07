@@ -65,9 +65,9 @@ fn base(
 fn register(subject: SubjectId) -> IntentEvent {
     base(
         subject,
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         TargetBinding::for_subject(subject),
-        serde_json::json!({ "is_natural_person": false }),
+        serde_json::json!({}),
         "reg",
     )
 }
@@ -99,7 +99,7 @@ fn edge_op(subject: SubjectId, verb: &str, edge: Uuid, idem: &str) -> IntentEven
 
 async fn append(pool: &PgPool, registry: &FoldRegistry, ev: &IntentEvent) {
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, registry, ev, "(test-event)", |_, _, _| Ok(()))
+    PgKycEventStore::append(&mut tx, registry, ev, "(test-event)", |_, _| Ok(()))
         .await
         .unwrap();
     tx.commit().await.unwrap();

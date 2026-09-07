@@ -70,26 +70,31 @@ async fn run_ok(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) ->
     }
 }
 
-/// Historical `register`-only shape (T2 retired it as a separate op — see
-/// `kyc_d21_engine.rs`'s identical helper for the full rationale). Used
-/// only where a test genuinely needs "registered, no type yet" — a state
-/// `place` can no longer produce, but the evaluation engine must still
-/// handle correctly for pre-existing streams.
+/// Below-the-op-layer `place` shape, entity-type omitted (see
+/// `kyc_d21_engine.rs`'s identical helper, `append_historical`, for the
+/// full rationale — `fold_control`'s `place` arm registers from `entity_id`
+/// alone; only the op layer requires `entity-type`). Used only where a test
+/// genuinely needs "registered, no type yet" — a state no real op-dispatched
+/// call can produce, but the fold itself, and hence the evaluation engine,
+/// must still handle correctly. `is_natural_person` is retained in the
+/// payload for shape stability only — the fold no longer reads it (A1b
+/// audit, 2026-09-07: entity type is the single source of truth for
+/// personhood).
 async fn append_historical_register(subject: SubjectId, is_natural_person: bool, pool: &PgPool) {
     let mut registry = FoldRegistry::new();
     registry.register(assembly_lexicon().hash, Arc::new(V1FoldImpl));
     let mut scope = Scope::begin(pool).await;
     let event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
-        AuthorityRef("test.historical-shape".into()),
+        AuthorityRef("test.below-op-layer-shape".into()),
         TargetBinding::for_subject(subject),
         serde_json::json!({ "entity_id": subject.0, "is_natural_person": is_natural_person }),
         chrono::Utc::now(),
     )
     .with_lexicon_hash(assembly_lexicon().hash);
-    append_in_scope(&mut scope, &registry, &event, "", |_, _, _| Ok(())).await.unwrap();
+    append_in_scope(&mut scope, &registry, &event, "", |_, _| Ok(())).await.unwrap();
     scope.tx.commit().await.unwrap();
 }
 

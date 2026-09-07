@@ -12,7 +12,7 @@
 //!
 //! Verbs already proven in dedicated test files:
 //!   kyc_ubo.assert.edge.connect          → tests/kyc_stream_ops.rs
-//!   kyc_ubo.assert.subject.register             → tests/kyc_stream_ops.rs + kyc_w3_w5_w6.rs
+//!   kyc_ubo.assert.subject.place                 → tests/kyc_stream_ops.rs
 //!
 //! `coverage_kyc_obligation_update_identity/screening/risk` below now assert
 //! REFUSAL, not success — the disclosed D2.0 P0 consequence: with `creation`
@@ -147,18 +147,6 @@ async fn run_attach_evidence(subject: SubjectId, edge: Uuid, pool: &PgPool) -> U
     };
     Uuid::parse_str(v["citation_id"].as_str().expect("citation_id"))
         .expect("citation_id must be a valid UUID")
-}
-
-/// Dispatch a verb op expecting refusal; commits nothing (rolls back).
-async fn run_expect_err(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> String {
-    let mut ctx = ob_poc_kyc_decide::test_verb_execution_context_with_session(Uuid::new_v4());
-    let mut scope = Scope::begin(pool).await;
-    let err = op
-        .execute(&args, &mut ctx, &mut scope)
-        .await
-        .expect_err(&format!("{} was expected to be refused", op.fqn()));
-    scope.tx.rollback().await.unwrap();
-    err.to_string()
 }
 
 /// Assert `verb_fqn` appears in kyc_intent_events for subject.
@@ -463,10 +451,17 @@ async fn coverage_kyc_subject_enquiry() {
 
 // ── Obligation lifecycle (kyc.obligation.*) ───────────────────────────────────
 
-/// D2.0 P0 disclosed consequence: `creation` (the only writer of a new
-/// `ObligationTracks` entry) is dissolved, so `Precondition::ObligationExists`
-/// can never again be satisfied — `update-identity` is now permanently
-/// refused for any obligation-id, real or fabricated.
+/// D2.0 P0 first found this refused (`creation`, the only writer of a new
+/// `ObligationTracks` entry, was dissolved, so `Precondition::ObligationExists`
+/// could never again be satisfied). EOP-DD-UBO-CLEANOUT-001 T6 P2
+/// (2026-09-07) went further: `fold/obligation.rs` — and with it
+/// `Precondition::ObligationExists` itself — is deleted entirely, so there
+/// is no longer a precondition left to refuse on. This verb was already not
+/// precondition-checked at the op layer either way (`validate_entry_fqn:
+/// None`, `kyc_stream_ops.rs`, T6.4 rows 12-14) — it now succeeds
+/// unconditionally, appending a genuinely fold-blind event: no fold arm
+/// ever reads it back (`kyc_pack_closure.rs::fold_blind_verbs_are_exactly_known`
+/// allow-lists exactly this verb for that reason).
 #[tokio::test]
 async fn coverage_kyc_obligation_update_identity() {
     let pool = pool().await;
@@ -477,7 +472,7 @@ async fn coverage_kyc_obligation_update_identity() {
         &pool,
     )
     .await;
-    let err = run_expect_err(
+    run(
         &KycObligationUpdateIdentity,
         serde_json::json!({
             "subject-id": subject.0, "obligation-id": Uuid::new_v4(), "state": "satisfied",
@@ -485,10 +480,7 @@ async fn coverage_kyc_obligation_update_identity() {
         &pool,
     )
     .await;
-    assert!(
-        err.to_lowercase().contains("obligation") && err.to_lowercase().contains("not found"),
-        "expected an ObligationExists refusal now that obligation.creation is dissolved: {err}"
-    );
+    assert_event(&pool, subject, "kyc_ubo.assert.entity.identity").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -503,7 +495,7 @@ async fn coverage_kyc_obligation_update_screening() {
         &pool,
     )
     .await;
-    let err = run_expect_err(
+    run(
         &KycObligationUpdateScreening,
         serde_json::json!({
             "subject-id": subject.0, "obligation-id": Uuid::new_v4(), "state": "satisfied",
@@ -511,10 +503,7 @@ async fn coverage_kyc_obligation_update_screening() {
         &pool,
     )
     .await;
-    assert!(
-        err.to_lowercase().contains("obligation") && err.to_lowercase().contains("not found"),
-        "expected an ObligationExists refusal now that obligation.creation is dissolved: {err}"
-    );
+    assert_event(&pool, subject, "kyc_ubo.assert.entity.screening").await;
     cleanup(&pool, &[subject]).await;
 }
 
@@ -529,7 +518,7 @@ async fn coverage_kyc_obligation_update_risk() {
         &pool,
     )
     .await;
-    let err = run_expect_err(
+    run(
         &KycObligationUpdateRisk,
         serde_json::json!({
             "subject-id": subject.0, "obligation-id": Uuid::new_v4(), "state": "in_progress",
@@ -537,10 +526,7 @@ async fn coverage_kyc_obligation_update_risk() {
         &pool,
     )
     .await;
-    assert!(
-        err.to_lowercase().contains("obligation") && err.to_lowercase().contains("not found"),
-        "expected an ObligationExists refusal now that obligation.creation is dissolved: {err}"
-    );
+    assert_event(&pool, subject, "kyc_ubo.assert.entity.risk").await;
     cleanup(&pool, &[subject]).await;
 }
 

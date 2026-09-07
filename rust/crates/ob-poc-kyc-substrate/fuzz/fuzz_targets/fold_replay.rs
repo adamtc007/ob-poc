@@ -2,10 +2,11 @@
 //! determinism), O6 (cross-module smo_person_id/smo_event_id invariant).
 //!
 //! `kyc_ubo.decide.determination.freeze` — the event a KYC case is approved against
-//! (K-23) — folds over exactly `fold_control` + `fold_obligations`. If
-//! either panics, or produces different output on two calls over the
-//! identical event slice, that's a correctness-of-record defect, not a
-//! cosmetic bug.
+//! (K-23) — folds over `fold_control`. If it panics, or produces different
+//! output on two calls over the identical event slice, that's a
+//! correctness-of-record defect, not a cosmetic bug. Was `fold_control` +
+//! `fold_obligations`; the obligation fold was removed
+//! (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07) with `fold/obligation.rs`.
 //!
 //! O6 note: the `panic!("fold invariant violated: smo_person_id is Some but
 //! smo_event_id is None")` this target used to hunt is GONE — TS.6 §5
@@ -24,7 +25,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use ob_poc_kyc_substrate::{
-    check_preconditions, fold_control, fold_obligations, fold_type_registry,
+    check_preconditions, fold_control, fold_type_registry,
     natural_persons_from_events, assembly_lexicon, recover_determination_at, Hash, LexiconManifest,
     OwnershipProngStrategy, RecoveryPin,
 };
@@ -50,20 +51,12 @@ fuzz_target!(|data: &[u8]| {
         "fold_control produced different output on two calls over the identical event slice"
     );
 
-    let obligations1 = fold_obligations(&refs);
-    let obligations2 = fold_obligations(&refs);
-    assert_eq!(
-        format!("{obligations1:?}"),
-        format!("{obligations2:?}"),
-        "fold_obligations produced different output on two calls over the identical event slice"
-    );
-
     // O1: check_preconditions against the last generated event, matched to
     // its real lexicon entry when the generator picked a known verb FQN.
     if let Some(last) = events.last() {
         if let Some(entry) = lexicon().entries.get(last.verb_fqn.as_str()) {
             let type_registry1 = fold_type_registry(&refs);
-            let _ = check_preconditions(entry, &control1, &obligations1, &type_registry1, last);
+            let _ = check_preconditions(entry, &control1, &type_registry1, last);
         }
     }
 

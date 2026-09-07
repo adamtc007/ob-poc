@@ -40,7 +40,7 @@ fn v1_registry() -> FoldRegistry {
 fn register_event(subject: SubjectId, idem: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("analyst".into()),
         TargetBinding::for_subject(subject),
@@ -92,7 +92,7 @@ async fn exit6_replay_no_redispatch() {
     // Append one event. This used to fan out one outbox row per projection
     // effect-kind; it now writes the event and nothing else.
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, &registry, &register_event(subject, "reg"), "(test-event)", |_, _, _| {
+    PgKycEventStore::append(&mut tx, &registry, &register_event(subject, "reg"), "(test-event)", |_, _| {
         Ok(())
     })
     .await

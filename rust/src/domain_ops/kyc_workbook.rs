@@ -65,7 +65,7 @@ use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
     check_preconditions, entity_type_from_wire, enumerate_placement_set, assembly_lexicon, preview,
     render_intent_event_to_sexpr, AuthorityRef, ControlState, FoldRegistry,
-    IntentEvent, KycError, LexiconManifest, MoveId, ObligationState,
+    IntentEvent, KycError, LexiconManifest, MoveId,
     SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
 
@@ -261,7 +261,7 @@ fn folded_state(
     committed: &[IntentEvent],
     staged: &[StagedMove],
     kit: &LexiconManifest,
-) -> Result<(ControlState, ObligationState, TypeRegistryState), KycError> {
+) -> Result<(ControlState, TypeRegistryState), KycError> {
     let candidates: Vec<IntentEvent> = staged.iter().map(|m| m.event.clone()).collect();
     preview(committed, &candidates, kit)
 }
@@ -292,7 +292,7 @@ impl KycWorkbook {
     /// The Repl's job: re-run-whole over the staged workbook (T2∘T3
     /// composed). Called after every stage, not just before commit. Returns
     /// all three folds (T6.1(a), extended to the type-registry axis).
-    pub fn validate(&self) -> Result<(ControlState, ObligationState, TypeRegistryState), KycError> {
+    pub fn validate(&self) -> Result<(ControlState, TypeRegistryState), KycError> {
         folded_state(&self.committed, &self.staged, &self.kit)
     }
 
@@ -337,12 +337,11 @@ impl KycWorkbook {
         }
         let parsed = sexpr_to_parsed_move(&source_file.atoms[0], self.subject)?;
 
-        let (frontier, frontier_obligation, frontier_type_registry) =
+        let (frontier, frontier_type_registry) =
             folded_state(&self.committed, &self.staged, &self.kit)?;
         let placement_set = enumerate_placement_set(
             self.subject,
             &frontier,
-            &frontier_obligation,
             &frontier_type_registry,
             &self.kit,
         );
@@ -386,7 +385,7 @@ impl KycWorkbook {
             // entity id isn't already placed (`NotCurrentlyPlaced` — vacuous
             // at the type-level probe above, real here against the actual id).
             if let Some(e) = entry {
-                check_preconditions(e, &frontier, &frontier_obligation, &frontier_type_registry, &event)?;
+                check_preconditions(e, &frontier, &frontier_type_registry, &event)?;
             }
             move_id
         } else {
@@ -451,11 +450,11 @@ impl KycWorkbook {
                 registry,
                 &staged.event,
                 &staged.source_text,
-                |control: &ControlState, obligation: &ObligationState, type_registry: &TypeRegistryState| {
+                |control: &ControlState, type_registry: &TypeRegistryState| {
                     let entry = kit.get(staged.event.verb_fqn.as_str()).ok_or_else(|| {
                         KycError::UnknownVerb(staged.event.verb_fqn.clone())
                     })?;
-                    check_preconditions(entry, control, obligation, type_registry, &staged.event)
+                    check_preconditions(entry, control, type_registry, &staged.event)
                 },
             )
             .await?;

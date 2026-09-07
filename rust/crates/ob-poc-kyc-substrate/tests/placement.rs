@@ -12,8 +12,8 @@ use uuid::Uuid;
 use std::collections::BTreeMap;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, enumerate_placement_set, assembly_lexicon, ControlState, EdgeId,
-    EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, LexiconManifest, ObligationState,
+    check_preconditions, enumerate_placement_set, assembly_lexicon, ControlState, EdgeId,
+    EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, LexiconManifest,
     PlacementSet, ProofKind, ProofRecord, StructureClass, SubjectId, TargetBinding,
     TypeRegistryState,
 };
@@ -24,10 +24,6 @@ fn subject() -> SubjectId {
 
 fn empty_state() -> ControlState {
     ControlState::default()
-}
-
-fn empty_obligation() -> ObligationState {
-    ObligationState::default()
 }
 
 fn empty_type_registry() -> TypeRegistryState {
@@ -107,7 +103,7 @@ fn abstain_always_present() {
         state_with_edge_with_proof(),
         strategized_state(),
     ] {
-        let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
+        let set = enumerate_placement_set(subj, &state, &empty_type_registry(), &lexicon);
         assert!(
             set.moves
                 .iter()
@@ -125,8 +121,8 @@ fn placement_set_deterministic() {
     let lexicon = assembly_lexicon();
     let state = state_with_edge_with_proof();
 
-    let a = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
-    let b = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
+    let a = enumerate_placement_set(subj, &state, &empty_type_registry(), &lexicon);
+    let b = enumerate_placement_set(subj, &state, &empty_type_registry(), &lexicon);
 
     assert_eq!(
         a.board_hash, b.board_hash,
@@ -151,7 +147,7 @@ fn canonical_order_stable() {
         state.edges.insert(e.id, e);
     }
 
-    let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
+    let set = enumerate_placement_set(subj, &state, &empty_type_registry(), &lexicon);
     let ids: Vec<&str> = set.moves.iter().map(|m| m.move_id.0.as_str()).collect();
     let mut sorted = ids.clone();
     sorted.sort_unstable();
@@ -164,10 +160,10 @@ fn canonical_order_stable() {
 // ── placement_iff_precondition (differential oracle) ───────────────────────
 
 /// For every lexicon entry and every candidate target the generator would
-/// probe, the move is in the placement set iff `check_control_preconditions`
+/// probe, the move is in the placement set iff `check_preconditions`
 /// (the same oracle the write path enforces) accepts it against the state.
 fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &LexiconManifest) {
-    let set = enumerate_placement_set(subj, state, &empty_obligation(), &empty_type_registry(), lexicon);
+    let set = enumerate_placement_set(subj, state, &empty_type_registry(), lexicon);
 
     for entry in lexicon.entries.values() {
         let fqn = entry.fqn.as_str();
@@ -197,7 +193,7 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
         // lexicon entries, so it never reaches that fqn.
         let is_edge_scoped = matches!(
             fqn,
-            "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.disconnect"
+            "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.disconnect"
         );
         let targets: Vec<TargetBinding> = if is_edge_scoped {
             state
@@ -220,7 +216,7 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
                 chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap(),
             );
             let oracle_says_legal =
-                check_control_preconditions(entry, state, &empty_type_registry(), &probe).is_ok();
+                check_preconditions(entry, state, &empty_type_registry(), &probe).is_ok();
             let set_says_legal = set.admits(fqn, &target);
             assert_eq!(
                 oracle_says_legal, set_says_legal,
@@ -301,7 +297,7 @@ fn enumerate_placement_set_scales_to_200_edges() {
     }
 
     let start = Instant::now();
-    let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
+    let set = enumerate_placement_set(subj, &state, &empty_type_registry(), &lexicon);
     let elapsed = start.elapsed();
 
     assert!(
@@ -333,7 +329,6 @@ fn place_offers_entity_types() {
     let set = enumerate_placement_set(
         subj,
         &empty_state(),
-        &empty_obligation(),
         &empty_type_registry(),
         &lexicon,
     );

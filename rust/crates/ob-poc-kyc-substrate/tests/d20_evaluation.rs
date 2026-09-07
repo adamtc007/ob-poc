@@ -71,18 +71,11 @@ fn entity_type_present_condition_reads_the_type_registry() {
 
     let subject = SubjectId(Uuid::new_v4());
     let entity = EntityId(Uuid::new_v4());
-    let reg = IntentEvent::new(
+    // `place` absorbs register + assert-type (T2, §3.2) — one event, both
+    // the membership and type axes.
+    let place = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.register",
-        Principal::test_analyst(),
-        AuthorityRef("test".into()),
-        TargetBinding::for_subject(subject),
-        serde_json::json!({ "entity_id": entity.0.to_string() }),
-        as_of(),
-    );
-    let assert_type = IntentEvent::new(
-        subject,
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -90,7 +83,7 @@ fn entity_type_present_condition_reads_the_type_registry() {
         as_of(),
     );
     let control = ControlState::default();
-    let types = fold_type_registry(&[&reg, &assert_type]);
+    let types = fold_type_registry(&[&place]);
     let board = empty_board(&control, &types);
 
     assert!(
@@ -131,9 +124,9 @@ fn proven_type_check_passes_when_every_entity_is_proved() {
 
     let subject = SubjectId(Uuid::new_v4());
     let entity = EntityId(Uuid::new_v4());
-    let assert_type = IntentEvent::new(
+    let place = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -154,7 +147,7 @@ fn proven_type_check_passes_when_every_entity_is_proved() {
         }),
         as_of(),
     );
-    let types = fold_type_registry(&[&assert_type, &evidence]);
+    let types = fold_type_registry(&[&place, &evidence]);
     let mut control = ControlState::default();
     control.registered_entity_ids.insert(entity);
     let board = empty_board(&control, &types);
@@ -182,23 +175,23 @@ fn proven_type_check_is_unevaluable_when_a_type_is_alleged() {
 
     let subject = SubjectId(Uuid::new_v4());
     let entity = EntityId(Uuid::new_v4());
-    let assert_type = IntentEvent::new(
+    let place = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
         serde_json::json!({ "entity_id": entity.0.to_string(), "entity_type": "natural_person" }),
         as_of(),
     );
-    let types = fold_type_registry(&[&assert_type]);
+    let types = fold_type_registry(&[&place]);
     let mut control = ControlState::default();
     control.registered_entity_ids.insert(entity);
     let board = empty_board(&control, &types);
     let outcome = ProvenTypeCheck.evaluate(&board);
     assert_eq!(
         outcome.cites,
-        vec![assert_type.id],
+        vec![place.id],
         "Unevaluable(AllegedType) must cite the assertion event that made the type Alleged — \
          the mechanism-level half of `alleged_finding_cites_its_assertion`"
     );

@@ -29,7 +29,7 @@
 //! substitute), so a live-DB drive-through would break this file's pure
 //! discipline for what is otherwise a fast, no-DB pack. Per the tooth's own
 //! fallback clause, the wiring question ("is `check_preconditions`/
-//! `check_control_preconditions` genuinely reached when this verb's op runs")
+//! `check_preconditions` genuinely reached when this verb's op runs")
 //! is answered by source-level dispatch-site enumeration instead — scanning
 //! `kyc_stream_ops.rs` for the two real call shapes (`stream_append`'s
 //! `validate_entry_fqn` argument, and the two inline
@@ -50,7 +50,7 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, fold_control_versioned, assembly_lexicon,
+    check_preconditions, fold_control_versioned, assembly_lexicon,
     evaluation_lexicon,
     AuthorityRef, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
     DeterminationDispatch, DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId,
@@ -77,8 +77,6 @@ const KYC_PROJECTION_SRC: &str = include_str!("../crates/ob-poc-kyc-store/src/pr
 const KYC_STORE_LIB_SRC: &str = include_str!("../crates/ob-poc-kyc-store/src/lib.rs");
 const LEXICON_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/lexicon.rs");
 const CONTROL_FOLD_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/fold/control.rs");
-const OBLIGATION_FOLD_SRC: &str =
-    include_str!("../crates/ob-poc-kyc-substrate/src/fold/obligation.rs");
 const TYPE_REGISTRY_FOLD_SRC: &str =
     include_str!("../crates/ob-poc-kyc-substrate/src/fold/type_registry.rs");
 
@@ -704,7 +702,6 @@ fn newly_covered_entries_are_fqn_correct_and_render_safe() {
 #[test]
 fn fold_blind_verbs_are_exactly_known() {
     let control_arms = fold_match_arms(CONTROL_FOLD_SRC);
-    let obligation_arms = fold_match_arms(OBLIGATION_FOLD_SRC);
     // D1 (EOP-DD-KYCUBO-TS.1): a THIRD fold axis exists
     // (`fold::type_registry::TypeRegistryState`) — the 4 new type-registry
     // moves fold there, not in control.rs/obligation.rs, so this scan must
@@ -731,7 +728,6 @@ fn fold_blind_verbs_are_exactly_known() {
         })
         .filter(|fqn| {
             !control_arms.contains(fqn)
-                && !obligation_arms.contains(fqn)
                 && !type_registry_arms.contains(fqn)
         })
         .collect();
@@ -742,14 +738,43 @@ fn fold_blind_verbs_are_exactly_known() {
     // fold-inert verb (effect_class: read_snapshot, fold-blind by design) —
     // was itself retired TS.6 P2 (K-G7): it was a derivation dressed as a
     // verb, carrying no precondition `freeze` doesn't already declare
-    // independently, so there was nothing to preserve by keeping it. The
-    // set is now empty with no by-design exception left to allow-list.
-    let expected: BTreeSet<String> = BTreeSet::new();
+    // independently, so there was nothing to preserve by keeping it.
+    //
+    // `kyc_ubo.assert.entity.{identity,screening,risk}` NEWLY fold-blind
+    // (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07): `fold/obligation.rs` —
+    // their only reader — is deleted. This is not a new defect this
+    // tranche introduces; the op layer had already stopped calling
+    // `check_preconditions` for these three before this tranche
+    // (`validate_entry_fqn: None`, `kyc_stream_ops.rs`, T6.4 rows 12-14),
+    // so a landed event for any of them was already going nowhere in
+    // practice — the fold's deletion just makes that structurally
+    // explicit instead of merely true-in-practice. Allow-listed here
+    // rather than hidden: a real, disclosed K-G7 member, not silently
+    // patched away.
+    //
+    // `kyc_ubo.decide.determination.freeze` NEWLY fold-blind (same tranche,
+    // same deletion): `fold/obligation.rs` carried a no-op arm,
+    // `"kyc_ubo.decide.determination.freeze" => {}`, whose only purpose was
+    // to satisfy this scanner — it did no fold work. Freeze's own read path
+    // (`ob-poc-kyc-store::cross_stream::prior_freeze_persons`) queries the
+    // `outbox` table directly, never `fold_control`/`fold_type_registry`, so
+    // deleting the stub changes nothing real; it only removes the
+    // appeasement arm and lets the scanner see what was already true.
+    let expected: BTreeSet<String> = [
+        "kyc_ubo.assert.entity.identity",
+        "kyc_ubo.assert.entity.screening",
+        "kyc_ubo.assert.entity.risk",
+        "kyc_ubo.decide.determination.freeze",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
 
     assert_eq!(
         fold_blind, expected,
-        "K-G7 fold-blind verb set changed — expected fully empty post-\
-         compute-fold-retirement (TS.6 P2); any member is a regression"
+        "K-G7 fold-blind verb set changed — expected exactly the 3 allow-listed \
+         identity/screening/risk verbs (fold-blind since fold/obligation.rs's removal, \
+         EOP-DD-UBO-CLEANOUT-001 T6 P2); any OTHER member is a regression"
     );
 }
 
@@ -934,7 +959,12 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // MOVED to `evaluation_lexicon()` (`kyc_ubo.decide.obligation.waiver`,
     // `preconditions: []` — see `evaluation_pack_is_exactly_known`'s note on
     // why Evaluation entries carry none). The 3 remaining Assembly
-    // obligation-fact verbs below keep `ObligationExists`.
+    // obligation-fact verbs below carried `ObligationExists` until
+    // EOP-DD-UBO-CLEANOUT-001 T6 P2 (2026-09-07) removed it —
+    // `fold/obligation.rs`/`ObligationState` deleted (it was already dead
+    // at the real write path, `validate_entry_fqn: None`,
+    // `kyc_stream_ops.rs`) — so all three now carry `vec![]`, same as
+    // `evaluation_lexicon()`'s decide.* entries.
     //
     // `Precondition::SubjectNotDecided` retired TS.6 P2 (K-G7) alongside
     // `kyc.person.approve`/`.reject` (renamed `kyc_ubo.decide.subject.approve`/`.reject`,
@@ -946,7 +976,7 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "kyc_ubo.assert.entity.screening",
         "kyc_ubo.assert.entity.risk",
     ] {
-        expected.insert(fqn.to_string(), vec![Precondition::ObligationExists]);
+        expected.insert(fqn.to_string(), vec![]);
     }
 
     // D1 (EOP-DD-KYCUBO-TS.1 §3, moves 2/6/7/8): assert-type carries only
@@ -1256,7 +1286,7 @@ fn stream_append_wiring(src: &str) -> BTreeMap<String, Option<String>> {
 }
 
 /// Extract fqns wired via the inline `let entry = lexicon.get("<fqn>")` →
-/// `check_preconditions(entry, ...)` / `check_control_preconditions(entry,
+/// `check_preconditions(entry, ...)` / `check_preconditions(entry,
 /// ...)` shape (`kyc_ubo.assert.edge.control`'s hand-rolled `append_in_scope`
 /// closure — the Part A A3 fix; `ubo.determination.compute-fold`'s own such
 /// call site was retired along with the verb, TS.6 P2). Looks ahead a
@@ -1278,7 +1308,7 @@ fn inline_lexicon_get_wiring(src: &str) -> BTreeSet<String> {
         let next_get = window[1..].find(".get(\"").unwrap_or(usize::MAX);
         let checker_hit = window
             .find("check_preconditions(entry")
-            .or_else(|| window.find("check_control_preconditions(entry"));
+            .or_else(|| window.find("check_preconditions(entry"));
         if let Some(hit) = checker_hit {
             if hit < next_get {
                 out.insert(fqn);
@@ -1291,7 +1321,7 @@ fn inline_lexicon_get_wiring(src: &str) -> BTreeSet<String> {
 
 /// The wiring half of the tooth: every lexicon entry with a non-empty
 /// `preconditions` list must have a genuine call-site in `kyc_stream_ops.rs`
-/// that reaches `check_preconditions`/`check_control_preconditions` for that
+/// that reaches `check_preconditions`/`check_preconditions` for that
 /// exact fqn when the verb's real op runs — not just a correct checker
 /// function in the abstract (see module doc for why this can't be a live-DB
 /// drive-through in this pure file).
@@ -1344,7 +1374,7 @@ fn every_precondition_carrying_verb_is_reached_by_the_checker() {
 /// The semantic half: for each of today's precondition-carrying verbs, a
 /// state that violates its stud must produce the real `KycError`, and a
 /// state that satisfies it must succeed — driven through the same
-/// `check_preconditions`/`check_control_preconditions` composition the real
+/// `check_preconditions`/`check_preconditions` composition the real
 /// op calls (proven wired by the sibling test above), not a bespoke
 /// re-implementation.
 #[test]
@@ -1380,7 +1410,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     // `dispatch_is_exhaustive`). This sub-test's job is narrower and
     // distinct: does the REAL `LexiconEntry` (`assembly_lexicon()`, not a
     // hand-built one) actually enforce, end-to-end through
-    // `check_control_preconditions` — one admitted type, one terminal type,
+    // `check_preconditions` — one admitted type, one terminal type,
     // one untyped subject.
     let freeze_entry_for_totality = lexicon.get("kyc_ubo.decide.determination.freeze").unwrap();
     let typed = |t: EntityType| -> TypeRegistryState {
@@ -1410,7 +1440,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         "sanity: PrivateLimitedCompany must be a live dispatch target for the admit case below"
     );
     assert!(
-        check_control_preconditions(
+        check_preconditions(
             freeze_entry_for_totality,
             &registered,
             &typed(EntityType::PrivateLimitedCompany),
@@ -1429,7 +1459,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         "sanity: NaturalPerson must be terminal for the refuse case below"
     );
     assert!(
-        check_control_preconditions(
+        check_preconditions(
             freeze_entry_for_totality,
             &registered,
             &typed(EntityType::NaturalPerson),
@@ -1444,7 +1474,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
 
     // The fail-closed floor: no recorded type at all still blocks.
     assert!(
-        check_control_preconditions(
+        check_preconditions(
             freeze_entry_for_totality,
             &registered,
             &TypeRegistryState::default(),
@@ -1877,7 +1907,7 @@ fn new_edge_kinds_are_not_traversed_as_control() {
 /// hand-duplicated in the op layer and the board preview, because the
 /// checker's signature could not see `TypeRegistryState` at all.
 ///
-/// Phase 2 widened `check_preconditions`/`check_control_preconditions` to
+/// Phase 2 widened `check_preconditions`/`check_preconditions` to
 /// accept `&TypeRegistryState` (threaded through the real append chokepoint,
 /// `ob-poc-kyc-store::PgKycEventStore::append`, and every other caller),
 /// promoted both studs to real `Precondition` variants
@@ -1931,7 +1961,7 @@ fn op_layer_only_studs_are_exactly_known() {
 /// place/remove/correct-type remains in the op layer
 /// (`src/domain_ops/kyc_stream_ops.rs`) or the board preview
 /// (`crates/ob-poc-kyc-substrate/src/placement.rs`) — both now consult the
-/// single `check_preconditions`/`check_control_preconditions` checker only.
+/// single `check_preconditions`/`check_preconditions` checker only.
 /// Source-scanned, not semantic: if either of these markers reappears
 /// verbatim, the duplication this whole tooth family exists to prevent has
 /// silently come back.
@@ -1941,14 +1971,14 @@ fn op_layer_only_studs_are_exactly_known() {
 /// merged into `place` and `member-withdrawal` renamed `remove`) used to
 /// hand-roll an `is_withdrawn` gate to decide which candidates to enumerate
 /// for both `place` and `remove` — a duplicate of the `NotCurrentlyPlaced`/
-/// `MembershipActive` precondition arms `check_control_preconditions`
+/// `MembershipActive` precondition arms `check_preconditions`
 /// already enforces on every probed candidate. Removed: `place` now always
 /// offers the subject's own entity as a candidate (the checker refuses it
 /// if already placed), and `remove` now always offers every registered
 /// entity (the checker refuses it if already withdrawn).
 ///
 /// 2026-09-07 (audit item 3, P2): `place` stopped probing
-/// `check_control_preconditions` at enumeration entirely — it offers entity
+/// `check_preconditions` at enumeration entirely — it offers entity
 /// TYPES now (`EOP-VS-UBO-GAME-001` §3.4 R9), computed from type geometry
 /// against currently-active board members, not a per-entity-id oracle
 /// probe (there is no id yet for a brand-new entity). Its `is_withdrawn`
@@ -1994,7 +2024,7 @@ fn no_stud_is_duplicated() {
         .expect("place type-level block must exist in placement.rs");
     // Bounded by the REMOVE COMMENT, not the `if let` line — the comment
     // sits between the place block's closing brace and the remove code and
-    // itself mentions `check_control_preconditions` (describing REMOVE's
+    // itself mentions `check_preconditions` (describing REMOVE's
     // own oracle use), which would otherwise leak into `place_block` and
     // false-positive the assertion below.
     let remove_comment_start = placement_src
@@ -2013,7 +2043,7 @@ fn no_stud_is_duplicated() {
     // `is_withdrawn` (which the block now legitimately calls for geometry
     // membership, not stud duplication).
     assert!(
-        !place_block.contains("check_control_preconditions") && !place_block.contains("check_preconditions"),
+        !place_block.contains("check_preconditions") && !place_block.contains("check_preconditions"),
         "placement.rs::place_and_remove_candidates (place block): place must never probe the \
          precondition oracle at enumeration — it offers TYPES (EOP-VS-UBO-GAME-001 §3.4 R9), \
          evaluated by type geometry only; the real NotCurrentlyPlaced check runs once, later, \
@@ -2023,7 +2053,7 @@ fn no_stud_is_duplicated() {
         !remove_block.contains("is_withdrawn"),
         "placement.rs::place_and_remove_candidates (remove block): found a \
          hand-rolled is_withdrawn check — the board-preview side of the stud \
-         duplication has come back; it must consult check_control_preconditions only"
+         duplication has come back; it must consult check_preconditions only"
     );
 }
 
@@ -2245,7 +2275,6 @@ fn no_legacy_fqns_remain() {
         ("kyc_dag.yaml", KYC_DAG_YAML),
         ("lexicon.rs", LEXICON_SRC),
         ("fold/control.rs", CONTROL_FOLD_SRC),
-        ("fold/obligation.rs", OBLIGATION_FOLD_SRC),
         ("kyc_stream_ops.rs", KYC_STREAM_OPS_SRC),
         ("kyc-decide/lib.rs", KYC_DECIDE_OPS_SRC),
     ];
@@ -2436,8 +2465,20 @@ async fn no_legacy_fqns_remain_in_the_search_index() {
     // gone from the index entirely, not renamed (member-withdrawal→remove
     // IS a rename, still counted once, P2). type-correction DISSOLVED
     // (18→17, P3) — gone from the index entirely, no replacement.
+    // T3 (2026-08-27, §3.1-§3.4): control+economic-interest MERGED into
+    // connect (17→16); reconciliation DISSOLVED, gone entirely (16→15);
+    // supersession MERGED into disconnect, no net count change (rename).
+    // T4-close (2026-08-28, EOP-DD-UBO-DISPATCH-001): structure-class
+    // DISSOLVED, gone entirely (15→14). T5 (2026-08-28,
+    // EOP-DD-UBO-PROOF-001): verification DISSOLVED, absorbed into evidence
+    // — no net count change (evidence already counted). Landed at 14,
+    // matching the live 14-verb lexicon (`assembly_lexicon()` +
+    // `evaluation_lexicon()`); this pin was stale from T3/T4/T5 (all landed
+    // before EOP-DD-UBO-CLEANOUT-001 T6) until corrected here (T6 P4,
+    // 2026-09-07) — the embeddings table itself was already correctly at
+    // 14, only this hardcoded assertion had drifted.
     assert_eq!(
-        indexed, 17,
-        "the 17 surviving renamed verbs must be discoverable under the new scheme"
+        indexed, 14,
+        "the 14 surviving verbs must be discoverable under the current scheme"
     );
 }

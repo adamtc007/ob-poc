@@ -53,9 +53,9 @@ use ob_poc::domain_ops::kyc_workbook::open_workbook;
 use ob_poc_kyc_seam::{append_in_scope, canonical_event_shape};
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{
-    assembly_lexicon, check_control_preconditions, enumerate_placement_set,
+    assembly_lexicon, check_preconditions, enumerate_placement_set,
     fold_control_versioned, fold_type_registry, AuthorityRef, ControlState, EdgeId, EntityId,
-    FoldRegistry, IntentEvent, LexiconManifest, ObligationState, Principal, SubjectId,
+    FoldRegistry, IntentEvent, LexiconManifest, Principal, SubjectId,
     TargetBinding, TypeRegistryState, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -137,7 +137,7 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 /// Op-layer simulation: build via the ONE constructor (R6), append under the
 /// real precondition oracle. Not the real `SemOsVerbOp` (those structs don't
 /// exist yet for connect/disconnect at RED time) — `canonical_event_shape` +
-/// `check_control_preconditions` are the two real pieces the op wraps; this
+/// `check_preconditions` are the two real pieces the op wraps; this
 /// inlines that wrapping so the gate compiles and REDs from day one, same
 /// reason `kyc_t2_place_remove.rs` never referenced `KycSubjectPlace`.
 async fn apply(
@@ -161,9 +161,9 @@ async fn apply(
         as_of,
     )
     .with_lexicon_hash(lexicon.hash);
-    append_in_scope(scope, registry, &event, "test", |control, _obligation, type_registry| {
+    append_in_scope(scope, registry, &event, "test", |control, type_registry| {
         if let Some(e) = &entry {
-            check_control_preconditions(e, control, type_registry, &event)
+            check_preconditions(e, control, type_registry, &event)
         } else {
             Ok(())
         }
@@ -490,8 +490,7 @@ async fn a_block_with_no_links_is_a_legal_board_state() {
 
     // ENUMERABLE: a placed, zero-link block is an ordinary `remove`
     // candidate — no special-casing excludes it.
-    let obligation = ObligationState::default();
-    let placement_set = enumerate_placement_set(subject, &control, &obligation, &tr, &lexicon);
+    let placement_set = enumerate_placement_set(subject, &control, &tr, &lexicon);
     let target = TargetBinding {
         entity_id: Some(d),
         ..TargetBinding::for_subject(subject)

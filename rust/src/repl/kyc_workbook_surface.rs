@@ -289,11 +289,10 @@ pub(crate) async fn dispatch(
         }
         KycWorkbookCommand::Propose { utterance } => {
             let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
-            let (control, obligation, type_registry) = workbook.validate()?;
+            let (control, type_registry) = workbook.validate()?;
             let board = enumerate_placement_set(
                 workbook.subject,
                 &control,
-                &obligation,
                 &type_registry,
                 &workbook.kit,
             );
@@ -349,8 +348,8 @@ pub(crate) async fn dispatch(
         }
         KycWorkbookCommand::Validate => {
             let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
-            let (control, obligation, _type_registry) = workbook.validate()?;
-            Ok(render_preview(&control, &obligation, workbook))
+            let (control, _type_registry) = workbook.validate()?;
+            Ok(render_preview(&control, workbook))
         }
         KycWorkbookCommand::Show => {
             let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
@@ -435,11 +434,11 @@ async fn run_sequential(
             registry,
             &staged.event,
             &staged.source_text,
-            |control, obligation, type_registry| {
+            |control, type_registry| {
                 let entry = kit.get(staged.event.verb_fqn.as_str()).ok_or_else(|| {
                     ob_poc_kyc_substrate::KycError::UnknownVerb(staged.event.verb_fqn.clone())
                 })?;
-                check_preconditions(entry, control, obligation, type_registry, &staged.event)
+                check_preconditions(entry, control, type_registry, &staged.event)
             },
         )
         .await;
@@ -476,18 +475,17 @@ async fn run_sequential(
 
 fn render_preview(
     control: &ob_poc_kyc_substrate::ControlState,
-    obligation: &ob_poc_kyc_substrate::ObligationState,
-    workbook: &KycWorkbook,
+    _workbook: &KycWorkbook,
 ) -> String {
-    let subject_state = obligation.derive_subject_state(workbook.subject);
+    // Was also `{} obligation subject(s), subject overall state={:?}` —
+    // dropped with `ObligationState`/`fold/obligation.rs`
+    // (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07); K-23 is enforced against
+    // `kyc_decision_records`, never this fold.
     format!(
-        "consequence preview — {} edge(s), structure_class={:?}, registered={}, \
-         {} obligation subject(s), subject overall state={:?}",
+        "consequence preview — {} edge(s), structure_class={:?}, registered={}",
         control.edges.len(),
         control.structure_class,
         control.registered,
-        obligation.subjects.len(),
-        subject_state
     )
 }
 
@@ -618,10 +616,10 @@ mod tests {
 
     #[test]
     fn parses_stage_with_dsl_text() {
-        let cmd = parse_kyc_workbook_command(r#"kyc-workbook.stage (kyc_ubo.assert.subject.register)"#);
+        let cmd = parse_kyc_workbook_command(r#"kyc-workbook.stage (kyc_ubo.assert.subject.place)"#);
         assert_eq!(
             cmd,
-            Some(Ok(KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.register)".to_string() }))
+            Some(Ok(KycWorkbookCommand::Stage { text: "(kyc_ubo.assert.subject.place)".to_string() }))
         );
     }
 

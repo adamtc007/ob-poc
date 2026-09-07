@@ -15,7 +15,7 @@ use uuid::Uuid;
 use ob_poc_kyc_substrate::{
     check_type_geometry, enumerate_placement_set,
     fold_type_registry, assembly_lexicon, AuthorityRef, EntityId, EntityType,
-    GeometryError, IntentEvent, LinkageSource, ObligationState, Pipe, Principal, SubjectId,
+    GeometryError, IntentEvent, LinkageSource, Pipe, Principal, SubjectId,
     TargetBinding, ALL_ENTITY_TYPES, ALL_PIPES,
 };
 
@@ -32,7 +32,7 @@ fn as_of() -> DateTime<Utc> {
 fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> IntentEvent {
     IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
@@ -431,7 +431,7 @@ fn construct_is_pure() {
     // `construct` (TS.1 move 9) is satisfied by the pre-existing `preview`
     // (T3, `src/preview.rs`) — P1 recon found it already matches move 9's
     // contract exactly: `(committed, candidates, lexicon) ->
-    // Result<(ControlState, ObligationState)>`, no store handle anywhere in
+    // Result<(ControlState, TypeRegistryState)>`, no store handle anywhere in
     // its signature. Proven structurally (type-surface, not behaviourally)
     // — the same pattern `gameboard_r0_convergence.rs::
     // enforcement_is_metadata_blind` uses: if `preview` ever gained a
@@ -463,11 +463,16 @@ fn construct_is_pure() {
 ///
 /// **T2 note (EOP-VS-UBO-GAME-001):** `register`/`type` retired, merged
 /// into `place` — real writes can no longer produce "registered but
-/// untyped." `register`/`assert_type_event` below build that state
-/// directly at the pure-fold level (their fold arms remain, historical
-/// replay only — R5) purely to keep exercising the geometry gate's
-/// before/after distinction this test exists for; no live surface can
-/// build it this way any more.
+/// untyped." `register`/`assert_type_event` below build that state at the
+/// pure-fold level via `place` itself: `fold_control`'s `place` arm sets
+/// `registered`/`registered_entity_ids` from `entity_id` alone, independent
+/// of whether `entity_type` is present in the payload — omitting it here
+/// reaches the same "registered but untyped" state a real write can no
+/// longer reach, since `canonical_event_shape`'s constructor requires
+/// `entity-type` on every real `place` call. (`register`'s own R5-historical
+/// fold arm, once the retired route to this same state, was itself deleted
+/// EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07 — there is no longer a fold arm
+/// keyed on the retired FQN at all, live or historical.)
 #[test]
 fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     let subj = subject();
@@ -478,7 +483,7 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     let register = |entity: EntityId| {
         IntentEvent::new(
             subj,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             Principal::test_analyst(),
             AuthorityRef("test".into()),
             TargetBinding::for_subject(subj),
@@ -491,7 +496,6 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
         &register(person),
         &register(company),
     ]);
-    let obligation = ObligationState::default();
     assert!(control.registered);
     assert_eq!(control.registered_entity_ids.len(), 2);
 
@@ -500,7 +504,7 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     // layer alone (SubjectRegistered=true) would admit them. This is the
     // K-G5 gap TS.1 closes.
     let untyped_registry = ob_poc_kyc_substrate::TypeRegistryState::default();
-    let set_before = enumerate_placement_set(subj, &control, &obligation, &untyped_registry, &lexicon);
+    let set_before = enumerate_placement_set(subj, &control, &untyped_registry, &lexicon);
     // EOP-VS-UBO-GAME-001 T3, §3.2: `control` + `economic-interest` merged
     // into one verb, `connect` — a single membership check now covers what
     // used to be two.
@@ -546,7 +550,7 @@ fn geometry_gate_and_new_moves_surface_through_enumerate_placement_set() {
     assert_eq!(typed_registry.type_of(person), Some(EntityType::NaturalPerson));
     assert_eq!(typed_registry.type_of(company), Some(EntityType::PrivateLimitedCompany));
 
-    let set_after = enumerate_placement_set(subj, &control, &obligation, &typed_registry, &lexicon);
+    let set_after = enumerate_placement_set(subj, &control, &typed_registry, &lexicon);
     assert!(
         set_after.moves.iter().any(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.connect"),
         "connect must be admitted once a geometrically-possible pair of typed members exists"

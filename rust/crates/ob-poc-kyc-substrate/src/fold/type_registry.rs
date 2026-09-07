@@ -293,32 +293,11 @@ pub(crate) fn apply_one_type_registry_event(
             }
         }
 
-        // Historical only (EOP-VS-UBO-GAME-001 T2 retired the verb; the arm
-        // stays so any pre-existing stream with real `type` events still
-        // folds correctly — R5). No new event of this kind can be produced
-        // going forward.
-        "kyc_ubo.assert.subject.type" => {
-            // CTN-2f: status is computed, never asserted (`no_move_sets_status`,
-            // TS.1 §6). Every `assert-type` starts `Alleged` — there is no
-            // payload flag to skip that (contrast an earlier draft of this
-            // arm, which read a `proof` field directly off the payload; that
-            // would have let a caller assert its way straight to `Proved`,
-            // the exact thing CTN-2f forbids). `Proved` is reachable only by
-            // deriving it from a subsequent `attach-evidence` event, below —
-            // mirrors `fold::control`'s `EdgeStatus` derivation exactly.
-            if let (Some(eid), Some(entity_type)) =
-                (entity_id(p, "entity_id"), entity_type_from_payload(p))
-            {
-                state.types.insert(
-                    eid,
-                    EntityTypeRecord {
-                        entity_type,
-                        originating_event_id: event.id,
-                        proofs: BTreeMap::new(),
-                    },
-                );
-            }
-        }
+        // `kyc_ubo.assert.subject.type`'s R5-historical arm REMOVED
+        // (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07, Q2) — `place` above
+        // is, and was already, the live arm for this axis too (T6.1(a) —
+        // one event, both axes); R5's replay-fidelity premise (a real
+        // stream to replay) is permanently false after the clean start.
         // Move 4 (TS.1 §3, redefined EOP-DD-UBO-PROOF-001 §1/§4, T5): "this
         // document/source evidences a TYPE OR A LINKAGE" — one verb, two
         // possible targets. Edge-scoped evidencing (`target.edge_id` set)
@@ -349,16 +328,9 @@ pub(crate) fn apply_one_type_registry_event(
         // contributes nothing to the fold (same "falls through as a no-op,
         // not a crash" discipline `geometry_triple_for_event`'s retired
         // `nominee-piercing` special case documents).
-        // Historical only (EOP-VS-UBO-GAME-001 T2 retired the verb in favor
-        // of `remove`, above — identical arm, kept so any pre-existing
-        // stream with real `member-withdrawal` events still folds
-        // correctly — R5). No new event of this kind can be produced
-        // going forward.
-        "kyc_ubo.assert.subject.member-withdrawal" => {
-            if let Some(eid) = entity_id(p, "entity_id") {
-                state.withdrawn_members.insert(eid, event.id);
-            }
-        }
+        // `kyc_ubo.assert.subject.member-withdrawal`'s R5-historical arm
+        // REMOVED (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07, Q2) —
+        // `remove` above is, and was already, the live arm.
         // Move 5 (EOP-DD-UBO-PROOF-001 §4, T5) — the TypeRegistry-axis half
         // of `retract`'s mirrored fold; `fold::control`'s arm does the same
         // over edge proofs, from the same event (T6.1(a)). At most one axis

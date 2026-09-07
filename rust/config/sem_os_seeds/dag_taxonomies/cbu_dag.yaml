@@ -274,7 +274,7 @@ dsl_verb_reconciliation:
     - kyc_ubo.decide.obligation.waiver
     - kyc_ubo.decide.subject.approve
     - kyc_ubo.decide.subject.reject
-    - kyc_ubo.assert.subject.register
+    - kyc_ubo.assert.subject.place
   onboarding_surface:
     - onboarding.status
   red_flag_surface:

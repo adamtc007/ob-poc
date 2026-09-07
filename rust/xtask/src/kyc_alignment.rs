@@ -34,8 +34,8 @@ use dsl_core::collect_declared_fqns;
 
 use ob_poc_kyc_substrate::{
     assembly_lexicon, enumerate_placement_set, evaluation_lexicon, fold_control_versioned,
-    fold_obligations_versioned, fold_type_registry, AuthorityRef, ControlState, EdgeId, EntityId,
-    FoldRegistry, IntentEvent, ObligationState, Principal, SubjectId, TargetBinding,
+    fold_type_registry, AuthorityRef, ControlState, EdgeId, EntityId,
+    FoldRegistry, IntentEvent, Principal, SubjectId, TargetBinding,
     TypeRegistryState, V1FoldImpl,
 };
 
@@ -286,11 +286,13 @@ impl DbSnapshot {
 /// Board-enumerable FQNs — the union of `enumerate_placement_set`'s output
 /// across TWO synthetic board states, folded in-memory (no DB, no write
 /// path): an empty board, and a board pushed as deep as the live
-/// precondition chain allows — registered+typed entities, an evidenced and
-/// verified control edge, a supported structure class, and a reconciliation
-/// marker (unlocking `verification`'s `EvidenceCited` and `freeze`'s
-/// `ReconciledProjection`/`StructureClassSupported`). This mirrors exactly
-/// what the real board machinery does; it does not reimplement it.
+/// precondition chain allows — placed+typed entities, a connected and
+/// evidenced edge, then disconnected (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+/// 2026-09-07: `register`/`structure-class`/`control` no longer have fold
+/// arms at all — using them here would silently probe nothing; `verify`/
+/// `reconciliation` were already retired before this tranche). This
+/// mirrors exactly what the real board machinery does; it does not
+/// reimplement it.
 ///
 /// `kyc_ubo.assert.entity.{identity,screening,risk}` never appear in either
 /// state, and no third state would change that: their sole precondition is
@@ -314,9 +316,8 @@ fn board_enumerable_fqns() -> Result<HashSet<String>> {
     // State 1: empty board.
     {
         let control = ControlState::default();
-        let obligation = ObligationState::default();
         let type_registry = TypeRegistryState::default();
-        let set = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+        let set = enumerate_placement_set(subject, &control, &type_registry, &lexicon);
         found.extend(set.moves.iter().map(|m| m.verb_fqn.as_str().to_string()));
     }
 
@@ -340,27 +341,17 @@ fn board_enumerable_fqns() -> Result<HashSet<String>> {
         let subj_target = TargetBinding::for_subject(subject);
         let events = vec![
             mk(
-                "kyc_ubo.assert.subject.register",
-                subj_target.clone(),
-                serde_json::json!({"entity_id": person.0}),
-            ),
-            mk(
-                "kyc_ubo.assert.subject.register",
-                subj_target.clone(),
-                serde_json::json!({"entity_id": company.0}),
-            ),
-            mk(
-                "kyc_ubo.assert.subject.type",
-                subj_target.clone(),
+                "kyc_ubo.assert.subject.place",
+                TargetBinding { entity_id: Some(person), ..subj_target.clone() },
                 serde_json::json!({"entity_id": person.0, "entity_type": "natural_person"}),
             ),
             mk(
-                "kyc_ubo.assert.subject.type",
-                subj_target.clone(),
+                "kyc_ubo.assert.subject.place",
+                TargetBinding { entity_id: Some(company), ..subj_target.clone() },
                 serde_json::json!({"entity_id": company.0, "entity_type": "private_limited_company"}),
             ),
             mk(
-                "kyc_ubo.assert.edge.control",
+                "kyc_ubo.assert.edge.connect",
                 subj_target.clone(),
                 serde_json::json!({
                     "edge_id": edge,
@@ -371,35 +362,23 @@ fn board_enumerable_fqns() -> Result<HashSet<String>> {
             ),
             // Edge-scoped: target carries the edge id, not the payload
             // (`edge_id_from_target` reads `event.target.edge_id` — see
-            // `fold/control.rs`'s evidence/verify arms).
+            // `fold/control.rs`'s evidence/disconnect arms).
             mk(
                 "kyc_ubo.assert.edge.evidence",
                 TargetBinding::for_edge(subject, EdgeId(edge)),
                 serde_json::json!({}),
             ),
             mk(
-                "kyc_ubo.assert.edge.verification",
+                "kyc_ubo.assert.edge.disconnect",
                 TargetBinding::for_edge(subject, EdgeId(edge)),
-                serde_json::json!({}),
-            ),
-            mk(
-                "kyc_ubo.assert.subject.structure-class",
-                subj_target.clone(),
-                serde_json::json!({"entity_id": company.0, "structure_class": "private_company"}),
-            ),
-            mk(
-                "kyc_ubo.assert.edge.reconciliation",
-                subj_target.clone(),
                 serde_json::json!({}),
             ),
         ];
         let refs: Vec<&IntentEvent> = events.iter().collect();
         let control = fold_control_versioned(&refs, &registry)
             .context("folding synthetic control state for board enumeration")?;
-        let obligation = fold_obligations_versioned(&refs, &registry)
-            .context("folding synthetic obligation state for board enumeration")?;
         let type_registry = fold_type_registry(&refs);
-        let set = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+        let set = enumerate_placement_set(subject, &control, &type_registry, &lexicon);
         found.extend(set.moves.iter().map(|m| m.verb_fqn.as_str().to_string()));
     }
 

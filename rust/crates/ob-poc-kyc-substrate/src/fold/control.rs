@@ -331,7 +331,7 @@ pub struct ControlState {
     // as the retired verb itself. SMO now reaches a determination solely via
     // the traversal's pull-on-exhaustion, which populates `candidates`
     // (`Prong::SmoFallback`) — TS.3 §4a.
-    /// Subject registration (if `kyc_ubo.assert.subject.register` has fired).
+    /// Subject registration (if `kyc_ubo.assert.subject.place` has fired).
     pub registered: bool,
     pub register_event_id: Option<EventId>,
     /// Entity ids registered so far under this subject_root (T6 row-9 fix,
@@ -569,27 +569,21 @@ pub(crate) fn evaluate_type_geometry(
 // `STRUCTURE_CLASS_WIRE_VALUES` RETIRED (EOP-DD-UBO-DISPATCH-001 T4,
 // 2026-08-28) alongside the `kyc_ubo.assert.subject.structure-class` verb —
 // it gated ONLY the op-side write-path validation in
-// `ob-poc-kyc-seam::canonical`, which is gone with the verb. The fold-side
-// parser below (`structure_class_from_payload`) stays — R5-historical, 10
-// real committed events (P0 census) — but has its own literal match arms,
-// never read this table as data.
-
-fn structure_class_from_payload(payload: &serde_json::Value) -> Option<StructureClass> {
-    match payload.get("structure_class")?.as_str()? {
-        "private_company" => Some(StructureClass::PrivateCompany),
-        "multi_tier_holding" => Some(StructureClass::MultiTierHoldingGroup),
-        "listed_entity" => Some(StructureClass::ListedEntity),
-        "lp_fund" => Some(StructureClass::LimitedPartnershipFund),
-        "llp" => Some(StructureClass::Llp),
-        "trust" => Some(StructureClass::Trust),
-        "foundation" => Some(StructureClass::Foundation),
-        "investment_fund" => Some(StructureClass::InvestmentFund),
-        "state_owned" => Some(StructureClass::StateOwned),
-        "cooperative" => Some(StructureClass::Cooperative),
-        "nominee" => Some(StructureClass::Nominee),
-        _ => None,
-    }
-}
+// `ob-poc-kyc-seam::canonical`, which is gone with the verb.
+//
+// `structure_class_from_payload` and the fold arm that called it REMOVED
+// (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07, Q2): R5 required keeping
+// this arm to preserve replay fidelity over a REAL pre-existing stream
+// (10 committed events, P0 census). R5 itself is unchanged and governs
+// everything written from the epoch forward (Adam, 2026-09-07) — but its
+// premise here (a stream to replay) is permanently false after the clean
+// start cleared it. `ControlState.structure_class`/`classify_event_id`
+// stay on the struct (read by `evaluation.rs`'s `StructureClassPresent`
+// applicability condition, out of this tranche's scope — the
+// inspect-game phase) but are now permanently `None`: no code anywhere
+// sets them, the same structural dead-end `JurisdictionPresent`/
+// `RiskAtOrAbove` already are (disclosed, not fixed — belongs to the
+// inspect-game phase, EOP-DD-UBO-CLEANOUT-001 T6 P0c).
 
 /// Apply a single event to `ControlState` — the inner step of the v1 fold.
 ///
@@ -601,19 +595,13 @@ pub(crate) fn apply_one_control_event(
 ) -> ControlState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
-        // Historical only (EOP-VS-UBO-GAME-001 T2 retired the verb; the arm
-        // stays so any pre-existing stream with real `register` events
-        // still folds correctly — R5, nothing is deleted). No new event of
-        // this kind can be produced going forward: absent from
-        // `assembly_lexicon()` and unregistered as an op.
-        "kyc_ubo.assert.subject.register" => {
-            state.registered = true;
-            state.register_event_id = Some(event.id);
-            if let Some(eid) = entity_id(p, "entity_id") {
-                state.registered_entity_ids.insert(eid);
-            }
-        }
-
+        // `kyc_ubo.assert.subject.register`'s R5-historical arm REMOVED
+        // (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07, Q2) — identical
+        // effect to `place` below, so removing it has no live consequence;
+        // R5's replay-fidelity premise (a real stream to replay) is
+        // permanently false after the clean start. A historical event
+        // bearing this FQN now falls through to the catch-all `_ => {}`.
+        //
         // §3.2: `place` absorbs register + assert-type — one event, both
         // axes. This arm writes the ControlGraph axis (membership);
         // `fold::type_registry::apply_one_type_registry_event` writes the
@@ -627,10 +615,10 @@ pub(crate) fn apply_one_control_event(
             }
         }
 
-        "kyc_ubo.assert.subject.structure-class" => {
-            state.structure_class = structure_class_from_payload(p);
-            state.classify_event_id = Some(event.id);
-        }
+        // `kyc_ubo.assert.subject.structure-class`'s R5-historical arm
+        // REMOVED (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07, Q2) — see
+        // this file's header note above `apply_one_control_event` for the
+        // `structure_class`/`classify_event_id` consequence.
 
         // §3.4 R8 (EOP-VS-UBO-GAME-001 T3, corrected 2026-08-27): `remove`
         // is never refused — it PRUNES the links that touch the removed
@@ -656,44 +644,14 @@ pub(crate) fn apply_one_control_event(
 
         // `kyc_ubo.assert.edge.economic-interest` — RETIRED (EOP-VS-UBO-GAME-001
         // T3 §3.2, absorbed into `connect` below). P0c census: 0 real
-        // committed events under this FQN — K-G7 full deletion of the arm
-        // (unlike `control` below, which has real history and stays R5).
-        // A historical event still bearing this verb_fqn falls through to
-        // the catch-all `_ => {}`, a no-op — replay-faithful, and provably
-        // inert (there is nothing to replay).
-
-        // Historical only (EOP-VS-UBO-GAME-001 T3 retired the FQN; the arm
-        // stays so any pre-existing stream with real `control` events still
-        // folds correctly — R5, nothing is deleted; P0c census: 4 real
-        // committed events). No new event of this kind can be produced
-        // going forward: absent from `assembly_lexicon()` and unregistered
-        // as an op — `connect` below is the live arm.
-        "kyc_ubo.assert.edge.control" => {
-            if let (Some(from), Some(to)) =
-                (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
-            {
-                let kind = edge_kind_from_payload(p);
-                let key = format!("control:{}:{}:{:?}", from.0, to.0, kind);
-                let edge_id = edge_id_from_payload(p)
-                    .unwrap_or_else(|| EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes())));
-                state.edges.insert(
-                    edge_id,
-                    EdgeState {
-                        id: edge_id,
-                        kind,
-                        from,
-                        to,
-                        percentage: opt_f64(p, "percentage"),
-                        status: EdgeStatus::Asserted,
-                        proofs: BTreeMap::new(),
-                        originating_event_id: event.id,
-                        trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
-                        superseded_by: None,
-                        pierced_from: edge_id_field(p, "pierced_from"),
-                    },
-                );
-            }
-        }
+        // committed events under this FQN — K-G7 full deletion of the arm.
+        //
+        // `kyc_ubo.assert.edge.control`'s R5-historical arm REMOVED
+        // (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07, Q2) — `connect`
+        // below is, and was already, the live arm; this one existed only
+        // to replay a real stream (4 committed events, P0c census) that
+        // the clean start has cleared. A historical event bearing either
+        // FQN now falls through to the catch-all `_ => {}`.
 
         // §3.2: `connect` absorbs assert-control + assert-economic-interest
         // — one merged verb, kind (including "economic_interest") always
@@ -865,7 +823,6 @@ pub fn fold_control(events: &[&IntentEvent]) -> ControlState {
 // ── Precondition checker ──────────────────────────────────────────────────────
 
 use crate::error::KycError;
-use crate::fold::obligation::{obligation_id_from_payload, ObligationState};
 use crate::lexicon::{LexiconEntry, Precondition};
 
 // `IMPLEMENTED_STRATEGY_CLASSES`/`strategy_for_structure_class` RETIRED
@@ -960,17 +917,21 @@ pub fn dispatch_for_entity_type(entity_type: &EntityType) -> DeterminationDispat
     }
 }
 
-/// Check all preconditions for a verb against the current control state,
-/// obligation state, and target binding **before** appending the event
-/// (K-11, K-14). The unified two-fold checker (T6.1(a)): a single evaluator
-/// sees both folds so a stud can read either axis — e.g. an obligation verb
-/// reading `ControlState.registered`, or an obligation-basis stud reading
-/// `ObligationState` — without forking the precondition discipline into two
-/// parallel checkers.
+/// Check all preconditions for a verb against the current control state and
+/// target binding **before** appending the event (K-11, K-14).
+///
+/// Was the "unified two-fold checker" (T6.1(a)) over `ControlState` AND
+/// `ObligationState` — narrowed to control-only (EOP-DD-UBO-CLEANOUT-001
+/// T6 P2, 2026-09-07): `ObligationState`/`fold/obligation.rs` deleted, both
+/// obligation-reading arms (`ObligationExists`, `SubjectAllTerminal`) went
+/// with it — see this crate's `lib.rs` module doc for the full reasoning
+/// (the obligation fold's only two write-triggering FQNs were both already
+/// retired/dissolved; nothing anywhere constructs an `ObligationTracks`).
+/// This absorbed the former `check_control_preconditions` delegate, which
+/// was already identical to this function once the obligation axis is gone.
 pub fn check_preconditions(
     lexicon_entry: &LexiconEntry,
     control: &ControlState,
-    obligation: &ObligationState,
     type_registry: &TypeRegistryState,
     event: &IntentEvent,
 ) -> Result<(), KycError> {
@@ -980,7 +941,7 @@ pub fn check_preconditions(
                 if !control.registered {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),
-                        reason: "subject must be registered (kyc_ubo.assert.subject.register) before this verb"
+                        reason: "subject must be registered (kyc_ubo.assert.subject.place) before this verb"
                             .into(),
                     });
                 }
@@ -1129,14 +1090,6 @@ pub fn check_preconditions(
                     }
                 }
             }
-            Precondition::ObligationExists => {
-                let oid = obligation_id_from_payload(&event.payload).ok_or_else(|| {
-                    KycError::MissingTarget("obligation_id required for ObligationExists".into())
-                })?;
-                if !obligation.obligations.contains_key(&oid) {
-                    return Err(KycError::ObligationNotFound(oid));
-                }
-            }
             Precondition::EntityRegistered => {
                 // TS.1 §3 rows 2/6/7 ("entity exists"). Vacuous when the
                 // probe carries no `entity_id` — same convention as
@@ -1151,21 +1104,10 @@ pub fn check_preconditions(
                             verb: lexicon_entry.fqn.clone(),
                             reason: format!(
                                 "entity {eid:?} is not a registered group member \
-                                 (kyc_ubo.assert.subject.register) — TS.1 §3 rows 2/6/7"
+                                 (kyc_ubo.assert.subject.place) — TS.1 §3 rows 2/6/7"
                             ),
                         });
                     }
-                }
-            }
-            Precondition::SubjectAllTerminal => {
-                if obligation.derive_subject_state(event.subject_root)
-                    != crate::fold::obligation::SubjectOverallState::AllTerminal
-                {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "not all required obligation tracks are terminal (K-23 gate)"
-                            .into(),
-                    });
                 }
             }
             Precondition::MembershipActive => {
@@ -1194,8 +1136,8 @@ pub fn check_preconditions(
                         return Err(KycError::PreconditionFailed {
                             verb: lexicon_entry.fqn.clone(),
                             reason: format!(
-                                "entity {eid:?} has no prior type assertion to correct — use \
-                                 kyc_ubo.assert.subject.type instead (TS.1 §3 row 7)"
+                                "entity {eid:?} has no prior type assertion — assert one via \
+                                 kyc_ubo.assert.subject.place first (TS.1 §3 row 7)"
                             ),
                         });
                     }
@@ -1315,19 +1257,11 @@ pub fn check_preconditions(
     Ok(())
 }
 
-/// Thin delegate over [`check_preconditions`] for callers that don't need the
-/// obligation axis yet (T6.1(a) — shrinks the diff for call sites where no
-/// attached precondition reads `ObligationState`; the real append chokepoint
-/// (`ob-poc-kyc-store::PgKycEventStore::append`) uses the two-fold function
-/// directly with a genuinely folded `ObligationState`, never this delegate).
-pub fn check_control_preconditions(
-    lexicon_entry: &LexiconEntry,
-    state: &ControlState,
-    type_registry: &TypeRegistryState,
-    event: &IntentEvent,
-) -> Result<(), KycError> {
-    check_preconditions(lexicon_entry, state, &ObligationState::default(), type_registry, event)
-}
+// `check_control_preconditions` REMOVED (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+// 2026-09-07): it was a thin delegate calling `check_preconditions` with a
+// default `&ObligationState` — once the obligation axis is gone, that made
+// it byte-for-byte identical to `check_preconditions` itself. Callers
+// updated to call `check_preconditions` directly.
 
 // ── Economic edge summary (for determination strategy) ────────────────────────
 
@@ -1626,13 +1560,14 @@ pub fn natural_persons_from_events(events: &[&IntentEvent]) -> BTreeSet<PersonId
         .map(|(eid, _)| PersonId(eid.0))
         .collect();
 
-    // R5-historical fallback — the same two FQNs the flag-only
-    // implementation recognized, now guarded on "no type assertion exists":
-    // reachable only by register-era events (no type ever) or a historical
-    // `place` whose wire type failed the fail-closed parse.
+    // Fallback guarded on "no type assertion exists" — reachable only by
+    // a `place` event whose wire type failed the fail-closed parse (the
+    // `kyc_ubo.assert.subject.register`-era arm of this check REMOVED,
+    // EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07: `register`'s own R5
+    // fold arm is gone, so no event bearing that FQN can occur here any
+    // more — see `apply_one_control_event`'s header note).
     for event in events {
-        if (event.verb_fqn.as_str() == "kyc_ubo.assert.subject.register"
-            || event.verb_fqn.as_str() == "kyc_ubo.assert.subject.place")
+        if event.verb_fqn.as_str() == "kyc_ubo.assert.subject.place"
             && event
                 .payload
                 .get("is_natural_person")

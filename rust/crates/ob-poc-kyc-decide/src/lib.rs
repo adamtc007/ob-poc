@@ -78,9 +78,9 @@ use sem_os_postgres::ops::SemOsVerbOp;
 
 use ob_poc_kyc_read::PgKycEventReader;
 use ob_poc_kyc_substrate::{
-    board_state_hash, evaluate_checks, fold_control, fold_obligations_versioned,
+    board_state_hash, evaluate_checks, fold_control,
     fold_type_registry, in_scope_check_ids, BoardSnapshot, EvaluationCatalogue, EvaluationRun,
-    FoldRegistry, Hash, RunPins, RunTrigger, SubjectId, V1FoldImpl,
+    Hash, RunPins, RunTrigger, SubjectId,
 };
 
 // ── JSON arg extraction (local — `super::helpers` in `ob-poc` is
@@ -107,32 +107,22 @@ fn json_extract_uuid(
         .ok_or_else(|| anyhow!("Missing {arg_name} argument"))
 }
 
-// ── Fold registry (this crate's own — read-only use, never appends) ────────
-
-/// The v1 fold registry, keyed by `assembly_lexicon()`'s hash — same
-/// registration `kyc_stream_ops.rs` uses, duplicated here rather than
-/// shared, since sharing would require depending on `ob-poc-kyc-seam` or
-/// the `ob-poc` binary crate, either of which reopens the dependency this
-/// crate exists to close off.
-fn v1_registry() -> FoldRegistry {
-    let mut registry = FoldRegistry::new();
-    registry.register(
-        ob_poc_kyc_substrate::assembly_lexicon().hash,
-        std::sync::Arc::new(V1FoldImpl),
-    );
-    registry
-}
-
-/// Load the board (control + type registry + obligation state) for
-/// `subject` from the live fact stream — a read, not a write (permitted
-/// under TS.6 §2's boundary: "Evaluation reads... its determination").
+/// Load the board (control + type registry) for `subject` from the live
+/// fact stream — a read, not a write (permitted under TS.6 §2's boundary:
+/// "Evaluation reads... its determination").
+///
+/// Was `(ControlState, TypeRegistryState, ObligationState)` — every one of
+/// this function's three callers discarded the obligation element
+/// (`_obligations`); K-23 is enforced against `kyc_decision_records`
+/// directly, never this fold. Dropped, along with the `v1_registry()`
+/// helper it was the only caller of, when `fold/obligation.rs` was removed
+/// (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07).
 async fn load_board_state(
     scope: &mut dyn TransactionScope,
     subject: SubjectId,
 ) -> Result<(
     ob_poc_kyc_substrate::ControlState,
     ob_poc_kyc_substrate::TypeRegistryState,
-    ob_poc_kyc_substrate::ObligationState,
 )> {
     let events = PgKycEventReader::load_events(scope.executor(), subject)
         .await
@@ -140,9 +130,7 @@ async fn load_board_state(
     let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
     let control = fold_control(&refs);
     let type_registry = fold_type_registry(&refs);
-    let obligations = fold_obligations_versioned(&refs, &v1_registry())
-        .map_err(|e| anyhow!("decide: obligation fold failed: {e}"))?;
-    Ok((control, type_registry, obligations))
+    Ok((control, type_registry))
 }
 
 /// D2.1 §7 Q3: extract the session identity from the SAME platform-extension
@@ -359,7 +347,7 @@ impl SemOsVerbOp for DecideApprove {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
 
-        let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
+        let (control, type_registry) = load_board_state(scope, subject).await?;
         let run = compute_and_persist_run(
             scope,
             ctx,
@@ -429,7 +417,7 @@ impl SemOsVerbOp for DecideReject {
         // Rejection is deliberately allowed at ANY stage (early rejection is
         // a real compliance outcome) — the run here is for the basis
         // citation only, never a gate.
-        let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
+        let (control, type_registry) = load_board_state(scope, subject).await?;
         let run = compute_and_persist_run(
             scope,
             ctx,
@@ -491,7 +479,7 @@ impl SemOsVerbOp for DecideObligationWaive {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Missing reason argument"))?;
 
-        let (control, type_registry, _obligations) = load_board_state(scope, subject).await?;
+        let (control, type_registry) = load_board_state(scope, subject).await?;
         let run = compute_and_persist_run(
             scope,
             ctx,

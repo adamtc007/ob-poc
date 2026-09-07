@@ -301,9 +301,9 @@ domains:
 
   kyc_ubo.decide.obligation:
     description: KYC Evaluation-pack obligation waiver (D2.0 §5, moved from
-      kyc_ubo.assert.obligation.waiver 2026-08-22) — a human ruling that a
-      failing check does not apply, citing the run. Writes only to
-      kyc_decision_records, never the dsl.kyc fact stream.
+      the retired assert-scoped obligation waiver verb on 2026-08-22) — a
+      human ruling that a failing check does not apply, citing the run.
+      Writes only to kyc_decision_records, never the dsl.kyc fact stream.
     verbs:
       waiver:
         flavour: attribute_mutating

@@ -51,20 +51,26 @@ const ASSEMBLY_VERB_FQNS: &[&str] = &[
 
 /// Named, documented exemptions: direct `TargetBinding` construction sites
 /// in `kyc_stream_ops.rs` that do NOT go through `canonical_event_shape`.
-/// Exactly two, both explained in `canonical.rs`'s own module doc and
+/// Exactly one, explained in `canonical.rs`'s own module doc and
 /// CLAUDE.md's KYC/UBO section:
 /// - `freeze` — computes a verdict from live `ControlState`/`ObligationState`,
 ///   not from declared arguments; calling `canonical_event_shape` with this
 ///   FQN is itself a caller bug (it `bail!`s).
-/// - `apply_screening_outcome_to_obligations` — an internal system fan-out
-///   hook that synthesizes `kyc_ubo.assert.entity.screening` events from
-///   live fold-derived `obligation_ids`, never from a caller's declared
-///   arguments. Not a "surface" in R6's sense.
 ///
-/// A third site appearing here means either a new second constructor snuck
+/// `apply_screening_outcome_to_obligations` was the second exemption until
+/// EOP-DD-UBO-CLEANOUT-001 T6 (2026-09-07): it fanned out
+/// `kyc_ubo.assert.entity.screening` events from fold-derived
+/// `obligation_ids` — a path that only ever existed because D2.0 §5's
+/// `creation` dissolution had already made those `obligation_ids` permanently
+/// unobtainable (confirmed inert since 2026-08-22, `tests/kyc_w5_screening_hook.rs`'s
+/// own comment). It is now a documented no-op with no `TargetBinding`
+/// construction at all — not a constructor exemption, because it constructs
+/// nothing.
+///
+/// A second site appearing here means either a new second constructor snuck
 /// in, or a new legitimate exemption exists that must be named here (and in
 /// `canonical.rs`'s doc) before this count changes.
-const OP_LAYER_DOCUMENTED_EXEMPTIONS: usize = 2;
+const OP_LAYER_DOCUMENTED_EXEMPTIONS: usize = 1;
 
 #[test]
 fn one_event_constructor_op_layer_covers_every_assembly_verb() {
@@ -100,9 +106,9 @@ fn one_event_constructor_op_layer_has_no_undocumented_second_constructor() {
         direct_target_binding, OP_LAYER_DOCUMENTED_EXEMPTIONS,
         "R6: kyc_stream_ops.rs has {direct_target_binding} direct TargetBinding \
          construction site(s) outside canonical_event_shape, expected exactly \
-         {OP_LAYER_DOCUMENTED_EXEMPTIONS} (freeze + apply_screening_outcome_to_obligations, \
-         both named exemptions in this file's doc comment). If you added a legitimate \
-         third exemption, name and document it there and in canonical.rs, then update \
+         {OP_LAYER_DOCUMENTED_EXEMPTIONS} (freeze, the sole named exemption in this \
+         file's doc comment). If you added a legitimate second exemption, name and \
+         document it there and in canonical.rs, then update \
          OP_LAYER_DOCUMENTED_EXEMPTIONS here. If not, this is a new undocumented second \
          constructor — route it through canonical_event_shape instead."
     );

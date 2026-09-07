@@ -15,7 +15,7 @@ use uuid::Uuid;
 use ob_poc_kyc_substrate::{
     check_preconditions, compute_assurance, enumerate_placement_set, fold_control,
     fold_type_registry, assembly_lexicon, AuthorityRef, EdgeId, EntityId, IntentEvent,
-    KycError, ObligationState, PersonId, Principal, ProngCandidate, ProvisionalityReason, Prong,
+    KycError, PersonId, Principal, ProngCandidate, ProvisionalityReason, Prong,
     SubjectId, TargetBinding,
 };
 
@@ -27,26 +27,26 @@ fn as_of() -> DateTime<Utc> {
     DateTime::<Utc>::from_timestamp(0, 0).unwrap()
 }
 
-fn register_event(subject: SubjectId, entity: EntityId) -> IntentEvent {
+/// `place` absorbs register + assert-type (T2, §3.2) — one event, both the
+/// membership (`fold_control`) and type (`fold_type_registry`) axes. `wire`
+/// is `None` to reproduce the old register-only ("registered but untyped")
+/// fixture shape: `fold_type_registry`'s `place` arm only inserts a type
+/// record when `entity_type` is present in the payload, so omitting it
+/// registers the entity in `ControlState` without touching
+/// `TypeRegistryState` at all — the exact split the two-verb fixture used to
+/// give for free.
+fn place_event(subject: SubjectId, entity: EntityId, wire: Option<&str>) -> IntentEvent {
+    let mut payload = serde_json::json!({ "entity_id": entity.0.to_string() });
+    if let Some(wire) = wire {
+        payload["entity_type"] = serde_json::Value::String(wire.to_string());
+    }
     IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.register",
-        Principal::test_analyst(),
-        AuthorityRef("test".into()),
-        TargetBinding::for_subject(subject),
-        serde_json::json!({ "entity_id": entity.0.to_string() }),
-        as_of(),
-    )
-}
-
-fn assert_type_event(subject: SubjectId, entity: EntityId, wire: &str) -> IntentEvent {
-    IntentEvent::new(
-        subject,
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("test".into()),
         TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
-        serde_json::json!({ "entity_id": entity.0.to_string(), "entity_type": wire }),
+        payload,
         as_of(),
     )
 }
@@ -76,18 +76,15 @@ fn illegal_target_type_is_refused() {
     let subject = subject();
     let person = EntityId(Uuid::new_v4());
     let trust = EntityId(Uuid::new_v4());
-    let reg1 = register_event(subject, person);
-    let reg2 = register_event(subject, trust);
-    let t1 = assert_type_event(subject, person, "natural_person");
-    let t2 = assert_type_event(subject, trust, "discretionary_trust");
-    let control = fold_control(&[&reg1, &reg2, &t1, &t2]);
-    let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
-    let obligation = ObligationState::default();
+    let p1 = place_event(subject, person, Some("natural_person"));
+    let p2 = place_event(subject, trust, Some("discretionary_trust"));
+    let control = fold_control(&[&p1, &p2]);
+    let type_registry = fold_type_registry(&[&p1, &p2]);
 
     let lexicon = assembly_lexicon();
     let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let event = assert_control_event(subject, person, trust, "voting_rights");
-    let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
+    let verdict = check_preconditions(entry, &control, &type_registry, &event);
     assert!(matches!(verdict, Err(KycError::GeometryRefused { .. })), "got {verdict:?}");
 }
 
@@ -119,15 +116,12 @@ fn preview_and_append_agree() {
         let subject = subject();
         let a = EntityId(Uuid::new_v4());
         let b = EntityId(Uuid::new_v4());
-        let reg1 = register_event(subject, a);
-        let reg2 = register_event(subject, b);
-        let t1 = assert_type_event(subject, a, "natural_person");
-        let t2 = assert_type_event(subject, b, "natural_person");
-        let control = fold_control(&[&reg1, &reg2, &t1, &t2]);
-        let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
-        let obligation = ObligationState::default();
+        let p1 = place_event(subject, a, Some("natural_person"));
+        let p2 = place_event(subject, b, Some("natural_person"));
+        let control = fold_control(&[&p1, &p2]);
+        let type_registry = fold_type_registry(&[&p1, &p2]);
 
-        let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+        let board = enumerate_placement_set(subject, &control, &type_registry, &lexicon);
         let offered_voting = board
             .moves
             .iter()
@@ -140,7 +134,7 @@ fn preview_and_append_agree() {
         );
 
         let event = assert_control_event(subject, a, b, "voting_rights");
-        let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
+        let verdict = check_preconditions(entry, &control, &type_registry, &event);
         assert!(verdict.is_err(), "append should ALSO refuse — preview and append agree (refuse case)");
     }
 
@@ -149,15 +143,12 @@ fn preview_and_append_agree() {
         let subject = subject();
         let person = EntityId(Uuid::new_v4());
         let corp = EntityId(Uuid::new_v4());
-        let reg1 = register_event(subject, person);
-        let reg2 = register_event(subject, corp);
-        let t1 = assert_type_event(subject, person, "natural_person");
-        let t2 = assert_type_event(subject, corp, "private_limited_company");
-        let control = fold_control(&[&reg1, &reg2, &t1, &t2]);
-        let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
-        let obligation = ObligationState::default();
+        let p1 = place_event(subject, person, Some("natural_person"));
+        let p2 = place_event(subject, corp, Some("private_limited_company"));
+        let control = fold_control(&[&p1, &p2]);
+        let type_registry = fold_type_registry(&[&p1, &p2]);
 
-        let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+        let board = enumerate_placement_set(subject, &control, &type_registry, &lexicon);
         // The SPECIFIC triple, not merely the verb — the whole point of R2.
         let offered = board
             .moves
@@ -168,7 +159,7 @@ fn preview_and_append_agree() {
         assert!(offered, "board SHOULD offer person --voting_rights--> corp");
 
         let event = assert_control_event(subject, person, corp, "voting_rights");
-        let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &event);
+        let verdict = check_preconditions(entry, &control, &type_registry, &event);
         assert!(verdict.is_ok(), "append should ALSO admit this specific legal triple: {verdict:?}");
     }
 }
@@ -181,22 +172,21 @@ fn untyped_endpoint_admits_provisionally() {
     let subject = subject();
     let a = EntityId(Uuid::new_v4());
     let b = EntityId(Uuid::new_v4());
-    let reg1 = register_event(subject, a);
-    let reg2 = register_event(subject, b);
-    // Deliberately NO assert-type for either entity.
-    let control = fold_control(&[&reg1, &reg2]);
-    let type_registry = fold_type_registry(&[&reg1, &reg2]);
-    let obligation = ObligationState::default();
+    let p1 = place_event(subject, a, None);
+    let p2 = place_event(subject, b, None);
+    // Deliberately NO entity-type on either place event.
+    let control = fold_control(&[&p1, &p2]);
+    let type_registry = fold_type_registry(&[&p1, &p2]);
 
     let lexicon = assembly_lexicon();
     let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let assert_event = assert_control_event(subject, a, b, "voting_rights");
-    let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
+    let verdict = check_preconditions(entry, &control, &type_registry, &assert_event);
     assert!(verdict.is_ok(), "untyped endpoint must ADMIT, not refuse: {verdict:?}");
 
     // Fold the real event so the edge id is deterministic-per-payload, then
     // build a determination touching `b` and confirm assurance records it.
-    let control2 = fold_control(&[&reg1, &reg2, &assert_event]);
+    let control2 = fold_control(&[&p1, &p2, &assert_event]);
     let edge_id = *control2.edges.keys().next().expect("edge inserted");
     let candidate = ProngCandidate {
         person_id: PersonId(a.0),
@@ -225,19 +215,16 @@ fn uncited_type_admits_provisionally() {
     let subject = subject();
     let person = EntityId(Uuid::new_v4());
     let corp = EntityId(Uuid::new_v4());
-    let reg1 = register_event(subject, person);
-    let reg2 = register_event(subject, corp);
-    let t1 = assert_type_event(subject, person, "natural_person");
-    let t2 = assert_type_event(subject, corp, "private_limited_company");
+    let p1 = place_event(subject, person, Some("natural_person"));
+    let p2 = place_event(subject, corp, Some("private_limited_company"));
     // No evidence event — both types stay asserted, never cited.
-    let control = fold_control(&[&reg1, &reg2, &t1, &t2]);
-    let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
-    let obligation = ObligationState::default();
+    let control = fold_control(&[&p1, &p2]);
+    let type_registry = fold_type_registry(&[&p1, &p2]);
 
     let lexicon = assembly_lexicon();
     let entry = lexicon.get("kyc_ubo.assert.edge.connect").unwrap();
     let assert_event = assert_control_event(subject, person, corp, "voting_rights");
-    let verdict = check_preconditions(entry, &control, &obligation, &type_registry, &assert_event);
+    let verdict = check_preconditions(entry, &control, &type_registry, &assert_event);
     assert!(verdict.is_ok(), "uncited-typed endpoint must ADMIT: {verdict:?}");
 
     let candidate = ProngCandidate {
@@ -268,15 +255,12 @@ fn geometry_refusal_is_distinguishable_from_stud_refusal() {
     let subject = subject();
     let person = EntityId(Uuid::new_v4());
     let fund = EntityId(Uuid::new_v4());
-    let reg1 = register_event(subject, person);
-    let reg2 = register_event(subject, fund);
-    let t1 = assert_type_event(subject, person, "natural_person");
-    let t2 = assert_type_event(subject, fund, "oeic_icvc");
-    let control = fold_control(&[&reg1, &reg2, &t1, &t2]);
-    let type_registry = fold_type_registry(&[&reg1, &reg2, &t1, &t2]);
-    let obligation = ObligationState::default();
+    let p1 = place_event(subject, person, Some("natural_person"));
+    let p2 = place_event(subject, fund, Some("oeic_icvc"));
+    let control = fold_control(&[&p1, &p2]);
+    let type_registry = fold_type_registry(&[&p1, &p2]);
     let geo_event = assert_control_event(subject, person, fund, "management_mandate");
-    let geo_verdict = check_preconditions(entry, &control, &obligation, &type_registry, &geo_event);
+    let geo_verdict = check_preconditions(entry, &control, &type_registry, &geo_event);
     assert!(matches!(geo_verdict, Err(KycError::GeometryRefused { .. })), "got {geo_verdict:?}");
 
     // Stud violation: a duplicate active edge of the same (from, to, kind) —
@@ -284,15 +268,13 @@ fn geometry_refusal_is_distinguishable_from_stud_refusal() {
     let subject_b = SubjectId(Uuid::new_v4());
     let corp_a = EntityId(Uuid::new_v4());
     let corp_b = EntityId(Uuid::new_v4());
-    let reg3 = register_event(subject_b, corp_a);
-    let reg4 = register_event(subject_b, corp_b);
-    let t3 = assert_type_event(subject_b, corp_a, "natural_person");
-    let t4 = assert_type_event(subject_b, corp_b, "private_limited_company");
+    let p3 = place_event(subject_b, corp_a, Some("natural_person"));
+    let p4 = place_event(subject_b, corp_b, Some("private_limited_company"));
     let first_assert = assert_control_event(subject_b, corp_a, corp_b, "voting_rights");
-    let control2 = fold_control(&[&reg3, &reg4, &t3, &t4, &first_assert]);
-    let type_registry2 = fold_type_registry(&[&reg3, &reg4, &t3, &t4]);
+    let control2 = fold_control(&[&p3, &p4, &first_assert]);
+    let type_registry2 = fold_type_registry(&[&p3, &p4]);
     let second_assert = assert_control_event(subject_b, corp_a, corp_b, "voting_rights");
-    let stud_verdict = check_preconditions(entry, &control2, &obligation, &type_registry2, &second_assert);
+    let stud_verdict = check_preconditions(entry, &control2, &type_registry2, &second_assert);
     assert!(matches!(stud_verdict, Err(KycError::PreconditionFailed { .. })), "got {stud_verdict:?}");
 
     // Distinguishable in both directions.
@@ -329,12 +311,9 @@ fn mixed_board() -> (SubjectId, EntityId, EntityId, EntityId, Vec<IntentEvent>) 
     let person2 = EntityId(Uuid::new_v4());
     let corp = EntityId(Uuid::new_v4());
     let evs = vec![
-        register_event(subject, person),
-        register_event(subject, person2),
-        register_event(subject, corp),
-        assert_type_event(subject, person, "natural_person"),
-        assert_type_event(subject, person2, "natural_person"),
-        assert_type_event(subject, corp, "private_limited_company"),
+        place_event(subject, person, Some("natural_person")),
+        place_event(subject, person2, Some("natural_person")),
+        place_event(subject, corp, Some("private_limited_company")),
     ];
     (subject, person, person2, corp, evs)
 }
@@ -348,9 +327,8 @@ fn illegal_triple_is_not_offered() {
     let refs: Vec<&IntentEvent> = evs.iter().collect();
     let control = fold_control(&refs);
     let type_registry = fold_type_registry(&refs);
-    let obligation = ObligationState::default();
 
-    let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+    let board = enumerate_placement_set(subject, &control, &type_registry, &lexicon);
 
     let offered_triples: Vec<(EntityId, EntityId, String)> = board
         .moves
@@ -404,9 +382,8 @@ fn preview_and_append_agree_for_every_triple() {
     let refs: Vec<&IntentEvent> = evs.iter().collect();
     let control = fold_control(&refs);
     let type_registry = fold_type_registry(&refs);
-    let obligation = ObligationState::default();
 
-    let board = enumerate_placement_set(subject, &control, &obligation, &type_registry, &lexicon);
+    let board = enumerate_placement_set(subject, &control, &type_registry, &lexicon);
     let offered: std::collections::BTreeSet<(EntityId, EntityId, String)> = board
         .moves
         .iter()
@@ -428,7 +405,7 @@ fn preview_and_append_agree_for_every_triple() {
                 let is_offered = offered.contains(&(from, to, (*wire).to_string()));
                 let event = assert_control_event(subject, from, to, wire);
                 let admits =
-                    check_preconditions(entry, &control, &obligation, &type_registry, &event)
+                    check_preconditions(entry, &control, &type_registry, &event)
                         .is_ok();
                 if is_offered != admits {
                     disagreements.push(format!(

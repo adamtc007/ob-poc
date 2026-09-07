@@ -40,7 +40,7 @@ use dsl_runtime::TransactionScope;
 use ob_poc::domain_ops::kyc_workbook::KycWorkbook;
 use ob_poc_kyc_substrate::{
     check_preconditions, assembly_lexicon, ControlState, EntityId, EntityType, EntityTypeRecord,
-    EventId, FoldRegistry, ObligationState, StructureClass, SubjectId,
+    EventId, FoldRegistry, StructureClass, SubjectId,
     TypeRegistryState, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
@@ -136,7 +136,6 @@ fn probe(subject: SubjectId, verb_fqn: &str) -> ob_poc_kyc_substrate::IntentEven
 fn precondition_blocks_illegal_placement() {
     let lexicon = assembly_lexicon();
     let subject = SubjectId(Uuid::new_v4());
-    let empty_obligation = ObligationState::default();
 
     // TS.4 fixture rework: the exemplar class walked TS.1 Trust → TS.2
     // Foundation → TS.3 StateOwned → Nominee; at TS.4 Nominee joined the
@@ -156,7 +155,6 @@ fn precondition_blocks_illegal_placement() {
     let freeze_result = check_preconditions(
         freeze_entry,
         &unclassified_ready,
-        &empty_obligation,
         &TypeRegistryState::default(),
         &probe(subject, "kyc_ubo.decide.determination.freeze"),
     );
@@ -197,7 +195,6 @@ fn type_registry_with(subject: SubjectId, entity_type: EntityType) -> TypeRegist
 fn precondition_admits_legal_placement() {
     let lexicon = assembly_lexicon();
     let subject = SubjectId(Uuid::new_v4());
-    let empty_obligation = ObligationState::default();
 
     // PrivateCompany is in the pinned implemented-strategy set.
     let pc_state = control_with_class_strategized(StructureClass::PrivateCompany);
@@ -207,7 +204,6 @@ fn precondition_admits_legal_placement() {
         check_preconditions(
             freeze_entry,
             &pc_state,
-            &empty_obligation,
             &type_registry,
             &probe(subject, "kyc_ubo.decide.determination.freeze"),
         )
@@ -217,95 +213,18 @@ fn precondition_admits_legal_placement() {
     );
 }
 
-// ── checker_sees_both_folds ─────────────────────────────────────────────────
-//
-// Direct proof that `check_preconditions` genuinely evaluates an
-// ObligationState-reading variant — this test builds a synthetic entry
-// (clone a real one, override `.preconditions`) rather than reaching for a
-// wired-up verb, exactly per the plan's own instruction for this gate.
-//
-// Originally exercised `SubjectNotDecided` (then UNATTACHED to any lexicon
-// entry in T6.1). `SubjectNotDecided` and `SubjectOverallState::Approved`/
-// `Rejected` were retired TS.6 P2 (K-G7): `kyc_ubo.decide.subject.approve`/`kyc_ubo.decide.subject.reject`
-// moved off the fact stream entirely (structural Evaluation-pack split,
-// `ob-poc-kyc-decide`), so the substrate's pure fold can no longer see a
-// decision to be "not yet decided" about — the finality check moved with
-// them onto `kyc_decision_records`. Rewired onto `SubjectAllTerminal`
-// instead (wired, live, and still ObligationState-reading) — same proof,
-// a real precondition rather than a synthetic one.
-
-#[test]
-fn checker_sees_both_folds() {
-    let lexicon = assembly_lexicon();
-    let subject = SubjectId(Uuid::new_v4());
-    let empty_control = ControlState::default();
-
-    let mut synthetic_entry = lexicon.get("kyc_ubo.assert.entity.identity").unwrap().clone();
-    synthetic_entry.preconditions = vec![ob_poc_kyc_substrate::Precondition::SubjectAllTerminal];
-
-    // InProgress (default/no rollup) — not all-terminal — must reject.
-    let not_terminal = ObligationState::default();
-    let result = check_preconditions(
-        &synthetic_entry,
-        &empty_control,
-        &not_terminal,
-        &TypeRegistryState::default(),
-        &probe(subject, "kyc_ubo.assert.entity.identity"),
-    );
-    assert!(
-        result.is_err(),
-        "SubjectAllTerminal must reject a subject with no rollup (defaults to InProgress)"
-    );
-
-    // AllTerminal — build a rollup AND a matching all-terminal obligation by
-    // hand (obligation is otherwise unreachable from outside the crate
-    // without a real event stream; `ObligationState`'s fields are all
-    // `pub`) — must admit. `derive_subject_state` derives fresh from
-    // `rollup.obligations`/`self.obligations` every call (it does not
-    // consult the stored `overall_state` field at all any more — that
-    // shortcut existed only for the now-retired Approved/Rejected
-    // variants), so a rollup with an empty `obligations` list is
-    // indistinguishable from InProgress regardless of what `overall_state`
-    // is set to; a real terminal obligation must be present.
-    let obligation_id = ob_poc_kyc_substrate::ObligationId(Uuid::new_v4());
-    let by_event = ob_poc_kyc_substrate::EventId::new();
-    let mut terminal = ObligationState::default();
-    terminal.obligations.insert(
-        obligation_id,
-        ob_poc_kyc_substrate::ObligationTracks {
-            obligation_id,
-            basis: ob_poc_kyc_substrate::ObligationBasis {
-                role: "director".into(),
-                jurisdiction: None,
-                cbu_role: None,
-                source_event_id: by_event,
-            },
-            identity: ob_poc_kyc_substrate::TrackState::Satisfied { by_event },
-            screening: ob_poc_kyc_substrate::TrackState::Satisfied { by_event },
-            risk: ob_poc_kyc_substrate::TrackState::Satisfied { by_event },
-            originating_event_id: by_event,
-        },
-    );
-    terminal.subjects.insert(
-        subject,
-        ob_poc_kyc_substrate::SubjectRollup {
-            subject_id: subject,
-            obligations: vec![obligation_id],
-        },
-    );
-    assert!(
-        check_preconditions(
-            &synthetic_entry,
-            &empty_control,
-            &terminal,
-            &TypeRegistryState::default(),
-            &probe(subject, "kyc_ubo.assert.entity.identity"),
-        )
-        .is_ok(),
-        "SubjectAllTerminal must admit once ObligationState shows the subject AllTerminal — \
-         proves the checker reads the obligation fold, not just control"
-    );
-}
+// `checker_sees_both_folds` RETIRED (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+// 2026-09-07) — its entire purpose was a direct proof that
+// `check_preconditions` genuinely evaluates an `ObligationState`-reading
+// variant. It had already been rewired once (from the retired
+// `SubjectNotDecided` onto `SubjectAllTerminal`, TS.6 P2) because its
+// premise kept losing its precondition; this time the premise itself
+// (an obligation-reading axis on the checker at all) is gone —
+// `fold/obligation.rs`/`ObligationState`/`Precondition::SubjectAllTerminal`
+// deleted, `fold/obligation.rs`'s own retirement comment: nothing anywhere
+// constructs an `ObligationTracks` any more, since D2.0 §5 dissolved
+// `creation`, the only verb that ever did. Same retirement shape as
+// `select_strategy_blocked_end_to_end` above: no rewrite target survives.
 
 // ── kit_drift_on_stud_batch ──────────────────────────────────────────────────
 //

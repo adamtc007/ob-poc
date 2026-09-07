@@ -260,8 +260,7 @@ mod e2e_tests {
         // does NOT include entity-workstream.set-ubo, which is admitted by
         // zero packs anywhere in the system.
         let allowed_verbs: std::collections::HashSet<String> = [
-            "kyc_ubo.assert.subject.register",
-            "kyc_ubo.assert.subject.structure-class",
+            "kyc_ubo.assert.subject.place",
             "kyc_ubo.assert.edge.connect",
             "kyc_ubo.decide.determination.freeze",
             "kyc-case.create",

@@ -88,19 +88,27 @@ fn historical_registry() -> FoldRegistry {
     r
 }
 
-/// Constructs a `register`-only or `type`-only event, exactly the shape a
-/// pre-T2 stream carries (EOP-VS-UBO-GAME-001 T2 retired both as separate
-/// op-dispatchable verbs, merged into `place` — no NEW write can produce an
-/// entity that is registered but untyped, or type-asserted independently of
-/// registration, any more). Used only by
-/// `unevaluable_is_not_fail_through_production` /
+/// Constructs a `place` event directly at the fold level, bypassing the
+/// `SemOsVerbOp` layer where `entity-type` is a required arg
+/// (`canonical_event_shape`'s `place` arm, via `required_string_arg`).
+/// `fold_control`'s `place` arm sets `registered`/`registered_entity_ids`
+/// from `entity_id` alone, independent of whether `entity_type` is present;
+/// `fold_type_registry`'s `place` arm only inserts a type record when it
+/// is. Omitting `entity_type` therefore reaches "registered but untyped" —
+/// a state no REAL op-dispatched call can produce (the op layer enforces
+/// the required arg) but the fold itself still represents correctly, since
+/// nothing in the fold requires the two axes to land in the same event.
+/// Used only by `unevaluable_is_not_fail_through_production` /
 /// `unevaluable_flips_to_pass_through_production`, which test the
-/// evaluation engine's `ProvenTypeCheck::FactAbsent`/`AllegedType` distinction
-/// — a real, still-valid fold state for historical data, reachable no other
-/// way post-T2. Bypasses `SemOsVerbOp` entirely (there is no live op for
-/// these FQNs); appends directly via the same `append_in_scope` chokepoint
-/// every op uses, so this is still a real governed append, just of a
-/// historical-shaped event.
+/// evaluation engine's `ProvenTypeCheck::FactAbsent`/`AllegedType`
+/// distinction. Appends directly via the same `append_in_scope` chokepoint
+/// every op uses, so this is still a real governed append, just built below
+/// the op layer's arg validation rather than through it. (Previously used
+/// the retired `register`/`type` FQNs to reach this state, framed as
+/// "pre-T2 historical shape" — EOP-DD-UBO-CLEANOUT-001 T6 P4, 2026-09-07,
+/// corrected this: after the clean start there is no historical stream
+/// left to justify that framing, and `place` reaches the identical fold
+/// state without naming a retired verb.)
 async fn append_historical(verb_fqn: &str, subject: SubjectId, payload: serde_json::Value, pool: &PgPool) {
     let registry = historical_registry();
     let mut scope = Scope::begin(pool).await;
@@ -114,7 +122,7 @@ async fn append_historical(verb_fqn: &str, subject: SubjectId, payload: serde_js
         chrono::Utc::now(),
     )
     .with_lexicon_hash(assembly_lexicon().hash);
-    append_in_scope(&mut scope, &registry, &event, "", |_, _, _| Ok(())).await.unwrap();
+    append_in_scope(&mut scope, &registry, &event, "", |_, _| Ok(())).await.unwrap();
     scope.tx.commit().await.unwrap();
 }
 
@@ -223,13 +231,14 @@ async fn findings_reach_the_run_record() {
 async fn unevaluable_carries_its_reason() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    // Historical shape — see `append_historical`'s own doc: this test needs
-    // FactAbsent (no type asserted at all), which `place` can no longer
-    // produce (it always types atomically).
+    // Below-the-op-layer shape — see `append_historical`'s own doc: this
+    // test needs FactAbsent (no type asserted at all), which a real
+    // op-dispatched `place` call can no longer produce (the op layer
+    // requires `entity-type`), but the fold itself still represents.
     append_historical(
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         subject,
-        serde_json::json!({ "entity_id": subject.0, "is_natural_person": true }),
+        serde_json::json!({ "entity_id": subject.0 }),
         &pool,
     )
     .await;
@@ -302,12 +311,12 @@ async fn load_run_history(pool: &PgPool, subject: SubjectId) -> Vec<EvaluationRu
 async fn unevaluable_is_not_fail_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    // Historical shape (T2 retired register/type as separate ops — see
-    // `append_historical`'s own doc): registered, no type yet.
+    // Below-the-op-layer shape — see `append_historical`'s own doc:
+    // registered, no type yet.
     append_historical(
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         subject,
-        serde_json::json!({ "entity_id": subject.0, "is_natural_person": true }),
+        serde_json::json!({ "entity_id": subject.0 }),
         &pool,
     )
     .await;
@@ -323,7 +332,7 @@ async fn unevaluable_is_not_fail_through_production() {
     // Confirms "never the reverse" isn't trivially satisfied by staying put
     // for the SAME reason.
     append_historical(
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         subject,
         serde_json::json!({ "entity_id": subject.0, "entity_type": "natural_person" }),
         &pool,
@@ -359,11 +368,11 @@ async fn unevaluable_is_not_fail_through_production() {
 async fn unevaluable_flips_to_pass_through_production() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
-    // Historical shape — see `append_historical`'s own doc.
+    // Below-the-op-layer shape — see `append_historical`'s own doc.
     append_historical(
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         subject,
-        serde_json::json!({ "entity_id": subject.0, "is_natural_person": true }),
+        serde_json::json!({ "entity_id": subject.0 }),
         &pool,
     )
     .await;
@@ -373,7 +382,7 @@ async fn unevaluable_flips_to_pass_through_production() {
     assert!(findings1[0]["verdict"].get("Unevaluable").is_some(), "no type asserted must be Unevaluable: {findings1}");
 
     append_historical(
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         subject,
         serde_json::json!({ "entity_id": subject.0, "entity_type": "natural_person" }),
         &pool,

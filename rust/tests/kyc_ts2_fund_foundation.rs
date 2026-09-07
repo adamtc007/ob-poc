@@ -495,17 +495,23 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
         )
         .with_lexicon_hash(lexicon_hash)
     };
+    // T3 (§3.1/§3.2) merged `assert.edge.control` + `assert.edge.economic-interest`
+    // into one verb, `connect` — `kind` alone distinguishes them now.
     let edge = |from: Uuid, to: Uuid, kind: &str| {
         mk(
-            "kyc_ubo.assert.edge.control",
+            "kyc_ubo.assert.edge.connect",
             serde_json::json!({ "from_entity_id": from, "to_entity_id": to, "kind": kind }),
         )
     };
 
+    // `place` absorbs register (+ structure-class + assert-type, T2/T6.1(a)).
+    // Only `ControlState.registered_entity_ids` matters to this fixture —
+    // `ControlProngStrategy::resolve` takes no `TypeRegistryState`/structure-class
+    // argument — so `entity-type` is omitted.
     let register = |entity: Uuid| {
         mk(
-            "kyc_ubo.assert.subject.register",
-            serde_json::json!({ "entity_id": entity, "is_natural_person": true, "entity-type": "natural_person" }),
+            "kyc_ubo.assert.subject.place",
+            serde_json::json!({ "entity_id": entity }),
         )
     };
 
@@ -515,22 +521,12 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
         register(gp_principal),
         register(nominee),
         register(economic_only),
-        mk(
-            "kyc_ubo.assert.subject.structure-class",
-            serde_json::json!({ "structure_class": "llp", "entity_id": subject_entity }),
-        ),
         edge(direct_voter, subject_entity, "voting_rights"),
         edge(board_holder, subject_entity, "board_appointment"),
         edge(intermediate, subject_entity, "gp_statutory"),
         edge(gp_principal, intermediate, "dominant_influence"),
         edge(nominee, subject_entity, "nominee"),
-        mk(
-            "kyc_ubo.assert.edge.economic-interest",
-            serde_json::json!({
-                "from_entity_id": economic_only, "to_entity_id": subject_entity,
-                "percentage": 40.0,
-            }),
-        ),
+        edge(economic_only, subject_entity, "economic_interest"),
     ];
     let refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control_versioned(&refs, &reg).expect("fold ok");

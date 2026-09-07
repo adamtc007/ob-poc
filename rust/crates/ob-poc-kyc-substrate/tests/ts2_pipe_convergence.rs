@@ -214,7 +214,7 @@ fn historical_edges_reclassify_without_mutation() {
     );
     let type_event = IntentEvent::new(
         subject,
-        "kyc_ubo.assert.subject.type",
+        "kyc_ubo.assert.subject.place",
         Principal::test_analyst(),
         AuthorityRef("historical".into()),
         TargetBinding { entity_id: Some(fund), ..TargetBinding::for_subject(subject) },

@@ -5,11 +5,23 @@
 //!   - Verb-event contract (§2)
 //!   - Lexicon-entry contract (§3)
 //!   - Control & determination fold (§4.1)
-//!   - Obligation fold (§4.2)
 //!   - Demoted ownership-prong strategy + freeze (§5)
 //!
 //! **No sqlx. No DB. No schema.**  The durable `kyc_intent_events` table
 //! replaces `InMemoryEventStore` in W1-proper behind the same interface.
+//!
+//! **Obligation fold (§4.2) REMOVED** (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+//! 2026-09-07): `fold/obligation.rs`'s only two write-triggering verbs
+//! (`kyc_ubo.assert.subject.register`, and the D2.0-§5-dissolved
+//! `kyc_ubo.assert.obligation.creation`) were both already retired —
+//! nothing anywhere ever constructed a fresh `ObligationTracks` entry at
+//! the live write path, and the op layer had already stopped calling
+//! `check_preconditions` for the three verbs that read `ObligationExists`
+//! (`identity`/`screening`/`risk` pass `validate_entry_fqn: None`,
+//! `kyc_stream_ops.rs`) — 317 lines of a dissolved concept, still live in
+//! the seam's signature. `ObligationState`, `fold_obligations`,
+//! `Precondition::ObligationExists`/`SubjectAllTerminal`, and
+//! `FoldImpl::apply_obligation` all went with it.
 
 pub(crate) mod determination;
 pub(crate) mod error;
@@ -44,7 +56,7 @@ pub use evaluation::{
 };
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
-    check_control_preconditions, check_preconditions, control_admission, dispatch_for_entity_type,
+    check_preconditions, control_admission, dispatch_for_entity_type,
     edges_of_kind_into, fold_control, governing_mandate_edges_into, natural_persons_from_events,
     proof_kind_from_wire, reconciled_control_edges, reconciled_economic_edges,
     reconciled_trust_edges, unpierced_nominee_edges, ControlAdmission, ControlState,
@@ -52,13 +64,7 @@ pub use fold::control::{
     ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge, StructureClass,
     TrustRoleKind, EDGE_KIND_WIRE_VALUES, PROOF_KIND_WIRE_VALUES,
 };
-pub use fold::obligation::{
-    fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
-    SubjectRollup, TrackState,
-};
-pub use fold::registry::{
-    fold_control_versioned, fold_obligations_versioned, FoldImpl, FoldRegistry, V1FoldImpl,
-};
+pub use fold::registry::{fold_control_versioned, FoldImpl, FoldRegistry, V1FoldImpl};
 pub use fold::type_registry::{
     entity_type_from_wire, fold_type_registry, EnquiryRecord,
     EntityTypeRecord, TypeCorrectionRecord, TypeRegistryState,

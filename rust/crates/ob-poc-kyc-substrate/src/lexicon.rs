@@ -110,12 +110,16 @@ pub enum Precondition {
     /// The edge named by `target.edge_id` must exist and not be superseded
     /// (rows 3,4).
     EdgeActive,
-    /// The obligation named by the event payload's `obligation_id` must exist
-    /// (rows 12–16).
-    ObligationExists,
-    /// The subject's obligation rollup must be `AllTerminal`
-    /// (row 17 — the K-23 approval gate).
-    SubjectAllTerminal,
+    // `ObligationExists`/`SubjectAllTerminal` REMOVED (EOP-DD-UBO-CLEANOUT-001
+    // T6 P2, 2026-09-07) with `fold/obligation.rs`/`ObligationState` — both
+    // were already permanently unreachable at the real write path (the op
+    // layer passed `validate_entry_fqn: None` for the three verbs that
+    // declared `ObligationExists`, precisely because it was dead there —
+    // see `identity`/`screening`/`risk`'s lexicon entries below, now
+    // `vec![]`), and `SubjectAllTerminal` was declared on no live lexicon
+    // entry (K-23 is enforced in `ob-poc-kyc-decide`, against
+    // `kyc_decision_records`, never this checker — see `evaluation_lexicon()`
+    // below).
 
     // ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new moves ─────────────────────
     /// `target.entity_id` must be in `ControlState.registered_entity_ids`
@@ -192,8 +196,8 @@ pub enum Precondition {
     /// TS.4 §3 Ruling B (K-8): a determination may not freeze while ANY
     /// active `EdgeKind::Nominee` edge remains unpierced anywhere in the
     /// subject's control graph — pure `ControlState` scan
-    /// (`unpierced_nominee_edges`), independent of `event`/target/payload,
-    /// same discipline as `SubjectAllTerminal`. `freeze` has exactly one
+    /// (`unpierced_nominee_edges`), independent of `event`/target/payload.
+    /// `freeze` has exactly one
     /// live surface (the op — `canonical_event_shape` bails on this FQN by
     /// design, §3.2), so this promotion doesn't close a two-surface
     /// disagreement the way `PiercedFromIsActiveNominee` does; it is done
@@ -594,7 +598,10 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // retired TS.6 P2 — decisions no longer reach the fact stream at
             // all (see `kyc.person.approve`/`.reject`'s TS.6 note below), so
             // the substrate has nothing left to check it against.
-            vec![Precondition::ObligationExists],
+            // `ObligationExists` REMOVED (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+            // 2026-09-07) — was already dead at the real write path
+            // (`validate_entry_fqn: None`, `kyc_stream_ops.rs`).
+            vec![],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -605,7 +612,8 @@ pub fn assembly_lexicon() -> LexiconManifest {
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
             // T6.4 row 13 (⊗): same stud as row 12, reused.
-            vec![Precondition::ObligationExists],
+            // `ObligationExists` REMOVED — see `identity` above.
+            vec![],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -615,7 +623,8 @@ pub fn assembly_lexicon() -> LexiconManifest {
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
             // T6.4 row 14 (⊗): same stud as row 12, reused.
-            vec![Precondition::ObligationExists],
+            // `ObligationExists` REMOVED — see `identity` above.
+            vec![],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -741,8 +750,8 @@ pub fn evaluation_lexicon() -> LexiconManifest {
         LexiconEntry::build(
             "kyc_ubo.decide.obligation.waiver",
             "A human rules that a failing check does not apply, with reason and \
-             authority, citing the run (D2.0 §5, moved from \
-             `kyc_ubo.assert.obligation.waiver` 2026-08-22). Writes only to \
+             authority, citing the run (D2.0 §5, moved from the retired \
+             assert-scoped obligation waiver verb on 2026-08-22). Writes only to \
              kyc_decision_records — never the fact stream.",
             Taxonomy::Obligation,
             smallvec![],

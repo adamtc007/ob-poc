@@ -22,11 +22,11 @@ use chrono::{TimeZone, Utc};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, fold_control, fold_control_versioned, fold_type_registry,
-    fold_obligations_versioned, freeze_determination, assembly_lexicon, reconciled_economic_edges,
+    check_preconditions, fold_control, fold_control_versioned, fold_type_registry,
+    freeze_determination, assembly_lexicon, reconciled_economic_edges,
     recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
     DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
-    IntentEvent, ObligationState, OwnershipProngStrategy, PersonId, Principal, Prong,
+    IntentEvent, OwnershipProngStrategy, PersonId, Principal, Prong,
     RecoveryPin, SubjectId, TargetBinding, TypeRegistryState, V1FoldImpl,
 };
 use std::sync::Arc;
@@ -149,84 +149,61 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
     let t = ts(2026, 1, 1);
 
     vec![
-        // Register the subject.
+        // Place the subject (entity A), a private limited company. `place`
+        // absorbs register + structure-class + assert-type in one event
+        // (T2/T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07) — the
+        // three separate `register`/`structure-class`/`type` steps this
+        // fixture used to build (the first two already dead no-ops before
+        // this edit, per the T4 comment this replaces) are gone; `place`
+        // sets both `ControlState.registered`/`registered_entity_ids` and
+        // the `TypeRegistryState` entry `freeze`'s precondition reads.
         te(
             0,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false, "role": "customer"}),
-            idem("reg-a"),
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("place-a"),
             t,
         ),
-        // Classify as private company.
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.structure-class",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("cls-a"),
-            t,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
-        // event — `structure-class` no longer drives freeze's precondition
-        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
-        // ControlState.structure_class); `place`/`type` is the fold arm
-        // that populates it (fold/type_registry.rs).
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.type",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("typ-a"),
-            t,
-        ),
-        // Register persons as natural persons.
+        // Place persons as natural persons.
         te(
             2,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p1.0, "is_natural_person": true, "role": "ubo_candidate"}),
-            idem("reg-p1"),
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("place-p1"),
             t,
         ),
         te(
             3,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p2.0, "is_natural_person": true, "role": "ubo_candidate"}),
-            idem("reg-p2"),
+            serde_json::json!({"entity_id": p2.0, "entity_type": "natural_person"}),
+            idem("place-p2"),
             t,
         ),
         te(
             4,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p3.0, "is_natural_person": true, "role": "ubo_candidate"}),
-            idem("reg-p3"),
+            serde_json::json!({"entity_id": p3.0, "entity_type": "natural_person"}),
+            idem("place-p3"),
             t,
         ),
         // Economic edges.
@@ -310,19 +287,13 @@ fn build_fixture_events(subject: SubjectId) -> Vec<IntentEvent> {
         // T3, §3.3, 2026-08-27): the verb dissolved — "no reconcile ... a third
         // path to what two moves already do" — its fold arm is gone, so this
         // step was a no-op even before removal here.
-        // Select strategy.
-        te(
-            10,
-            subject,
-            "ubo.determination.select-strategy",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("select-strategy"),
-            t,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED
+        // (EOP-DD-UBO-CLEANOUT-001 T6 P3, 2026-09-07): retired TS.6 P2 —
+        // `freeze` now derives its strategy from `TypeRegistryState`
+        // (EntityTypeSupportsStrategy, T4-close), never from a separately
+        // asserted strategy event; this step was a no-op even before
+        // removal here, same as the reconciliation step above.
     ]
 }
 
@@ -428,45 +399,21 @@ fn ec2_freeze_precondition_no_longer_gates_on_reconciliation() {
 
     // Two sources claim 70% and 60% — combined 130% (conflict).
     let events = [
+        // `place` absorbs register + structure-class + assert-type in one
+        // event (T2/T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07)
+        // — sets both `ControlState.registered`/`registered_entity_ids` and
+        // the `TypeRegistryState` entry `freeze`'s precondition
+        // (EntityTypeSupportsStrategy) reads.
         te(
             0,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("reg"),
-            t,
-        ),
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.structure-class",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("cls"),
-            t,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
-        // event — `structure-class` no longer drives freeze's precondition
-        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
-        // ControlState.structure_class); `place`/`type` is the fold arm
-        // that populates it (fold/type_registry.rs).
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.type",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("typ"),
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("place"),
             t,
         ),
         te(
@@ -534,7 +481,7 @@ fn ec2_freeze_precondition_no_longer_gates_on_reconciliation() {
     // ControlState.structure_class) — derive it from the same events.
     let type_registry = fold_type_registry(&event_refs);
     let result =
-        check_control_preconditions(freeze_entry, &control, &type_registry, &dummy_event);
+        check_preconditions(freeze_entry, &control, &type_registry, &dummy_event);
     assert!(
         result.is_ok(),
         "T3 §3.3: freeze's precondition check no longer gates on reconciliation — {result:?}"
@@ -658,29 +605,20 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
         te(
             0,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
             serde_json::json!({"entity_id": a.0}),
-            idem("reg"),
+            idem("place"),
             t,
         ),
         // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
         // the note on the first fixture in this file.
-        te(
-            2,
-            subject,
-            "ubo.determination.select-strategy",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("strategy"),
-            t,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED (T6 P3) — see the
+        // note on the first fixture in this file.
         te(
             3,
             subject,
@@ -750,57 +688,30 @@ fn ec5_replay_determinism_after_supersede() {
 
     // Phase 1: build state with P1 owning B which owns A.
     let mut events: Vec<IntentEvent> = vec![
+        // `place` absorbs register + structure-class + assert-type (T2/
+        // T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07).
         te(
             0,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("reg-a"),
-            t1,
-        ),
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.structure-class",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("cls"),
-            t1,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
-        // event — `structure-class` no longer drives freeze's precondition
-        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
-        // ControlState.structure_class); `place`/`type` is the fold arm
-        // that populates it (fold/type_registry.rs).
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.type",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("typ"),
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("place-a"),
             t1,
         ),
         te(
             2,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
-            idem("reg-p1"),
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("place-p1"),
             t1,
         ),
         // B → A: 60%
@@ -833,18 +744,9 @@ fn ec5_replay_determinism_after_supersede() {
         ),
         // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
         // the note on the first fixture in this file.
-        te(
-            6,
-            subject,
-            "ubo.determination.select-strategy",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("strategy"),
-            t1,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED (T6 P3) — see the
+        // note on the first fixture in this file.
         // First freeze at seq=7 (t1).
         te(
             7,
@@ -1224,13 +1126,13 @@ fn d2_phase2_unregistered_hash_is_hard_error_not_silent_fold() {
     let event = te(
         0,
         subject,
-        "kyc_ubo.assert.subject.register",
+        "kyc_ubo.assert.subject.place",
         unknown_hash,
         analyst(),
         authority(),
         TargetBinding::for_subject(subject),
-        serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-        idem("reg"),
+        serde_json::json!({"entity_id": a.0}),
+        idem("place"),
         t,
     );
 
@@ -1253,41 +1155,13 @@ fn d2_phase2_unregistered_hash_is_hard_error_not_silent_fold() {
     }
 }
 
-#[test]
-fn d2_phase2_obligation_unregistered_hash_is_hard_error() {
-    let subject = fixture_subject_id();
-    let t = ts(2026, 1, 1);
-    let unknown_hash = Hash::of(b"obligation-unknown-version");
-
-    let event = te(
-        0,
-        subject,
-        "kyc_ubo.assert.subject.register",
-        unknown_hash,
-        analyst(),
-        authority(),
-        TargetBinding::for_subject(subject),
-        serde_json::json!({"entity_id": Uuid::new_v4()}),
-        idem("reg"),
-        t,
-    );
-
-    let registry = FoldRegistry::new();
-    let events = vec![&event as &IntentEvent];
-
-    let result = fold_obligations_versioned(&events, &registry);
-    assert!(
-        result.is_err(),
-        "fold_obligations_versioned must reject unregistered hash"
-    );
-    assert!(
-        matches!(
-            result.unwrap_err(),
-            ob_poc_kyc_substrate::KycError::UnregisteredLexiconHash(_)
-        ),
-        "must be UnregisteredLexiconHash",
-    );
-}
+// `d2_phase2_obligation_unregistered_hash_is_hard_error` REMOVED
+// (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07) — tested
+// `fold_obligations_versioned`, deleted with `fold/obligation.rs`. Its
+// control-axis sibling (`d2_phase2_unregistered_hash_is_hard_error_not_silent_fold`,
+// unaffected, still above) already proves the same registry-dispatch
+// property; there was never a second dispatch mechanism, only two folds
+// sharing one.
 
 // ── Phase 3 Test A: Two versions actually dispatch differently ─────────────────
 //
@@ -1302,9 +1176,6 @@ struct NoopFoldImpl;
 
 impl FoldImpl for NoopFoldImpl {
     fn apply_control(&self, state: ControlState, _event: &IntentEvent) -> ControlState {
-        state // intentionally ignore
-    }
-    fn apply_obligation(&self, state: ObligationState, _event: &IntentEvent) -> ObligationState {
         state // intentionally ignore
     }
 }
@@ -1459,69 +1330,42 @@ fn axes_diverge_on_correction() {
     let natural_persons: BTreeSet<PersonId> = [p1, p2].into();
 
     let mut events: Vec<IntentEvent> = vec![
+        // `place` absorbs register + structure-class + assert-type (T2/
+        // T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07).
         te(
             0,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("reg-a"),
-            t1,
-        ),
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.structure-class",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("cls"),
-            t1,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
-        // event — `structure-class` no longer drives freeze's precondition
-        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
-        // ControlState.structure_class); `place`/`type` is the fold arm
-        // that populates it (fold/type_registry.rs).
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.type",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("typ"),
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("place-a"),
             t1,
         ),
         te(
             2,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
-            idem("reg-p1"),
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("place-p1"),
             t1,
         ),
         te(
             3,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p2.0, "is_natural_person": true}),
-            idem("reg-p2"),
+            serde_json::json!({"entity_id": p2.0, "entity_type": "natural_person"}),
+            idem("place-p2"),
             t1,
         ),
         // P1 -> A: 30% (above 25% threshold; will be superseded at t2).
@@ -1554,18 +1398,9 @@ fn axes_diverge_on_correction() {
         ),
         // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
         // the note on the first fixture in this file.
-        te(
-            7,
-            subject,
-            "ubo.determination.select-strategy",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("strategy"),
-            t1,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED (T6 P3) — see the
+        // note on the first fixture in this file.
         // First freeze at t1 — both P1 and P2 active.
         te(
             8,
@@ -1686,57 +1521,30 @@ fn bitemporal_matches_txtime_when_axes_align() {
     let natural_persons: BTreeSet<PersonId> = [p1].into();
 
     let events: Vec<IntentEvent> = vec![
+        // `place` absorbs register + structure-class + assert-type (T2/
+        // T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07).
         te(
             0,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("reg-a"),
-            t1,
-        ),
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.structure-class",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("cls"),
-            t1,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry
-        // event — `structure-class` no longer drives freeze's precondition
-        // (EntityTypeSupportsStrategy reads TypeRegistryState, not
-        // ControlState.structure_class); `place`/`type` is the fold arm
-        // that populates it (fold/type_registry.rs).
-        te(
-            1,
-            subject,
-            "kyc_ubo.assert.subject.type",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("typ"),
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("place-a"),
             t1,
         ),
         te(
             2,
             subject,
-            "kyc_ubo.assert.subject.register",
+            "kyc_ubo.assert.subject.place",
             h,
             analyst(),
             authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
-            idem("reg-p1"),
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("place-p1"),
             t1,
         ),
         // B -> A: 60%
@@ -1769,18 +1577,9 @@ fn bitemporal_matches_txtime_when_axes_align() {
         ),
         // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
         // the note on the first fixture in this file.
-        te(
-            6,
-            subject,
-            "ubo.determination.select-strategy",
-            h,
-            analyst(),
-            authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("strategy"),
-            t1,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED (T6 P3) — see the
+        // note on the first fixture in this file.
         te(
             7,
             subject,
@@ -1851,30 +1650,19 @@ fn r4_legal_set_at_past_time_is_reproducible() {
     let natural_persons: BTreeSet<PersonId> = [p1].into();
 
     let events: Vec<IntentEvent> = vec![
+        // `place` absorbs register + structure-class + assert-type (T2/
+        // T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07).
         te(
-            0, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
+            0, subject, "kyc_ubo.assert.subject.place", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("r4-reg-a"), t1,
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("r4-place-a"), t1,
         ),
         te(
-            1, subject, "kyc_ubo.assert.subject.structure-class", h, analyst(), authority(),
+            2, subject, "kyc_ubo.assert.subject.place", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("r4-cls"), t1,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry event.
-        te(
-            1, subject, "kyc_ubo.assert.subject.type", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("r4-typ"), t1,
-        ),
-        te(
-            2, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
-            idem("r4-reg-p1"), t1,
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("r4-place-p1"), t1,
         ),
         te(
             3, subject, "kyc_ubo.assert.edge.connect", h, analyst(), authority(),
@@ -1890,12 +1678,9 @@ fn r4_legal_set_at_past_time_is_reproducible() {
         ),
         // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
         // the note on the first fixture in this file.
-        te(
-            6, subject, "ubo.determination.select-strategy", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("r4-strategy"), t1,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED (T6 P3) — see the
+        // note on the first fixture in this file.
         te(
             7, subject, "kyc_ubo.decide.determination.freeze", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
@@ -1953,30 +1738,19 @@ fn r4_legality_pins_its_ruleset() {
     let natural_persons: BTreeSet<PersonId> = [p1].into();
 
     let events: Vec<IntentEvent> = vec![
+        // `place` absorbs register + structure-class + assert-type (T2/
+        // T6.1(a), EOP-DD-UBO-CLEANOUT-001 T6 P2/P3, 2026-09-07).
         te(
-            0, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
+            0, subject, "kyc_ubo.assert.subject.place", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
-            idem("r4b-reg-a"), t1,
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("r4b-place-a"), t1,
         ),
         te(
-            1, subject, "kyc_ubo.assert.subject.structure-class", h, analyst(), authority(),
+            2, subject, "kyc_ubo.assert.subject.place", h, analyst(), authority(),
             TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
-            idem("r4b-cls"), t1,
-        ),
-        // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): companion type-registry event.
-        te(
-            1, subject, "kyc_ubo.assert.subject.type", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": subject.0, "entity_type": "private_limited_company"}),
-            idem("r4b-typ"), t1,
-        ),
-        te(
-            2, subject, "kyc_ubo.assert.subject.register", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
-            idem("r4b-reg-p1"), t1,
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("r4b-place-p1"), t1,
         ),
         te(
             3, subject, "kyc_ubo.assert.edge.connect", h, analyst(), authority(),
@@ -1986,12 +1760,9 @@ fn r4_legality_pins_its_ruleset() {
         ),
         // `kyc_ubo.assert.edge.reconciliation` step REMOVED (T3, §3.3) — see
         // the note on the first fixture in this file.
-        te(
-            5, subject, "ubo.determination.select-strategy", h, analyst(), authority(),
-            TargetBinding::for_subject(subject),
-            serde_json::json!({"strategy": "ownership_prong_strategy"}),
-            idem("r4b-strategy"), t1,
-        ),
+        //
+        // `ubo.determination.select-strategy` step REMOVED (T6 P3) — see the
+        // note on the first fixture in this file.
         te(
             6, subject, "kyc_ubo.decide.determination.freeze", h, analyst(), authority(),
             TargetBinding::for_subject(subject),

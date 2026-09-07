@@ -461,7 +461,7 @@ invocation_phrases:
   - "start kyc"
   - "compliance check"
 allowed_verbs:
-  - kyc_ubo.assert.subject.register
+  - kyc_ubo.assert.subject.place
   - kyc-case.create
 "#
     }
@@ -722,7 +722,7 @@ allowed_verbs:
     #[test]
     fn test_packs_declaring_verb_finds_owner() {
         let router = make_router();
-        let owners = router.packs_declaring_verb("kyc_ubo.assert.subject.register");
+        let owners = router.packs_declaring_verb("kyc_ubo.assert.subject.place");
         assert_eq!(owners.len(), 1);
         assert_eq!(owners[0].id, "kyc-case");
     }

@@ -399,11 +399,6 @@ async fn run_scenario_1(pool: &PgPool, verbose: bool) -> Result<()> {
     );
     println!("    PASS: UBO evaluation complete");
 
-    // Step 6: Make decision
-    println!("\n  Step 6: Record decision...");
-    record_decision(pool, cbu_id, "CLEARED").await?;
-    println!("    PASS: Decision recorded as CLEARED");
-
     println!("\n  Scenario 1: ALL CHECKS PASSED");
     Ok(())
 }
@@ -608,11 +603,6 @@ async fn run_scenario_2(pool: &PgPool, verbose: bool) -> Result<()> {
         "Expected at least 1 control person (GP LLC as general_partner)"
     );
     println!("    PASS: Identified 3 BOs + control person(s)");
-
-    // Step 4: Make decision
-    println!("\n  Step 4: Record decision...");
-    record_decision(pool, cbu_id, "CLEARED").await?;
-    println!("    PASS: Decision recorded as CLEARED");
 
     println!("\n  Scenario 2: ALL CHECKS PASSED");
     Ok(())
@@ -819,11 +809,6 @@ async fn run_scenario_3(pool: &PgPool, verbose: bool) -> Result<()> {
         println!("    Enhanced DD required: {}", requires_edd);
     }
     println!("    PASS: Enhanced DD flagged");
-
-    // Step 5: Make decision
-    println!("\n  Step 5: Record decision...");
-    record_decision(pool, cbu_id, "CLEARED").await?;
-    println!("    PASS: Decision recorded as CLEARED");
 
     println!("\n  Scenario 3: ALL CHECKS PASSED");
     Ok(())
@@ -1270,38 +1255,3 @@ async fn evaluate_ubo(pool: &PgPool, cbu_id: Uuid) -> Result<UboEvaluation> {
     })
 }
 
-async fn record_decision(pool: &PgPool, cbu_id: Uuid, status: &str) -> Result<()> {
-    let evaluation = evaluate_ubo(pool, cbu_id).await?;
-    let snapshot = serde_json::json!({
-        "beneficial_owners": evaluation.beneficial_owners.iter().map(|bo| {
-            serde_json::json!({
-                "name": bo.name,
-                "percentage": bo.percentage
-            })
-        }).collect::<Vec<_>>(),
-        "control_persons": evaluation.control_persons.iter().map(|cp| {
-            serde_json::json!({
-                "name": cp.name,
-                "role": cp.role
-            })
-        }).collect::<Vec<_>>()
-    });
-
-    // Use a placeholder user ID for test
-    let test_user_id = Uuid::nil();
-
-    sqlx::query(
-        r#"
-        INSERT INTO "ob-poc".kyc_decisions (cbu_id, status, evaluation_snapshot, decided_by)
-        VALUES ($1, $2, $3, $4)
-        "#,
-    )
-    .bind(cbu_id)
-    .bind(status)
-    .bind(snapshot)
-    .bind(test_user_id)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}

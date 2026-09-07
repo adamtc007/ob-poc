@@ -6,7 +6,7 @@
 //! interesting-branch coverage).
 //!
 //! `gen_events` builds a plausible-but-adversarial `IntentEvent` sequence:
-//! verb FQNs drawn from the 16 known dsl.kyc verbs (plus deliberately
+//! verb FQNs drawn from the 14 live dsl.kyc verbs (plus deliberately
 //! unknown ones, to keep `apply_one_control_event`'s total-dispatch
 //! fallthrough hot), payloads carrying every field any control-fold verb
 //! reads, and a small reused id pool so edges/entities/persons actually
@@ -18,46 +18,36 @@ use ob_poc_kyc_substrate::{
 };
 use uuid::Uuid;
 
-/// All 13 live dsl.kyc verb FQNs (control-fold verbs, obligation-fold verbs,
-/// and determination-layer verbs the pure folds ignore) plus a couple of
-/// deliberately-unknown FQNs, so every fold's total-dispatch fallthrough
-/// (D2) stays hot alongside its real match arms. `fold_control` and
-/// `fold_obligations` each only react to their own subset — every other
-/// verb here exercises their harmless `_ => {}` arm instead.
-/// `select-strategy`/`compute-fold` (TS.6 P2, K-G7) and `pierce-nominee`
-/// (TS.6 P2, folded into a macro composing `assert-control`+`supersede`)
-/// dropped from this list — none of the three has a dedicated fold arm any
-/// more, so their strings would just be more `not.a.real.verb`-style
-/// fallthrough noise, indistinguishable from the two deliberate unknowns
-/// already below. `kyc.person.approve`/`.reject` also dropped (TS.6 P1/P2)
-/// — renamed `kyc_ubo.decide.subject.approve`/`.reject` and moved to `ob-poc-kyc-decide`,
-/// which never appends to the fact stream at all, so neither fold has ever
-/// had a dispatch arm for them (this fuzz target only exercises
-/// `apply_one_control_event`/`apply_one_obligation_event`, never
-/// `ob-poc-kyc-decide`'s DB-backed ops).
-/// EOP-VS-UBO-GAME-001 T3 (2026-08-27, §3.2/§3.3): `economic-interest` and
-/// `supersession` dropped from this list — same reasoning as select-strategy/
-/// compute-fold above: their fold arms were deleted outright (K-G7, 0 real
-/// committed events under either FQN), so their strings are now just more
-/// fallthrough noise, superseded by `connect`/`disconnect`, added below.
-/// `control` KEPT (R5, historical-only — 4 real committed events, arm
-/// stays); `reconciliation` DROPPED (K-G7 full deletion, field and arm both
-/// gone — see `fold::control`'s retirement comment).
+/// All 14 live dsl.kyc verb FQNs (`assembly_lexicon()` + `evaluation_lexicon()`
+/// combined — the determination-layer/evaluation verbs the pure control
+/// fold ignores are still worth generating, so `check_preconditions`
+/// against the last event has a real lexicon entry to match more often)
+/// plus a couple of deliberately-unknown FQNs, so `apply_one_control_event`'s
+/// total-dispatch fallthrough (D2) stays hot alongside its real match arms.
+///
+/// Was a hand-maintained list carrying several retired-name generations
+/// (register/structure-class/control/verification/the three
+/// `obligation.*` names) — deleted (EOP-DD-UBO-CLEANOUT-001 T6 P2, C2,
+/// 2026-09-07): that list existed to prove OLD events still fold safely,
+/// and after the clean start there are no old events, so keeping it would
+/// make this fuzzer assert a property the system no longer has. Retired
+/// FQNs now fall to the two deliberate unknowns below instead — same
+/// `_ => {}` fallthrough coverage, no retired vocabulary required to reach it.
 const ALL_VERBS: &[&str] = &[
-    "kyc_ubo.assert.subject.register",
-    "kyc_ubo.assert.subject.structure-class",
-    "kyc_ubo.assert.edge.control",
+    "kyc_ubo.assert.subject.place",
+    "kyc_ubo.assert.subject.remove",
+    "kyc_ubo.assert.subject.enquiry",
     "kyc_ubo.assert.edge.connect",
-    "kyc_ubo.assert.edge.evidence",
-    "kyc_ubo.assert.edge.verification",
     "kyc_ubo.assert.edge.disconnect",
-    "kyc_ubo.decide.determination.freeze",
-    "kyc_ubo.assert.obligation.creation",
+    "kyc_ubo.assert.edge.evidence",
+    "kyc_ubo.assert.edge.retract",
     "kyc_ubo.assert.entity.identity",
     "kyc_ubo.assert.entity.screening",
     "kyc_ubo.assert.entity.risk",
-    "kyc_ubo.assert.obligation.satisfaction",
-    "kyc_ubo.assert.obligation.waiver",
+    "kyc_ubo.decide.determination.freeze",
+    "kyc_ubo.decide.subject.approve",
+    "kyc_ubo.decide.subject.reject",
+    "kyc_ubo.decide.obligation.waiver",
     // Genuinely unknown FQNs — historical/garbage-event fallthrough (D2).
     "not.a.real.verb",
     "",
@@ -213,7 +203,10 @@ fn build_payload(
         "smo_person_id",
         pick_uuid_like(tape, person_pool).map(serde_json::Value::from),
     );
-    // Obligation-fold fields (`fold/obligation.rs::apply_one_obligation_event`).
+    // `obligation_id` — inert payload noise since `fold/obligation.rs`'s
+    // removal (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07); kept so the
+    // generator's payload shape is unchanged for the fields other arms
+    // still read.
     put(
         "obligation_id",
         pick_uuid_like(tape, obligation_pool).map(serde_json::Value::from),
@@ -277,9 +270,10 @@ fn build_target(tape: &mut Tape, edge_pool: &[String], subject_root: SubjectId) 
 
 /// Build a plausible-but-adversarial event sequence (1..=20 events) sharing
 /// one `subject_root` and small entity/edge/person/obligation id pools.
-/// Drives both the control fold and the obligation fold — `ALL_VERBS`
-/// spans both verb sets (plus the determination-layer verbs neither fold
-/// reacts to, and a couple of genuinely-unknown FQNs).
+/// Drives the control fold — `ALL_VERBS` spans the full live lexicon (plus
+/// the determination/evaluation-layer verbs the control fold ignores, and
+/// a couple of genuinely-unknown FQNs). The obligation id pool stays for
+/// payload-shape stability even though no fold reads it any more.
 pub fn gen_events(tape: &mut Tape) -> Vec<IntentEvent> {
     let subject_root = SubjectId(Uuid::new_v4());
     let entity_pool: Vec<String> = (0..4).map(|_| Uuid::new_v4().to_string()).collect();

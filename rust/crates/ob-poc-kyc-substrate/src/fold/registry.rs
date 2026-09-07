@@ -23,7 +23,6 @@ use std::sync::Arc;
 use crate::error::KycError;
 use crate::event::IntentEvent;
 use crate::fold::control::{apply_one_control_event, ControlState};
-use crate::fold::obligation::{apply_one_obligation_event, ObligationState};
 use crate::types::Hash;
 
 // ── Trait ────────────────────────────────────────────────────────────────────
@@ -37,26 +36,21 @@ use crate::types::Hash;
 pub trait FoldImpl: Send + Sync {
     /// Apply one event's contribution to the control graph state.
     fn apply_control(&self, state: ControlState, event: &IntentEvent) -> ControlState;
-    /// Apply one event's contribution to the obligation graph state.
-    fn apply_obligation(&self, state: ObligationState, event: &IntentEvent) -> ObligationState;
 }
 
 // ── V1 implementation (the current lexicon) ───────────────────────────────────
 
 /// `FoldImpl` for the initial lexicon version (the `assembly_lexicon()` manifest).
 ///
-/// Wraps `apply_one_control_event` and `apply_one_obligation_event` — the
-/// authoritative v1 fold logic extracted from `fold/control.rs` and
-/// `fold/obligation.rs`.
+/// Wraps `apply_one_control_event` — the authoritative v1 fold logic
+/// extracted from `fold/control.rs`. Was `apply_one_control_event` +
+/// `apply_one_obligation_event`; the obligation half went with
+/// `fold/obligation.rs` (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07).
 pub struct V1FoldImpl;
 
 impl FoldImpl for V1FoldImpl {
     fn apply_control(&self, state: ControlState, event: &IntentEvent) -> ControlState {
         apply_one_control_event(state, event)
-    }
-
-    fn apply_obligation(&self, state: ObligationState, event: &IntentEvent) -> ObligationState {
-        apply_one_obligation_event(state, event)
     }
 }
 
@@ -131,19 +125,5 @@ pub fn fold_control_versioned(
     Ok(state)
 }
 
-/// Fold an event stream's obligation state, dispatching each event through the
-/// registry on `event.lexicon_hash`.
-///
-/// # Errors
-/// Propagates `KycError::UnregisteredLexiconHash` on the first unregistered hash.
-pub fn fold_obligations_versioned(
-    events: &[&IntentEvent],
-    registry: &FoldRegistry,
-) -> Result<ObligationState, KycError> {
-    let mut state = ObligationState::default();
-    for event in events {
-        let impl_ = registry.get(&event.lexicon_hash)?;
-        state = impl_.apply_obligation(state, event);
-    }
-    Ok(state)
-}
+// `fold_obligations_versioned` REMOVED (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+// 2026-09-07) with `fold/obligation.rs`/`ObligationState`/`FoldImpl::apply_obligation`.

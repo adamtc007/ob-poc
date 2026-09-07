@@ -46,7 +46,7 @@ use chrono::{DateTime, Utc};
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc_kyc_substrate::{
     assembly_lexicon, enumerate_placement_set, fold_control, fold_type_registry, AuthorityRef,
-    EntityId, IntentEvent, ObligationState, Principal, SubjectId, TargetBinding,
+    EntityId, IntentEvent, Principal, SubjectId, TargetBinding,
 };
 use ob_poc_types::TransactionScopeId;
 
@@ -87,22 +87,23 @@ fn as_of() -> DateTime<Utc> {
 /// A real, populated board — one company, one natural person, both
 /// registered and type-asserted (Alleged), a control edge between them.
 /// Pure: built from `IntentEvent`s and folded directly, no DB round-trip.
-fn populated_board(subject: SubjectId) -> (ob_poc_kyc_substrate::ControlState, ObligationState, ob_poc_kyc_substrate::TypeRegistryState) {
+fn populated_board(subject: SubjectId) -> (ob_poc_kyc_substrate::ControlState, ob_poc_kyc_substrate::TypeRegistryState) {
     let co = EntityId(Uuid::new_v4());
     let p1 = EntityId(Uuid::new_v4());
     let mk = |fqn: &str, target: TargetBinding, payload: serde_json::Value| {
         IntentEvent::new(subject, fqn, Principal::test_analyst(), AuthorityRef("test".into()), target, payload, as_of())
     };
+    // Was `register` + `subject.type` (two events per entity) — retired
+    // (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07): `place` absorbs both
+    // axes in one event (T4/EOP-VS-UBO-GAME-001 §3.2).
     let events = [
-        mk("kyc_ubo.assert.subject.register", TargetBinding::for_subject(subject), serde_json::json!({ "entity_id": co.0 })),
-        mk("kyc_ubo.assert.subject.register", TargetBinding::for_subject(subject), serde_json::json!({ "entity_id": p1.0 })),
         mk(
-            "kyc_ubo.assert.subject.type",
+            "kyc_ubo.assert.subject.place",
             TargetBinding { entity_id: Some(co), ..TargetBinding::for_subject(subject) },
             serde_json::json!({ "entity_id": co.0, "entity_type": "private_limited_company" }),
         ),
         mk(
-            "kyc_ubo.assert.subject.type",
+            "kyc_ubo.assert.subject.place",
             TargetBinding { entity_id: Some(p1), ..TargetBinding::for_subject(subject) },
             serde_json::json!({ "entity_id": p1.0, "entity_type": "natural_person" }),
         ),
@@ -110,7 +111,7 @@ fn populated_board(subject: SubjectId) -> (ob_poc_kyc_substrate::ControlState, O
     let refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control(&refs);
     let type_registry = fold_type_registry(&refs);
-    (control, ObligationState::default(), type_registry)
+    (control, type_registry)
 }
 
 /// The three target shapes a `LegalMove` can declare (mirrors
@@ -151,8 +152,8 @@ async fn every_advertised_move_is_dispatchable() {
     let pool = pool().await;
 
     let subject = SubjectId(Uuid::new_v4());
-    let (control, obligation, type_registry) = populated_board(subject);
-    let placement = enumerate_placement_set(subject, &control, &obligation, &type_registry, &assembly_lexicon());
+    let (control, type_registry) = populated_board(subject);
+    let placement = enumerate_placement_set(subject, &control, &type_registry, &assembly_lexicon());
 
     // Distinct (verb_fqn, shape) pairs the board actually proposes.
     let mut pairs: BTreeSet<(String, Shape)> = BTreeSet::new();

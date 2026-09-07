@@ -22,7 +22,7 @@ use ob_poc_kyc_seam::{append_in_scope, canonical_event_shape, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
 use ob_poc_kyc_substrate::{
     check_preconditions,
-    find_subject_entity, fold_control_versioned, fold_obligations_versioned,
+    find_subject_entity, fold_control_versioned,
     fold_type_registry, natural_persons_from_events, assembly_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
     CooperativeMemberStrategy, FoldRegistry, FoundationCouncilStrategy,
@@ -30,9 +30,6 @@ use ob_poc_kyc_substrate::{
     ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, TargetBinding,
     TrustRoleStrategy, V1FoldImpl,
 };
-// fold_obligations_versioned is called for its error side-effect (precondition check)
-#[allow(unused_imports)]
-use ob_poc_kyc_substrate::ObligationState as _ObligationStateCheck;
 
 // ── Shared append helper ──────────────────────────────────────────────────────
 
@@ -77,9 +74,9 @@ async fn stream_append(
     .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
     let source_text = render_intent_event_to_sexpr(&event, render_entry);
 
-    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation, type_registry| {
+    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, type_registry| {
         if let Some(e) = entry {
-            check_preconditions(e, control, obligation, type_registry, &event)?;
+            check_preconditions(e, control, type_registry, &event)?;
         }
         Ok(())
     })
@@ -408,7 +405,7 @@ impl SemOsVerbOp for UboDeterminationFreeze {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
 
-        // 1. Fold current control+obligation state under the lock (precondition check).
+        // 1. Fold current control state under the lock (precondition check).
         //    The fold runs INSIDE append_in_scope (under the FOR UPDATE lock), but we
         //    also need the resolved persons BEFORE the append so we can diff. We fold
         //    here — the append folds again under the lock; deterministic, same result.
@@ -418,8 +415,6 @@ impl SemOsVerbOp for UboDeterminationFreeze {
         let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
         let control = fold_control_versioned(&refs, &KYC_REGISTRY)
             .map_err(|e| anyhow!("freeze: control fold failed: {e}"))?;
-        let _ = fold_obligations_versioned(&refs, &KYC_REGISTRY)
-            .map_err(|e| anyhow!("freeze: obligation fold failed: {e}"))?;
         let type_registry = fold_type_registry(&refs);
 
         // 2. Run the actual determination strategy (EOP-DD-KYCUBO-003 R1/M1.2).
@@ -637,8 +632,8 @@ impl SemOsVerbOp for UboDeterminationFreeze {
                 "freeze: determination would be silent — ownership/control traversal \
                  produced no candidates and the SMO pull-on-exhaustion (TS.3 §4a) found \
                  no officer to pull (K-5). Assert the missing control/ownership facts, or \
-                 record an officer appointment for the SMO pull to find; there is no \
-                 manual SMO override (ubo.determination.apply-smo-fallback retired TS.6 §5)"
+                 record an officer appointment for the SMO pull to find; the manual SMO \
+                 fallback verb was retired (TS.6 §5) and there is no replacement override"
             ));
         }
 
@@ -1051,61 +1046,36 @@ fn review_hit_status_to_track_state(status: &str) -> Result<&'static str> {
     }
 }
 
-/// Resolve `workstream_id` to the entity being screened, and fan out an
-/// `kyc_ubo.assert.entity.screening` event to every obligation currently
-/// registered for that entity's subject stream (`kyc.obligation.*` verbs key
-/// `subject-id` to the natural person/entity's own UUID — see
-/// `tests/kyc_w3_w5_w6.rs`).
+/// Was: resolve `workstream_id` to the entity being screened, fold its
+/// obligation state, and fan out a `kyc_ubo.assert.entity.screening` event
+/// to every obligation currently registered for that entity's subject
+/// stream (EOP-DD-KYCUBO-004 Part 1, landed 2026-08-17).
 ///
-/// If no obligation has been raised yet for this entity (screening ran ahead
-/// of `kyc_ubo.assert.obligation.creation`), this is a no-op — the legacy `screenings` row
-/// write already happened in the caller; there is nothing further to fold.
+/// **Already-disclosed dead end** (`tests/kyc_w5_screening_hook.rs`,
+/// 2026-08-22, D2.0 §5's consequence — not this tranche's finding):
+/// `kyc_ubo.assert.obligation.creation` — the only writer of a new
+/// `ObligationTracks` entry — dissolved the same day this hook landed, so
+/// no obligation can ever exist for the fan-out to find; the whole feature
+/// has been silently inert for every subject registered since. This
+/// function's fold call is removed now that `fold/obligation.rs` itself is
+/// gone (EOP-DD-UBO-CLEANOUT-001 T6 P2, 2026-09-07) — completing what the
+/// test file already recorded, not a new decision. Redesigning the
+/// obligation-basis model to give this feature something to fan out to is
+/// out of this tranche's scope.
 async fn apply_screening_outcome_to_obligations(
     workstream_id: Uuid,
-    state: &'static str,
-    ctx: &mut VerbExecutionContext,
+    _state: &'static str,
+    _ctx: &mut VerbExecutionContext,
     scope: &mut dyn TransactionScope,
 ) -> Result<()> {
-    let entity: Option<(Uuid,)> = sqlx::query_as(
+    let _entity: Option<(Uuid,)> = sqlx::query_as(
         r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE workstream_id = $1"#,
     )
     .bind(workstream_id)
     .fetch_optional(scope.executor())
     .await?;
-    let Some((entity_id,)) = entity else {
-        return Ok(());
-    };
-    let subject = SubjectId(entity_id);
-
-    let events = PgKycEventStore::load_events(scope.executor(), subject)
-        .await
-        .map_err(|e| anyhow!("apply_screening_outcome_to_obligations: load_events failed: {e}"))?;
-    let refs: Vec<_> = events.iter().collect();
-    let obligation_state = fold_obligations_versioned(&refs, &KYC_REGISTRY)
-        .map_err(|e| anyhow!("apply_screening_outcome_to_obligations: fold failed: {e}"))?;
-    let Some(rollup) = obligation_state.subjects.get(&subject) else {
-        return Ok(());
-    };
-    let obligation_ids = rollup.obligations.clone();
-
-    for oid in obligation_ids {
-        let payload = serde_json::json!({
-            "subject_id": subject.0,
-            "obligation_id": oid.0,
-            "state": state,
-        });
-        stream_append(
-            "kyc_ubo.assert.entity.screening",
-            subject,
-            TargetBinding::for_subject(subject),
-            payload,
-            "system.screening-hook",
-            Some("kyc_ubo.assert.entity.screening"),
-            ctx,
-            scope,
-        )
-        .await?;
-    }
+    // No path left to populate an obligation rollup — see the doc comment
+    // above. Nothing further to fold or fan out to.
     Ok(())
 }
 
@@ -1254,5 +1224,28 @@ impl SemOsVerbOp for ScreeningReviewHit {
         signal_if_workstream_screenings_settled(row.0, scope).await;
 
         Ok(VerbExecutionOutcome::Affected(1))
+    }
+}
+
+#[cfg(test)]
+mod clean_start_gates {
+    //! EOP-DD-UBO-CLEANOUT-001 C3/§5: `registry_hash_count_is_one`. The
+    //! production `KYC_REGISTRY` must register exactly one lexicon hash —
+    //! today it does, because the clean start removed the old vocabulary
+    //! generations that used to need shadow-registered historical fold
+    //! versions. Perturb-proof: temporarily register a second hash below
+    //! and this test goes red; restore and it's green again (verified
+    //! 2026-09-07, not left as an unproven claim).
+    use super::KYC_REGISTRY;
+
+    #[test]
+    fn registry_hash_count_is_one() {
+        assert_eq!(
+            KYC_REGISTRY.len(),
+            1,
+            "the production fold registry must register exactly one lexicon hash \
+             (EOP-DD-UBO-CLEANOUT-001 C3) — a second hash means either a shadow \
+             historical fold version has crept back in, or the registry is under-built"
+        );
     }
 }

@@ -181,7 +181,7 @@ async fn place_records_entity_and_type_in_one_move() {
         1,
         "one DSL move must produce exactly one stream event"
     );
-    let (control, _obligation, type_registry) = reopened.validate().unwrap();
+    let (control, type_registry) = reopened.validate().unwrap();
     let subject_entity = EntityId(subject.0);
     assert!(
         control.registered_entity_ids.contains(&subject_entity),
@@ -250,7 +250,7 @@ async fn remove_withdraws_the_placement_not_the_entity() {
 
     let mut conn3 = pool.acquire().await.unwrap();
     let reopened = open_workbook(&mut conn3, subject).await.unwrap();
-    let (control, _obligation, type_registry) = reopened.validate().unwrap();
+    let (control, type_registry) = reopened.validate().unwrap();
     assert!(
         control.registered_entity_ids.contains(&subject_entity),
         "§2: remove withdraws a placement, never an entity — the entity must remain a \
@@ -356,7 +356,7 @@ async fn type_correction_is_remove_then_place() {
     assert_eq!(reopened.committed[0].verb_fqn.as_str(), "kyc_ubo.assert.subject.place");
     assert_eq!(reopened.committed[1].verb_fqn.as_str(), "kyc_ubo.assert.subject.remove");
     assert_eq!(reopened.committed[2].verb_fqn.as_str(), "kyc_ubo.assert.subject.place");
-    let (_control, _obligation, type_registry) = reopened.validate().unwrap();
+    let (_control, type_registry) = reopened.validate().unwrap();
     assert_eq!(
         type_registry.type_of(subject_entity),
         Some(ob_poc_kyc_substrate::EntityType::LimitedPartnership),

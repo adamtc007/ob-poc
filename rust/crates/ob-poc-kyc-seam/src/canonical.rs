@@ -586,14 +586,16 @@ mod tests {
         assert!(canonical_event_shape("kyc_ubo.assert.edge.retract", s, &args).is_err());
     }
 
-    /// EOP-VS-UBO-GAME-001 T3, §3.3: reconciliation is retired, not merged —
-    /// `canonical_event_shape` must refuse the FQN outright now.
-    #[test]
-    fn reconciliation_is_gone() {
-        let s = subj();
-        let args = serde_json::json!({ "subject-id": s.0 });
-        assert!(canonical_event_shape("kyc_ubo.assert.edge.reconciliation", s, &args).is_err());
-    }
+    // `reconciliation_is_gone` RETIRED (EOP-DD-UBO-CLEANOUT-001 T6 P3,
+    // 2026-09-07): it named the retired FQN as a live string literal to
+    // prove `canonical_event_shape` refuses it — but the match arm that
+    // once specially intercepted it is gone (T3, §3.3), so the FQN now
+    // falls straight through to the generic `other => bail!(...)` arm,
+    // identically to any other unrecognized string. `unknown_verb_fqn_bails`
+    // already covers that arm; this test added no behavioural coverage
+    // beyond it once the special-case was deleted. Same retirement shape as
+    // `checker_sees_both_folds` (kyc_t61_studs.rs): no rewrite target
+    // survives.
 
     #[test]
     fn obligation_track_verbs_rename_obligation_and_subject_id() {
@@ -634,26 +636,14 @@ mod tests {
         assert!(canonical_event_shape("not.a.real.verb", s, &args).is_err());
     }
 
-    /// T2 (EOP-VS-UBO-GAME-001 §3.2) retired `register`/`type` (merged into
-    /// `place`) and `member-withdrawal` (renamed `remove`). A stale match
-    /// arm silently reappearing for any of these would let a second
-    /// constructor back in through the side door; this guards that.
-    #[test]
-    fn retired_verbs_are_no_longer_recognized() {
-        let s = subj();
-        let args = serde_json::json!({ "subject-id": s.0, "entity-id": Uuid::new_v4() });
-        for fqn in [
-            "kyc_ubo.assert.subject.register",
-            "kyc_ubo.assert.subject.type",
-            "kyc_ubo.assert.subject.type-correction",
-            "kyc_ubo.assert.subject.member-withdrawal",
-            "kyc_ubo.assert.subject.structure-class",
-            "kyc_ubo.assert.edge.economic-interest",
-            "kyc_ubo.assert.edge.supersession",
-            "kyc_ubo.assert.edge.reconciliation",
-            "kyc_ubo.assert.edge.verification",
-        ] {
-            assert!(canonical_event_shape(fqn, s, &args).is_err(), "{fqn} must no longer be recognized");
-        }
-    }
+    // `retired_verbs_are_no_longer_recognized` RETIRED
+    // (EOP-DD-UBO-CLEANOUT-001 T6 P3, 2026-09-07), same reasoning as
+    // `reconciliation_is_gone` above, generalized across the whole set: it
+    // named 9 retired FQNs as live string literals to prove each one is
+    // refused, but every match arm that ever specially intercepted them is
+    // now deleted (T2/T3/T4-close/T5) — they all fall through to the same
+    // generic `other => bail!(...)` arm as any garbage string, which
+    // `unknown_verb_fqn_bails` already covers. Keeping this test would mean
+    // keeping a live literal list of retired vocabulary for no behavioural
+    // gain — exactly the residue P3 exists to clear.
 }

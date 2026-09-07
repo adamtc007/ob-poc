@@ -90,8 +90,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::event::IntentEvent;
-use crate::fold::control::{check_control_preconditions, check_preconditions, ControlState};
-use crate::fold::obligation::ObligationState;
+use crate::fold::control::{check_preconditions, ControlState};
 use crate::fold::type_registry::TypeRegistryState;
 use crate::geometry::{check_type_geometry, EntityType, LinkageSource, ALL_ENTITY_TYPES, ALL_PIPES};
 use crate::lexicon::LexiconManifest;
@@ -204,10 +203,7 @@ impl PlacementSet {
 /// iterates real lexicon entries, so it never reaches this function for
 /// that fqn.
 fn is_edge_scoped(verb_fqn: &str) -> bool {
-    matches!(
-        verb_fqn,
-        "kyc_ubo.assert.edge.verification" | "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.disconnect"
-    )
+    matches!(verb_fqn, "kyc_ubo.assert.edge.evidence" | "kyc_ubo.assert.edge.disconnect")
 }
 
 fn move_id_for(verb_fqn: &str, target: &TargetBinding) -> MoveId {
@@ -401,7 +397,7 @@ fn place_and_remove_candidates(
         for &entity in &state.registered_entity_ids {
             let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
             let probe = probe_event(subject, REMOVE, target.clone());
-            if check_control_preconditions(entry, state, type_registry, &probe).is_ok() {
+            if check_preconditions(entry, state, type_registry, &probe).is_ok() {
                 moves.push(LegalMove {
                     move_id: entity_move_id(REMOVE, entity),
                     verb_fqn: VerbFqn(REMOVE.to_string()),
@@ -436,11 +432,11 @@ fn place_and_remove_candidates(
     moves
 }
 
-/// Enumerate the legal placement set for `subject` given its folded control,
-/// obligation, and type-registry `state` and the `lexicon`'s registered verb
-/// set. Takes all three folds (T6.1(a) extended to the type axis — see
-/// module doc) even though only the two geometry-gated verbs read
-/// `type_registry` today.
+/// Enumerate the legal placement set for `subject` given its folded control
+/// and type-registry `state` and the `lexicon`'s registered verb set. Was
+/// three folds (T6.1(a) extended to the type axis) — the obligation
+/// parameter dropped with `ObligationState` (EOP-DD-UBO-CLEANOUT-001 T6 P2,
+/// 2026-09-07); only the two geometry-gated verbs read `type_registry` today.
 ///
 /// For edge-scoped verbs, one candidate move is probed per edge present in
 /// `state.edges` (including superseded edges — K-13 supersede-never-delete
@@ -454,7 +450,6 @@ fn place_and_remove_candidates(
 pub fn enumerate_placement_set(
     subject: SubjectId,
     state: &ControlState,
-    obligation: &ObligationState,
     type_registry: &TypeRegistryState,
     lexicon: &LexiconManifest,
 ) -> PlacementSet {
@@ -488,7 +483,7 @@ pub fn enumerate_placement_set(
                         let target = TargetBinding::for_subject(subject);
                         let mut probe = probe_event(subject, fqn, target.clone());
                         probe.payload = geometry_probe_payload(from, to, wire);
-                        if check_preconditions(entry, state, obligation, type_registry, &probe)
+                        if check_preconditions(entry, state, type_registry, &probe)
                             .is_err()
                         {
                             continue;
@@ -529,7 +524,7 @@ pub fn enumerate_placement_set(
 
         for target in targets {
             let probe = probe_event(subject, fqn, target.clone());
-            if check_preconditions(entry, state, obligation, type_registry, &probe).is_ok() {
+            if check_preconditions(entry, state, type_registry, &probe).is_ok() {
                 let id = move_id_for(fqn, &target);
                 candidates.insert(
                     id.clone(),

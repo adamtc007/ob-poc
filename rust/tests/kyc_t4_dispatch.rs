@@ -47,7 +47,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, ControlProngStrategy, ControlState, DeterminationDispatch,
+    check_preconditions, ControlProngStrategy, ControlState, DeterminationDispatch,
     DeterminationStrategy, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId, EntityType,
     EntityTypeRecord, EventId, FundControlStrategy, LexiconEntry, PersonId, ProofKind,
     ProofRecord, Prong, TargetBinding, TrustRoleKind, TrustRoleStrategy, TypeRegistryState,
@@ -168,7 +168,7 @@ fn unmapped_type_refuses_freeze_by_name() {
 
     // Terminal type: refuses, naming the type.
     let terminal_registry = registry_with(subject_entity, EntityType::NaturalPerson);
-    let err = check_control_preconditions(&entry, &control, &terminal_registry, &event)
+    let err = check_preconditions(&entry, &control, &terminal_registry, &event)
         .expect_err("a NaturalPerson subject must refuse freeze");
     let msg = err.to_string();
     assert!(
@@ -178,7 +178,7 @@ fn unmapped_type_refuses_freeze_by_name() {
 
     // No type known at all: refuses, saying so.
     let empty_registry = TypeRegistryState::default();
-    let err = check_control_preconditions(&entry, &control, &empty_registry, &event)
+    let err = check_preconditions(&entry, &control, &empty_registry, &event)
         .expect_err("a subject with no known entity type must refuse freeze");
     assert!(
         !err.to_string().is_empty(),
@@ -187,7 +187,7 @@ fn unmapped_type_refuses_freeze_by_name() {
 
     // A supported type: admits.
     let ok_registry = registry_with(subject_entity, EntityType::PrivateLimitedCompany);
-    check_control_preconditions(&entry, &control, &ok_registry, &event)
+    check_preconditions(&entry, &control, &ok_registry, &event)
         .expect("a PrivateLimitedCompany subject must be admitted to freeze");
 }
 

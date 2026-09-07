@@ -1,5 +1,15 @@
 # KYC/UBO — Current-State Gap Report & Refactoring Plan
 
+> **PARTIALLY SUPERSEDED (EOP-DD-UBO-CLEANOUT-001 C5, 2026-09-07).**
+> `EOP-DD-KYCUBO-003` (2026-07-01, M1+M3 executed) states it "supersedes/
+> updates" this document — pre-W1–W7, now stale — for the determination-
+> logic and approval-gate items it covers (the `freeze`/`OwnershipProngStrategy`
+> wiring, the K-23 approval gate, the `structure_class` payload-key bug).
+> `EOP-DD-KYCUBO-001` v0.2 still lists this document's §7–§8 as binding for
+> the W1 slice, so this is not a blanket retirement of the whole document —
+> read §7–§8 as still-referenced, everything about determination-logic
+> correctness as superseded by 003.
+
 | | |
 |---|---|
 | **Document** | EOP-RP-KYCUBO-001 (companion refactoring plan to EOP-VS-KYCUBO-001) |
@@ -8,7 +18,7 @@
 | **Author** | Lead architect (Claude), grounded in a 5-probe codebase + DB survey |
 | **Date** | 2026-06-30 |
 | **Binds to** | EOP-VS-KYCUBO-001 v0.6 *From Percentage to Determination* (the V&S; treated here as binding). Invariants referenced as K-1…K-35. Workstreams W1–W7 from V&S Appendix B. |
-| **Status** | Analysis only. This document does not authorise implementation. It is the §12 / Appendix-B companion the V&S anticipates. |
+| **Status** | Analysis only. This document does not authorise implementation. It is the §12 / Appendix-B companion the V&S anticipates. Partially superseded — see notice above. |
 
 > **Reading note.** The V&S is verb-first and event-sourced *by design decision*, not by tooling preference. This report does **not** collapse the target into CRUD, ORM, an entity service, or generic event sourcing. Where the current code already does the verb-first thing partially (e.g. per-verb content hashing, the convergence allegation/proof split, dual VOTES/ECONOMIC axes), that is called out as *reusable substrate*, not as "done."
 
