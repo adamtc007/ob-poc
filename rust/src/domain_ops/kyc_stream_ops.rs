@@ -432,15 +432,21 @@ impl SemOsVerbOp for UboDeterminationFreeze {
         let entity_type = type_registry.type_of(subject_entity_id).ok_or_else(|| {
             anyhow!("freeze: no entity type known for the subject (EntityTypeSupportsStrategy precondition)")
         })?;
-        let strategy_name = match ob_poc_kyc_substrate::dispatch_for_entity_type(&entity_type) {
-            ob_poc_kyc_substrate::DeterminationDispatch::Strategy(name) => name,
-            ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => {
-                return Err(anyhow!(
-                    "freeze: {entity_type:?} is not a determination subject \
-                     (EOP-DD-UBO-DISPATCH-001 §4 D2, EntityTypeSupportsStrategy precondition)"
-                ));
-            }
-        };
+        // EOP-DD-UBO-BASES-001 §3: the dispatch table maps a type to the SET
+        // of strategies that apply — every strategy in the set runs below
+        // and the results union (§3, §4). Only `PrivateLimitedCompany`/
+        // `PublicListedCompany` carry more than one member; every other
+        // type's set is unchanged from DISPATCH-001's single-strategy row.
+        let strategy_names: &'static [&'static str] =
+            match ob_poc_kyc_substrate::dispatch_for_entity_type(&entity_type) {
+                ob_poc_kyc_substrate::DeterminationDispatch::Strategies(names) => names,
+                ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => {
+                    return Err(anyhow!(
+                        "freeze: {entity_type:?} is not a determination subject \
+                         (EOP-DD-UBO-DISPATCH-001 §4 D2, EntityTypeSupportsStrategy precondition)"
+                    ));
+                }
+            };
         // TS.4 §3 Ruling B (widened from §2.6's original nominee_pierce_
         // strategy-only scope): `resolve()` returns `Vec<ProngCandidate>`
         // and cannot signal error, so the unpierced-nominee scan lives
@@ -482,57 +488,59 @@ impl SemOsVerbOp for UboDeterminationFreeze {
                 unpierced.join(", ")
             ));
         }
-        let strategy: &dyn DeterminationStrategy = match strategy_name {
-            "ownership_prong_strategy" => &OwnershipProngStrategy,
-            // M4: control-by-other-means (voting rights, board appointment, GP
-            // statutory control, LLP designated member, trust roles, dominant
-            // influence). Scope note lives on ControlProngStrategy itself — v1
-            // walks control-kind edges only, does not cross into the economic
-            // axis for an intermediate controlling entity's own UBOs.
-            "control_prong_strategy" => &ControlProngStrategy,
-            // TS.1: trust control follows role (trustee/protector always;
-            // settlor unless proven irrevocable; beneficiary never). Scope
-            // note lives on TrustRoleStrategy itself.
-            "trust_role_strategy" => &TrustRoleStrategy,
-            // TS.2: fund control sits with the manager (ManCo/AIFM/GP-analog),
-            // asserted as dominant_influence/board_appointment — a NAMED thin
-            // delegate to the control-prong traversal so the freeze pin
-            // records WHICH model ran. Scope note lives on FundControlStrategy.
-            "fund_control_strategy" => &FundControlStrategy,
-            // TS.2: a foundation has no owners by construction — control sits
-            // with the council/board. Traverses board_appointment +
-            // dominant_influence ONLY. Scope note lives on
-            // FoundationCouncilStrategy.
-            "foundation_council_strategy" => &FoundationCouncilStrategy,
-            // TS.3: the controller of a state-owned entity is a state organ
-            // — the strategy runs the full control walk for the rare genuine
-            // natural-person controller; zero candidates legitimizes the
-            // existing apply-smo-fallback route. Scope note lives on
-            // StateOwnedStrategy.
-            "state_owned_strategy" => &StateOwnedStrategy,
-            // TS.3: one-member-one-vote — membership never yields a UBO;
-            // control arises from office. Traverses voting_rights +
-            // board_appointment + dominant_influence ONLY. Scope note lives
-            // on CooperativeMemberStrategy.
-            "cooperative_member_strategy" => &CooperativeMemberStrategy,
-            // TS.4: post-piercing the subject resolves by the UNDERLYING
-            // structure — a thin delegate to the control-prong traversal;
-            // the unpierced-nominee fail-closed guard runs above, before
-            // this dispatch, backed by `Precondition::NoUnpiercedNomineeEdges`
-            // (declared, re-checked at append too — see the comment above).
-            // Scope note lives on NomineePierceStrategy.
-            "nominee_pierce_strategy" => &NomineePierceStrategy,
-            other => {
-                return Err(anyhow!(
-                    "freeze: strategy '{other}' selected but no DeterminationStrategy is \
-                     registered for it — only ownership_prong_strategy, \
-                     control_prong_strategy, trust_role_strategy, \
-                     fund_control_strategy, foundation_council_strategy, \
-                     state_owned_strategy, cooperative_member_strategy, and \
-                     nominee_pierce_strategy exist today"
-                ));
-            }
-        };
+        fn strategy_for_name(name: &str) -> Result<&'static dyn DeterminationStrategy> {
+            Ok(match name {
+                "ownership_prong_strategy" => &OwnershipProngStrategy,
+                // M4: control-by-other-means (voting rights, board appointment, GP
+                // statutory control, LLP designated member, trust roles, dominant
+                // influence). Scope note lives on ControlProngStrategy itself — v1
+                // walks control-kind edges only, does not cross into the economic
+                // axis for an intermediate controlling entity's own UBOs.
+                "control_prong_strategy" => &ControlProngStrategy,
+                // TS.1: trust control follows role (trustee/protector always;
+                // settlor unless proven irrevocable; beneficiary never). Scope
+                // note lives on TrustRoleStrategy itself.
+                "trust_role_strategy" => &TrustRoleStrategy,
+                // TS.2: fund control sits with the manager (ManCo/AIFM/GP-analog),
+                // asserted as dominant_influence/board_appointment — a NAMED thin
+                // delegate to the control-prong traversal so the freeze pin
+                // records WHICH model ran. Scope note lives on FundControlStrategy.
+                "fund_control_strategy" => &FundControlStrategy,
+                // TS.2: a foundation has no owners by construction — control sits
+                // with the council/board. Traverses board_appointment +
+                // dominant_influence ONLY. Scope note lives on
+                // FoundationCouncilStrategy.
+                "foundation_council_strategy" => &FoundationCouncilStrategy,
+                // TS.3: the controller of a state-owned entity is a state organ
+                // — the strategy runs the full control walk for the rare genuine
+                // natural-person controller; zero candidates legitimizes the
+                // existing apply-smo-fallback route. Scope note lives on
+                // StateOwnedStrategy.
+                "state_owned_strategy" => &StateOwnedStrategy,
+                // TS.3: one-member-one-vote — membership never yields a UBO;
+                // control arises from office. Traverses voting_rights +
+                // board_appointment + dominant_influence ONLY. Scope note lives
+                // on CooperativeMemberStrategy.
+                "cooperative_member_strategy" => &CooperativeMemberStrategy,
+                // TS.4: post-piercing the subject resolves by the UNDERLYING
+                // structure — a thin delegate to the control-prong traversal;
+                // the unpierced-nominee fail-closed guard runs above, before
+                // this dispatch, backed by `Precondition::NoUnpiercedNomineeEdges`
+                // (declared, re-checked at append too — see the comment above).
+                // Scope note lives on NomineePierceStrategy.
+                "nominee_pierce_strategy" => &NomineePierceStrategy,
+                other => {
+                    return Err(anyhow!(
+                        "freeze: strategy '{other}' selected but no DeterminationStrategy is \
+                         registered for it — only ownership_prong_strategy, \
+                         control_prong_strategy, trust_role_strategy, \
+                         fund_control_strategy, foundation_council_strategy, \
+                         state_owned_strategy, cooperative_member_strategy, and \
+                         nominee_pierce_strategy exist today"
+                    ));
+                }
+            })
+        }
 
         let natural_persons = natural_persons_from_events(&refs);
         // K-6: threshold should be reference-plane data (per jurisdiction/structure
@@ -543,9 +551,19 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .and_then(|v| v.as_f64())
             .unwrap_or(25.0);
 
-        let mut candidates: Vec<ProngCandidate> =
-            strategy.resolve(&control, subject_entity_id, &natural_persons, threshold_pct);
+        // EOP-DD-UBO-BASES-001 §3/§4: every strategy in the dispatch set
+        // runs against the SAME `control`/`natural_persons`, and the
+        // results union — then merge to one candidate per person, every
+        // admitting basis named (§4: "a person found by ownership and
+        // control is one candidate with two bases, not two candidates").
+        let mut candidates: Vec<ProngCandidate> = Vec::new();
+        for name in strategy_names {
+            let strategy = strategy_for_name(name)?;
+            candidates.extend(strategy.resolve(&control, subject_entity_id, &natural_persons, threshold_pct));
+        }
+        let strategy_name = strategy_names.join("+");
         candidates.sort_by_key(|c| c.person_id.0);
+        let mut candidates = ob_poc_kyc_substrate::merge_candidates_by_person(candidates);
 
         // TS.3 §3: record any statutory-authority stop at the subject —
         // traversal already excludes it (control_admission ==
@@ -567,6 +585,7 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             Some((pulled, record)) => {
                 candidates.extend(pulled);
                 candidates.sort_by_key(|c| c.person_id.0);
+                candidates = ob_poc_kyc_substrate::merge_candidates_by_person(candidates);
                 Some(record)
             }
             None => None,

@@ -292,12 +292,13 @@ async fn resolve_via_strategy(
     // `structure_class`/`strategy_for_structure_class` — both retired.
     assert_eq!(
         match ob_poc_kyc_substrate::dispatch_for_entity_type(&entity_type) {
-            ob_poc_kyc_substrate::DeterminationDispatch::Strategy(name) => Some(name),
+            ob_poc_kyc_substrate::DeterminationDispatch::Strategies(names) => Some(names),
             ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => None,
         },
-        Some(expected_strategy),
-        "{entity_type:?} must dispatch to {expected_strategy} (T4: strategy is derived \
-         from entity-type, not separately asserted)"
+        Some([expected_strategy].as_slice()),
+        "{entity_type:?} must dispatch to exactly {{{expected_strategy}}} (T4: strategy is \
+         derived from entity-type, not separately asserted; EOP-DD-UBO-BASES-001 §3 widens \
+         only the company row, unaffected here)"
     );
     let persons = ob_poc_kyc_substrate::natural_persons_from_events(&refs);
     strategy.resolve(&control, subject_entity, &persons, 25.0)

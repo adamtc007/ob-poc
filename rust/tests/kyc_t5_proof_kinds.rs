@@ -222,6 +222,7 @@ fn assurance_reports_the_citation_set() {
         originating_event_id: connect.id,
         pivot: None,
         pierces: Vec::new(),
+        bases: Vec::new(),
     };
 
     let assurance = compute_assurance(&[candidate], &[], &control, &type_registry);

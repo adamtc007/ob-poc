@@ -310,11 +310,12 @@ async fn m3_3_entity_type_round_trips_through_the_type_registry_fold() {
         match ob_poc_kyc_substrate::dispatch_for_entity_type(
             &ob_poc_kyc_substrate::EntityType::PrivateLimitedCompany
         ) {
-            ob_poc_kyc_substrate::DeterminationDispatch::Strategy(name) => Some(name),
+            ob_poc_kyc_substrate::DeterminationDispatch::Strategies(names) => Some(names),
             ob_poc_kyc_substrate::DeterminationDispatch::NotADeterminationSubject => None,
         },
-        Some("ownership_prong_strategy"),
-        "PrivateLimitedCompany must dispatch to ownership_prong_strategy (§2)"
+        Some(["ownership_prong_strategy", "control_prong_strategy"].as_slice()),
+        "PrivateLimitedCompany must dispatch to BOTH the ownership and control limbs \
+         (EOP-DD-UBO-BASES-001 §3 — supersedes DISPATCH-001 §2's single-strategy row)"
     );
 
     cleanup(&pool, &[subject]).await;

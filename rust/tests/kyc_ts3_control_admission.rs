@@ -42,7 +42,7 @@ use ob_poc_kyc_substrate::{
     ControlAdmission, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
     DeterminationStrategy, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId, EntityType,
     EntityTypeRecord, EventId, FundControlStrategy, OwnershipProngStrategy, PersonId, ProofKind,
-    ProofRecord, Prong, ProngCandidate, ProvisionalityReason, StateOwnedStrategy, StructureClass,
+    ProofRecord, Prong, ProvisionalityReason, StateOwnedStrategy, StructureClass,
     TypeRegistryState, EDGE_KIND_WIRE_VALUES,
 };
 
@@ -204,12 +204,29 @@ fn statutory_authority_stops_with_reason() {
 }
 
 // ── §7 gate: officers_contribute_only_on_exhaustion ──────────────────────────
-
+//
+// SUPERSEDED BY EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08, recorded in
+// `docs/eop/EOP-STATE-KYCUBO-D1_State-of-Play.md` §7, not by editing this
+// ratified TS.3 gate): at TS.3 landing time `OfficerAppointment` was
+// `NotControl` — an officer only ever surfaced via the separate
+// SMO-pull-on-exhaustion mechanism, so adding one to an already-resolving
+// structure was provably inert (the old assertion this test's name
+// promised). R-A reclassifies `OfficerAppointment`/`Employment` to
+// `Traverse` (§1: "control has several doors, any one opens") — an
+// officer is now an independently-sufficient door for THEIR OWN person,
+// so adding an officer edge to a resolving structure now DOES add the
+// officer as their own candidate; it still changes nothing for the
+// PERSON already resolving via a different basis (independent doors,
+// independent people — `merge_candidates_by_person` only unions bases
+// for the SAME person). Renamed to state the surviving property
+// accurately; see `kyc_bases_001_p0_smo_gate.rs`
+// (`smo_fallback_fires_only_on_total_exhaustion`) for the "officer is a
+// door, not a fallback" positive gate this test's old name promised.
 #[test]
-fn officers_contribute_only_on_exhaustion() {
+fn officer_is_an_independent_door_not_gated_on_exhaustion() {
     let subject = eid(8);
     let alice = PersonId(eid(9).0); // resolves via VotingRights
-    let carol = PersonId(eid(10).0); // an officer — must NOT appear when ownership/control resolved
+    let carol = PersonId(eid(10).0); // an officer — now an independent door too
 
     // (a) Ownership/control already resolves via VotingRights.
     let mut resolving = ControlState { structure_class: None, ..Default::default() };
@@ -223,36 +240,44 @@ fn officers_contribute_only_on_exhaustion() {
     assert_eq!(candidates_without_officer[0].person_id, alice);
 
     // Now add an OfficerAppointment edge for Carol at the SAME subject —
-    // must change NOTHING: neither the strategy walk (Carol never appears)
-    // nor the pull (which never even fires, because prior_candidates is
-    // non-empty).
+    // R-A: Carol now appears too, as her OWN independent candidate; Alice's
+    // candidate is unaffected (independent doors, independent people).
     let officer = edge(6, EdgeKind::OfficerAppointment, EntityId(carol.0), subject, 6);
     resolving.edges.insert(officer.id, officer);
     let candidates_with_officer =
         ControlProngStrategy.resolve(&resolving, subject, &natural_persons, 25.0);
     assert_eq!(
-        format!("{candidates_without_officer:?}"),
-        format!("{candidates_with_officer:?}"),
-        "adding an officer edge to a resolving structure must change NOTHING"
+        candidates_with_officer.len(),
+        2,
+        "R-A: the officer is now an independent door, not gated on exhaustion: \
+         {candidates_with_officer:#?}"
     );
+    assert!(candidates_with_officer.iter().any(|c| c.person_id == alice));
+    assert!(candidates_with_officer.iter().any(|c| c.person_id == carol
+        && c.prong == Prong::ControlByOtherMeans));
     assert!(
         pull_smo_on_exhaustion(&resolving, subject, &natural_persons, &candidates_with_officer)
             .is_none(),
         "the pull must not fire when prior_candidates is non-empty"
     );
 
-    // (b) Contrast: with NO VotingRights edge (ownership/control genuinely
-    // exhausts at `subject`), the SAME officer edge alone DOES get pulled.
+    // (b) Contrast retained: with NO VotingRights edge, the SAME officer
+    // edge alone now resolves DIRECTLY (Traverse) — never via the SMO pull.
     let mut exhausted = ControlState { structure_class: None, ..Default::default() };
     let officer2 = edge(7, EdgeKind::OfficerAppointment, EntityId(carol.0), subject, 7);
     exhausted.edges.insert(officer2.id, officer2);
-    let empty_candidates: Vec<ProngCandidate> = vec![];
-    let pulled = pull_smo_on_exhaustion(&exhausted, subject, &natural_persons, &empty_candidates);
-    assert!(pulled.is_some(), "with nothing else, exhaustion must pull the officer: {pulled:#?}");
-    let (pulled_candidates, _) = pulled.unwrap();
-    assert_eq!(pulled_candidates.len(), 1);
-    assert_eq!(pulled_candidates[0].person_id, carol);
-    assert_eq!(pulled_candidates[0].prong, Prong::SmoFallback);
+    let direct = ControlProngStrategy.resolve(&exhausted, subject, &natural_persons, 25.0);
+    assert_eq!(direct.len(), 1, "R-A: the officer resolves directly, no pull needed: {direct:#?}");
+    assert_eq!(direct[0].person_id, carol);
+    assert_eq!(
+        direct[0].prong,
+        Prong::ControlByOtherMeans,
+        "R-A: direct admission, not the separate SmoFallback prong"
+    );
+    assert!(
+        pull_smo_on_exhaustion(&exhausted, subject, &natural_persons, &direct).is_none(),
+        "the pull must not fire once the primary walk already found the officer directly"
+    );
 }
 
 // ── §7 gate: smo_fallback_is_recorded_never_silent ───────────────────────────
@@ -264,21 +289,27 @@ fn smo_fallback_is_recorded_never_silent() {
     // and control both exhaust at ManCo (TS.2 Ruling 2a: the mandate
     // holder, not the fund).
     //
-    // **Superseded by EOP-DD-KYCUBO-TS.4 §2 Ruling A (2026-08-22), an
-    // INTENDED difference, not drift:** at TS.3 landing time,
-    // `FundControlStrategy` was still a thin delegate to
-    // `ControlProngStrategy`, so its own walk exhausted with ZERO
-    // candidates and an EXTERNAL, subject-anchored `pull_smo_on_exhaustion`
-    // call was needed to surface the officer. TS.4's `fund_pivot_resolve`
-    // makes the per-pivot exhaustion pull INTERNAL to `FundControlStrategy`
-    // itself (correctly anchored at the pivot — Ruling 2a's whole point:
-    // the naive subject-anchored pull is wrong for co-management, TS.4 §5
-    // `co_management_unions_with_per_pivot_paths`), so `resolve()` alone
-    // now returns the officer directly. The external, generic
-    // `pull_smo_on_exhaustion` — still exercised below — correctly declines
-    // to pull a SECOND time once `resolve()` already returned a candidate
-    // (§4a: "fires ONLY on exhaustion... never pushed" — `prior_candidates`
-    // is no longer empty).
+    // **Superseded by EOP-DD-KYCUBO-TS.4 §2 Ruling A (2026-08-22)** and then
+    // again by **EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08)**, both INTENDED
+    // differences, not drift: at TS.3 landing time, `FundControlStrategy`
+    // was still a thin delegate to `ControlProngStrategy`, so its own walk
+    // exhausted with ZERO candidates and an EXTERNAL, subject-anchored
+    // `pull_smo_on_exhaustion` call was needed to surface the officer.
+    // TS.4's `fund_pivot_resolve` made the per-pivot exhaustion pull
+    // INTERNAL to `FundControlStrategy` itself (anchored at the pivot), so
+    // `resolve()` alone returned the officer directly — but still labelled
+    // `Prong::SmoFallback`, because `OfficerAppointment` was still
+    // `NotControl` and the ONLY route to the officer was the pull. R-A
+    // reclassifies `OfficerAppointment` to `Traverse`: the pivot's own
+    // control-chain walk (`resolve_chain_candidates` over
+    // `reconciled_control_edges`) now finds the officer as a genuine
+    // `ControlByOtherMeans` candidate BEFORE any pull is attempted — the
+    // internal per-pivot pull this test originally named never fires for
+    // this fixture anymore, because `prior_candidates` is no longer empty
+    // by the time it would be considered. What remains load-bearing here:
+    // the EXTERNAL, generic `pull_smo_on_exhaustion` still correctly
+    // declines to pull a SECOND time once the primary walk already
+    // produced a candidate — the property the test name is actually about.
     let fund = eid(11);
     let manco = eid(12);
     let officer = PersonId(eid(13).0);
@@ -296,15 +327,20 @@ fn smo_fallback_is_recorded_never_silent() {
     assert_eq!(
         candidates.len(),
         1,
-        "TS.4 Ruling A: FundControlStrategy now performs its own per-pivot exhaustion \
-         pull internally: {candidates:#?}"
+        "TS.4 Ruling A: FundControlStrategy resolves the officer via the pivot's own \
+         control-chain walk: {candidates:#?}"
     );
     assert_eq!(candidates[0].person_id, officer);
-    assert_eq!(candidates[0].prong, Prong::SmoFallback);
+    assert_eq!(
+        candidates[0].prong,
+        Prong::ControlByOtherMeans,
+        "R-A: OfficerAppointment is now Traverse-admitted, so the pivot's primary walk finds \
+         the officer directly — no pull, no SmoFallback label, ever attempted for this fixture"
+    );
     assert_eq!(
         candidates[0].pivot.as_ref().expect("carries its pivot").pivot_entity,
         manco,
-        "the internal pull is anchored at the pivot (ManCo), never the fund"
+        "resolution is still anchored at the pivot (ManCo), never the fund"
     );
 
     // The generic, subject-anchored pull must NOT double-pull now that
@@ -318,11 +354,22 @@ fn smo_fallback_is_recorded_never_silent() {
     );
 }
 
-// ── §7 gate: employment_and_containment_never_traversed ──────────────────────
-
+// ── §7 gate: containment_never_traversed ──────────────────────────────────────
+//
+// SUPERSEDED IN PART BY EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08): TS.3 §3
+// originally classified BOTH `Employment` and `Containment` `NotControl`.
+// R-A reclassifies `Employment` (= `EdgeKind::Employment`, R-A's
+// "EmploymentDelegatedAuthority") to `Traverse` — "employment with
+// delegated authority is the thing" — leaving `Containment` as the sole
+// survivor of this test's original two-kind property (structural scoping,
+// not a control basis, per V&S citations). Renamed accordingly; a
+// positive covering gate for Employment-as-a-door lives alongside
+// `officer_is_an_independent_door_not_gated_on_exhaustion` above (same
+// `Traverse` admission, same mechanism, `EdgeKind::OfficerAppointment` and
+// `EdgeKind::Employment` are siblings in the `control_admission` match).
 #[test]
-fn employment_and_containment_never_traversed() {
-    // Property: adding EITHER edge, in ANY quantity, changes no determination.
+fn containment_never_traversed() {
+    // Property: adding the edge, in ANY quantity, changes no determination.
     let company = eid(14);
     let umbrella = eid(15);
     let carol = PersonId(eid(16).0);
@@ -338,12 +385,7 @@ fn employment_and_containment_never_traversed() {
     assert_eq!(baseline.len(), 1);
     assert_eq!(baseline[0].person_id, carol);
 
-    // Any quantity of Employment/Containment edges — three employment, two
-    // containment — must not change the result at all.
-    for i in 0..3u128 {
-        let e = edge(20 + i, EdgeKind::Employment, EntityId(carol.0), company, 20 + i);
-        state.edges.insert(e.id, e);
-    }
+    // Any quantity of Containment edges — two — must not change the result.
     for i in 0..2u128 {
         let e = edge(30 + i, EdgeKind::Containment, company, umbrella, 30 + i);
         state.edges.insert(e.id, e);
@@ -352,10 +394,8 @@ fn employment_and_containment_never_traversed() {
     assert_eq!(
         format!("{baseline:?}"),
         format!("{with_stray:?}"),
-        "TS.3 §3: Employment/Containment must be inert in ANY quantity (property, not \
-         a single-edge check)"
+        "TS.3 §3: Containment must be inert in ANY quantity (property, not a single-edge check)"
     );
-    assert_eq!(control_admission(&EdgeKind::Employment), ControlAdmission::NotControl);
     assert_eq!(control_admission(&EdgeKind::Containment), ControlAdmission::NotControl);
 }
 
@@ -515,10 +555,15 @@ fn admission_is_exhaustive() {
             ControlAdmission::Pierce => pierce += 1,
         }
     }
-    assert_eq!(traverse, 11, "8 original + ManagementMandate + MembershipRights = 10 pipe-slots \
-        across 8 EdgeKind arms + TrustRole covers 4 wire values -> 11 wire-value classifications");
+    // EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08): OfficerAppointment/Employment
+    // moved NotControl -> Traverse (11 -> 13; 4 -> 2), recorded in
+    // docs/eop/EOP-STATE-KYCUBO-D1_State-of-Play.md §7, not by editing this
+    // ratified TS.3 gate.
+    assert_eq!(traverse, 13, "8 original + ManagementMandate + MembershipRights + \
+        OfficerAppointment + Employment = 12 pipe-slots across 10 EdgeKind arms + TrustRole \
+        covers 4 wire values -> 13 wire-value classifications");
     assert_eq!(stop, 1, "StatutoryAuthority only");
-    assert_eq!(not_control, 4, "EconomicInterest, OfficerAppointment, Employment, Containment");
+    assert_eq!(not_control, 2, "EconomicInterest, Containment");
     assert_eq!(pierce, 1, "Nominee only");
     assert_eq!(traverse + stop + not_control + pierce, 17, "every wire value classifies exactly once");
 }

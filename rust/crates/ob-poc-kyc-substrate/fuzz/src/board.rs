@@ -185,7 +185,19 @@ fn build_event(
                     "kind": proposed.kind_wire,
                 });
                 if tape.bool() {
-                    payload["percentage"] = serde_json::json!(tape.percentage());
+                    // EOP-DD-UBO-BASES-001 §6: an `economic_interest` connect
+                    // must carry an in-range percentage to remain a LEGAL
+                    // offered move (C2) now that `PercentageIsBounded`
+                    // enforces one; a non-economic kind's percentage is
+                    // inert and unvalidated either way, so it keeps using
+                    // the adversarial generator (harmless noise, exercised
+                    // for its own sake).
+                    let pct = if proposed.kind_wire == "economic_interest" {
+                        tape.bounded_percentage()
+                    } else {
+                        tape.percentage()
+                    };
+                    payload["percentage"] = serde_json::json!(pct);
                 }
                 (payload, Some(edge), None)
             }

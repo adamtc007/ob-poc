@@ -110,6 +110,18 @@ impl<'a> Tape<'a> {
         (self.u8() as f64) * (1100.0 / 255.0) - 50.0
     }
 
+    /// Bounded f64 in `[0.0, 100.0]` — for board-move generation, where the
+    /// move being built must be a LEGAL one (C2: offered ⟺ admitted).
+    /// `percentage()`'s adversarial range is for probing write-path
+    /// validation directly (`tests/kyc_bases_001_percentage.rs`); the board
+    /// generator explores legal state space, so an `economic_interest`
+    /// connect it offers must carry an in-range value now that
+    /// `Precondition::PercentageIsBounded` enforces one
+    /// (EOP-DD-UBO-BASES-001 §6).
+    pub fn bounded_percentage(&mut self) -> f64 {
+        (self.u8() as f64) * (100.0 / 255.0)
+    }
+
     fn garbage_string(&mut self) -> String {
         let len = self.choice(12);
         (0..len).map(|_| self.u8() as char).collect()

@@ -41,21 +41,56 @@ pub enum Prong {
     ControlByOtherMeans,
     /// No ownership/control found; senior managing official fallback (K-5).
     SmoFallback,
-    /// Both ownership and control prongs apply.
-    Dual,
+    // `Dual` RETIRED (EOP-DD-UBO-BASES-001 §4, 2026-09-08) — it was
+    // declared, ratified as the shape for "both prongs apply", and
+    // constructed nowhere (confirmed by the P0 recon: zero call sites in
+    // the crate). A person found by more than one prong is not a fourth
+    // enum value layered on top of the other three; §4's ruled shape is
+    // the SET of admitting bases on the candidate itself
+    // (`ProngCandidate::bases`) — the set is what replaces `Dual`, not a
+    // renamed variant. `prong` on a merged candidate names whichever of
+    // the three real prongs is most specific (ownership, if any basis
+    // carries a quantum; else control; SMO only when nothing else
+    // admitted at all) — `bases` is what makes the OTHER admitting routes
+    // visible, never lost.
 }
 
 // ── Prong candidate ───────────────────────────────────────────────────────────
 
+/// EOP-DD-UBO-BASES-001 §4: one edge (kind + id) that, on its own,
+/// independently admits a candidate — "control has several doors, and any
+/// one opens" (§1). Carries its OWN chain because two bases for the same
+/// person can be reached by genuinely different paths (e.g. a direct
+/// board seat vs. a chain of control through an intermediate entity).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmittingBasis {
+    pub edge_kind: EdgeKind,
+    pub edge_id: EdgeId,
+    /// The chain from the subject entity to (but not including) this
+    /// candidate — same convention as `ProngCandidate::ownership_chain`.
+    pub chain: Vec<EntityId>,
+}
+
 /// One natural person resolved as a UBO candidate under a specific prong.
 /// K-1: basis mandatory.  K-35: originating_event_id for every candidate.
+///
+/// EOP-DD-UBO-BASES-001 §4: `bases` carries the SET of admitting edges —
+/// a person found by three edges (or by two different strategies, §3) is
+/// ONE candidate here, recorded once, with every basis named. Disconnect
+/// of one basis removes a route, not the person, while any other basis
+/// survives (§1, §7 `disconnect_removes_a_route_not_the_person`) — that
+/// property can only be STATED once something names which bases survived,
+/// which is what this field is for.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProngCandidate {
     pub person_id: PersonId,
     pub prong: Prong,
     /// Effective ownership % (ownership prong only; None for control/SMO).
     pub effective_ownership_pct: Option<f64>,
-    /// The chain from subject entity to this person.
+    /// The chain from subject entity to this person — the PRIMARY basis's
+    /// chain (K-35 auditability). `bases` carries every basis's own chain;
+    /// this field is kept for existing consumers and is always equal to
+    /// `bases[0].chain` when `bases` is non-empty.
     pub ownership_chain: Vec<EntityId>,
     /// The event that introduced the edge that makes this person a candidate.
     pub originating_event_id: EventId,
@@ -69,6 +104,11 @@ pub struct ProngCandidate {
     /// substitution.
     #[serde(default)]
     pub pierces: Vec<PierceRecord>,
+    /// EOP-DD-UBO-BASES-001 §4: every independently-admitting basis,
+    /// deduplicated by edge id — never empty for a real candidate (an
+    /// SMO-pulled candidate carries one basis too: the officer edge).
+    #[serde(default)]
+    pub bases: Vec<AdmittingBasis>,
 }
 
 // ── Fund pivot (EOP-DD-KYCUBO-TS.4 §2 Ruling A) ─────────────────────────────
@@ -149,6 +189,78 @@ pub struct PierceRecord {
     /// The replacement edge asserted by `kyc_ubo.assert.edge.nominee-piercing`, carrying
     /// the real underlying kind.
     pub replacement_edge_id: EdgeId,
+}
+
+// ── Adjacency type aliases (EOP-DD-UBO-BASES-001 §4 basis accumulation) ─────
+
+/// `to_entity → (from_entity, edge_id, edge_kind, percentage, originating_event_id)`
+/// — `OwnershipProngStrategy`'s adjacency; `edge_id`/`edge_kind` are carried
+/// so each contributing edge can become its own `AdmittingBasis`.
+type EconomicAdjacency = BTreeMap<EntityId, Vec<(EntityId, EdgeId, EdgeKind, f64, EventId)>>;
+
+/// `to_entity → (from_entity, edge_id, edge_kind, originating_event_id)` —
+/// `resolve_chain_candidates`'s adjacency (every control-axis strategy).
+type ControlAdjacency = BTreeMap<EntityId, Vec<(EntityId, EdgeId, EdgeKind, EventId)>>;
+
+/// Every admitting edge for one person, keyed by edge id to dedupe a
+/// re-visited traversal path.
+type BasisMap = BTreeMap<EdgeId, AdmittingBasis>;
+
+// ── Merge by person (EOP-DD-UBO-BASES-001 §4) ────────────────────────────────
+
+/// Fold a raw list of `ProngCandidate`s down to one-per-person, unioning
+/// `bases` (deduplicated by edge id — the same admitting edge reached via
+/// two different traversal paths must not be recorded twice). Used both
+/// WITHIN one strategy call (`resolve_chain_candidates`: a person admitted
+/// by three edges under one strategy) and ACROSS strategies (freeze's
+/// orchestration: a person found by ownership AND control, §3) — the same
+/// operation either way, "one candidate, every basis named" (§4).
+///
+/// Field-merge policy for the non-`bases` fields, when two raw entries for
+/// the same person disagree: prefer whichever entry carries
+/// `effective_ownership_pct: Some(_)` (a percentage is the more specific
+/// fact — K-3 already guarantees at most one such entry exists per person,
+/// since only the ownership prong ever sets it) for `prong`,
+/// `effective_ownership_pct`, `ownership_chain`, and
+/// `originating_event_id`; otherwise keep the first entry encountered
+/// (deterministic — callers pass candidates in a stable, already-sorted
+/// order). `pivot` keeps whichever entry has one (mutually exclusive in
+/// practice — only a fund-pivoted strategy ever sets it). `pierces` unions
+/// by `nominee_edge_id`.
+pub fn merge_candidates_by_person(candidates: Vec<ProngCandidate>) -> Vec<ProngCandidate> {
+    let mut by_person: BTreeMap<PersonId, ProngCandidate> = BTreeMap::new();
+    for c in candidates {
+        match by_person.get_mut(&c.person_id) {
+            None => {
+                by_person.insert(c.person_id, c);
+            }
+            Some(existing) => {
+                let mut basis_map: BTreeMap<EdgeId, AdmittingBasis> =
+                    existing.bases.iter().cloned().map(|b| (b.edge_id, b)).collect();
+                for b in c.bases {
+                    basis_map.entry(b.edge_id).or_insert(b);
+                }
+                existing.bases = basis_map.into_values().collect();
+
+                if existing.effective_ownership_pct.is_none() && c.effective_ownership_pct.is_some()
+                {
+                    existing.prong = c.prong;
+                    existing.effective_ownership_pct = c.effective_ownership_pct;
+                    existing.ownership_chain = c.ownership_chain;
+                    existing.originating_event_id = c.originating_event_id;
+                }
+                if existing.pivot.is_none() {
+                    existing.pivot = c.pivot;
+                }
+                for p in c.pierces {
+                    if !existing.pierces.iter().any(|e| e.nominee_edge_id == p.nominee_edge_id) {
+                        existing.pierces.push(p);
+                    }
+                }
+            }
+        }
+    }
+    by_person.into_values().collect()
 }
 
 // ── Strategy interface (K-4) ─────────────────────────────────────────────────
@@ -244,28 +356,40 @@ impl DeterminationStrategy for OwnershipProngStrategy {
     ) -> Vec<ProngCandidate> {
         let edges = reconciled_economic_edges(state);
 
-        // Build adjacency: to_entity → sorted vec of (from_entity, pct, originating_event_id).
-        // BTreeMap ensures deterministic iteration order (Q6, K-16/18/33).
-        // The edge's assertion event id is used (never random) for K-35.
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, f64, EventId)>> = BTreeMap::new();
+        // Build adjacency: to_entity → sorted vec of (from_entity, edge_id,
+        // edge_kind, pct, originating_event_id). BTreeMap ensures
+        // deterministic iteration order (Q6, K-16/18/33). The edge's
+        // assertion event id is used (never random) for K-35. `edge_id`/
+        // `edge_kind` are carried so a contributing edge can be recorded as
+        // its own `AdmittingBasis` (EOP-DD-UBO-BASES-001 §4) — additive to
+        // the summed percentage, never a replacement for it (§1: this
+        // document does not touch the ownership arithmetic).
+        let mut adj: EconomicAdjacency = BTreeMap::new();
         for e in &edges {
-            adj.entry(e.to)
-                .or_default()
-                .push((e.from, e.percentage, e.originating_event_id));
+            adj.entry(e.to).or_default().push((
+                e.from,
+                e.id,
+                e.kind.clone(),
+                e.percentage,
+                e.originating_event_id,
+            ));
         }
         // Sort each adjacency list so traversal order is deterministic regardless of
         // insertion order (edges arrive in event-stream order, which is stable, but
         // an explicit sort is the contract).
         for neighbours in adj.values_mut() {
-            neighbours.sort_by_key(|&(from, _, orig)| (from, orig));
+            neighbours.sort_by_key(|(from, edge_id, _, _, orig)| (*from, *edge_id, *orig));
         }
 
         // DFS with cumulative percentage multiplication.
         // Stack: (current_entity, cumulative_pct, path_so_far, earliest_originating_event_id)
         let mut stack: Vec<(EntityId, f64, Vec<EntityId>, Option<EventId>)> =
             vec![(subject_entity_id, 100.0, vec![subject_entity_id], None)];
-        // BTreeMap for deterministic merge when a person is reachable via multiple chains.
-        let mut candidates: BTreeMap<PersonId, (f64, Vec<EntityId>, Option<EventId>)> =
+        // BTreeMap for deterministic merge when a person is reachable via
+        // multiple chains: (summed pct, primary chain, primary originating
+        // event, every contributing edge as its own basis keyed by edge id
+        // to dedupe a re-visited path).
+        let mut candidates: BTreeMap<PersonId, (f64, Vec<EntityId>, Option<EventId>, BasisMap)> =
             BTreeMap::new();
 
         while let Some((entity, cumulative_pct, path, first_orig)) = stack.pop() {
@@ -274,7 +398,9 @@ impl DeterminationStrategy for OwnershipProngStrategy {
                 continue;
             }
 
-            for &(parent, edge_pct, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
+            for (parent, edge_id, edge_kind, edge_pct, edge_orig) in
+                adj.get(&entity).cloned().unwrap_or_default()
+            {
                 let new_pct = cumulative_pct * edge_pct / 100.0;
                 // Carry the first (earliest) originating event down the chain.
                 let chain_orig = Some(first_orig.unwrap_or(edge_orig));
@@ -286,8 +412,14 @@ impl DeterminationStrategy for OwnershipProngStrategy {
                         0.0,
                         path.clone(),
                         chain_orig,
+                        BTreeMap::new(),
                     ));
                     entry.0 += new_pct;
+                    entry.3.entry(edge_id).or_insert(AdmittingBasis {
+                        edge_kind,
+                        edge_id,
+                        chain: path.clone(),
+                    });
                 } else {
                     // Intermediate entity — continue traversal.
                     let mut new_path = path.clone();
@@ -301,8 +433,8 @@ impl DeterminationStrategy for OwnershipProngStrategy {
         // originating_event_id is always deterministic (from edge assertion events).
         candidates
             .into_iter()
-            .filter(|(_, (pct, _, _))| *pct >= threshold_pct)
-            .map(|(pid, (pct, chain, orig))| ProngCandidate {
+            .filter(|(_, (pct, _, _, _))| *pct >= threshold_pct)
+            .map(|(pid, (pct, chain, orig, bases))| ProngCandidate {
                 person_id: pid,
                 prong: Prong::OwnershipProng,
                 effective_ownership_pct: Some(pct),
@@ -312,6 +444,7 @@ impl DeterminationStrategy for OwnershipProngStrategy {
                 originating_event_id: orig.expect("originating_event_id must be deterministic"),
                 pivot: None,
                 pierces: Vec::new(),
+                bases: bases.into_values().collect(),
             })
             .collect()
     }
@@ -325,45 +458,56 @@ impl DeterminationStrategy for OwnershipProngStrategy {
 /// delegating to `ControlProngStrategy`). Extracted verbatim from the
 /// previously-duplicated `ControlProngStrategy`/`TrustRoleStrategy` bodies
 /// (TS.2 — behavior-preserving refactor): the caller builds the adjacency
-/// (`to_entity → (from_entity, originating_event_id)`) from whichever edge
-/// set its ruling admits; this walks it.
+/// (`to_entity → (from_entity, edge_id, edge_kind, originating_event_id)`)
+/// from whichever edge set its ruling admits; this walks it.
 ///
 /// Semantics (Q6, K-16/18/33 determinism contract):
-/// - adjacency lists are sorted by `(from, orig)` so traversal order is
-///   deterministic regardless of insertion order;
+/// - adjacency lists are sorted by `(from, edge_id, orig)` so traversal
+///   order is deterministic regardless of insertion order;
 /// - DFS from `subject_entity_id` with a path-based cycle guard;
-/// - a `from` that is a natural person becomes a candidate — first
-///   deterministic path wins (control is binary, not summed);
+/// - a `from` that is a natural person becomes a candidate — control is
+///   binary per edge, not summed, but EOP-DD-UBO-BASES-001 §4 records
+///   EVERY admitting edge as its own basis on the SAME candidate (no
+///   longer "first path wins" — that silently dropped every basis but the
+///   first, the exact defect §4 exists to close);
 /// - a `from` that is a legal entity is traversed further;
 /// - every candidate is `Prong::ControlByOtherMeans` with
 ///   `effective_ownership_pct: None` — control carries no quantum.
 fn resolve_chain_candidates(
-    mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>>,
+    mut adj: ControlAdjacency,
     subject_entity_id: EntityId,
     natural_persons: &BTreeSet<PersonId>,
 ) -> Vec<ProngCandidate> {
     for neighbours in adj.values_mut() {
-        neighbours.sort_by_key(|&(from, orig)| (from, orig));
+        neighbours.sort_by_key(|(from, edge_id, _, orig)| (*from, *edge_id, *orig));
     }
 
     // DFS: no percentage to carry, just the path (for ownership_chain / K-35)
     // and the earliest originating event.
     let mut stack: Vec<(EntityId, Vec<EntityId>, Option<EventId>)> =
         vec![(subject_entity_id, vec![subject_entity_id], None)];
-    let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId)> = BTreeMap::new();
+    // Every admitting edge for a person, keyed by edge id to dedupe a
+    // re-visited path; `(primary_chain, primary_orig)` is the first
+    // encountered, kept for K-35/ownership_chain compatibility.
+    let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId, BasisMap)> = BTreeMap::new();
 
     while let Some((entity, path, first_orig)) = stack.pop() {
         if path.iter().filter(|&&e| e == entity).count() > 1 {
             continue; // cycle guard
         }
-        for &(parent, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
+        for (parent, edge_id, edge_kind, edge_orig) in adj.get(&entity).cloned().unwrap_or_default()
+        {
             let chain_orig = first_orig.unwrap_or(edge_orig);
             let parent_person_id = PersonId(parent.0);
             if natural_persons.contains(&parent_person_id) {
-                // First deterministic path wins (control is binary, not summed).
-                candidates
+                let entry = candidates
                     .entry(parent_person_id)
-                    .or_insert_with(|| (path.clone(), chain_orig));
+                    .or_insert_with(|| (path.clone(), chain_orig, BTreeMap::new()));
+                entry.2.entry(edge_id).or_insert(AdmittingBasis {
+                    edge_kind,
+                    edge_id,
+                    chain: path.clone(),
+                });
             } else {
                 let mut new_path = path.clone();
                 new_path.push(parent);
@@ -374,7 +518,7 @@ fn resolve_chain_candidates(
 
     candidates
         .into_iter()
-        .map(|(pid, (chain, orig))| ProngCandidate {
+        .map(|(pid, (chain, orig, bases))| ProngCandidate {
             person_id: pid,
             prong: Prong::ControlByOtherMeans,
             effective_ownership_pct: None,
@@ -382,6 +526,7 @@ fn resolve_chain_candidates(
             originating_event_id: orig,
             pivot: None,
             pierces: Vec::new(),
+            bases: bases.into_values().collect(),
         })
         .collect()
 }
@@ -429,11 +574,12 @@ impl DeterminationStrategy for ControlProngStrategy {
     ) -> Vec<ProngCandidate> {
         let edges = reconciled_control_edges(state);
 
-        // Adjacency: to_entity → sorted vec of (from_entity, originating_event_id).
-        // Same determinism contract as OwnershipProngStrategy (Q6, K-16/18/33).
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        // Adjacency: to_entity → sorted vec of (from_entity, edge_id,
+        // edge_kind, originating_event_id). Same determinism contract as
+        // OwnershipProngStrategy (Q6, K-16/18/33).
+        let mut adj: ControlAdjacency = BTreeMap::new();
         for e in &edges {
-            adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+            adj.entry(e.to).or_default().push((e.from, e.id, e.kind.clone(), e.originating_event_id));
         }
         resolve_chain_candidates(adj, subject_entity_id, natural_persons)
     }
@@ -501,10 +647,15 @@ impl DeterminationStrategy for TrustRoleStrategy {
         // proven-irrevocable settlor) is never traversed at all.
         // Same determinism contract as ControlProngStrategy (Q6, K-16/18/33).
         let edges = reconciled_trust_edges(state);
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        let mut adj: ControlAdjacency = BTreeMap::new();
         for e in &edges {
             if Self::edge_qualifies(&e.role, e.trust_revocable) {
-                adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+                adj.entry(e.to).or_default().push((
+                    e.from,
+                    e.id,
+                    EdgeKind::TrustRole(e.role.clone()),
+                    e.originating_event_id,
+                ));
             }
         }
         resolve_chain_candidates(adj, subject_entity_id, natural_persons)
@@ -576,9 +727,9 @@ pub fn fund_pivot_resolve(
 
     if pivots.is_empty() {
         let edges = reconciled_control_edges(state);
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        let mut adj: ControlAdjacency = BTreeMap::new();
         for e in &edges {
-            adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+            adj.entry(e.to).or_default().push((e.from, e.id, e.kind.clone(), e.originating_event_id));
         }
         return FundPivotResult {
             candidates: resolve_chain_candidates(adj, subject_entity_id, natural_persons),
@@ -631,6 +782,11 @@ pub fn fund_pivot_resolve(
                     originating_event_id: pivot_edge.originating_event_id,
                     pivot: None,
                     pierces: Vec::new(),
+                    bases: vec![AdmittingBasis {
+                        edge_kind: pivot_edge.kind.clone(),
+                        edge_id: pivot_edge.id,
+                        chain: Vec::new(),
+                    }],
                 }]
             } else {
                 // Re-anchor: walk the shared control-chain traversal FROM the
@@ -638,9 +794,14 @@ pub fn fund_pivot_resolve(
                 // what TS.4 adds is the pivot record and the
                 // correctly-anchored exhaustion below.
                 let edges = reconciled_control_edges(state);
-                let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+                let mut adj: ControlAdjacency = BTreeMap::new();
                 for e in &edges {
-                    adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+                    adj.entry(e.to).or_default().push((
+                        e.from,
+                        e.id,
+                        e.kind.clone(),
+                        e.originating_event_id,
+                    ));
                 }
                 resolve_chain_candidates(adj, pivot_entity, natural_persons)
             };
@@ -795,10 +956,15 @@ impl DeterminationStrategy for FoundationCouncilStrategy {
         // directly: the two strategies are the same rule under two names
         // (see doc comment above).
         let edges = reconciled_trust_edges(state);
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        let mut adj: ControlAdjacency = BTreeMap::new();
         for e in &edges {
             if TrustRoleStrategy::edge_qualifies(&e.role, e.trust_revocable) {
-                adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+                adj.entry(e.to).or_default().push((
+                    e.from,
+                    e.id,
+                    EdgeKind::TrustRole(e.role.clone()),
+                    e.originating_event_id,
+                ));
             }
         }
         resolve_chain_candidates(adj, subject_entity_id, natural_persons)
@@ -850,9 +1016,9 @@ impl DeterminationStrategy for StateOwnedStrategy {
         // Full control-edge admission (§2.4: same as control-prong), walked
         // by the shared DFS. Same determinism contract (Q6, K-16/18/33).
         let edges = reconciled_control_edges(state);
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        let mut adj: ControlAdjacency = BTreeMap::new();
         for e in &edges {
-            adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+            adj.entry(e.to).or_default().push((e.from, e.id, e.kind.clone(), e.originating_event_id));
         }
         resolve_chain_candidates(adj, subject_entity_id, natural_persons)
     }
@@ -915,7 +1081,7 @@ impl DeterminationStrategy for CooperativeMemberStrategy {
         // Admitted kinds (§2.5, widened by TS.3 §3): voting_rights +
         // board_appointment + dominant_influence + membership_rights.
         let edges = reconciled_control_edges(state);
-        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        let mut adj: ControlAdjacency = BTreeMap::new();
         for e in &edges {
             if matches!(
                 e.kind,
@@ -924,7 +1090,12 @@ impl DeterminationStrategy for CooperativeMemberStrategy {
                     | EdgeKind::DominantInfluence
                     | EdgeKind::MembershipRights
             ) {
-                adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+                adj.entry(e.to).or_default().push((
+                    e.from,
+                    e.id,
+                    e.kind.clone(),
+                    e.originating_event_id,
+                ));
             }
         }
         resolve_chain_candidates(adj, subject_entity_id, natural_persons)
@@ -1116,6 +1287,24 @@ pub struct SmoPullRecord {
 /// route this comment named as the fallback is retired; a determination
 /// with no candidates and no pull is silent, and K-5 forbids silence).
 ///
+/// **R-B (EOP-DD-UBO-BASES-001 §5, 2026-09-08):** this guard now IS "fires
+/// only when no basis of any kind admitted anyone", literally, not merely
+/// by the old happenstance that officer edges were invisible everywhere.
+/// R-A moved `OfficerAppointment`/`Employment` to `Traverse`, so for any
+/// strategy that reads `reconciled_control_edges` directly
+/// (`ControlProngStrategy`, `StateOwnedStrategy`, `CooperativeMemberStrategy`,
+/// the no-pivot branch of `fund_pivot_resolve`), an officer is now found by
+/// the PRIMARY walk — `prior_candidates` is non-empty before this function
+/// is ever called, so the pull correctly never fires for them (no
+/// double-admission, no suppression either way — the two mechanisms are
+/// mutually exclusive by construction). `TrustRoleStrategy`/
+/// `FoundationCouncilStrategy` still read only `TrustRole`-kind edges
+/// (deliberate, TS.1), so an officer basis on e.g. a `CharityNotForProfit`
+/// subject (geometrically legal — TS.1 admits `OfficerAppointment` onto
+/// that type) remains invisible to the primary walk and this pull is still
+/// the only path that finds them — the one case this function continues to
+/// carry real, distinct weight for.
+///
 /// **Frontier, independently derived:** re-walks `reconciled_control_edges`
 /// from `subject_entity_id` (the SAME admitted-edge set every control-axis
 /// strategy shares) to find the exact set of non-person nodes the walk
@@ -1152,8 +1341,28 @@ pub fn pull_smo_on_exhaustion(
 
     // Re-derive the frontier: nodes the walk reached (from subject_entity_id,
     // over the same adjacency every control strategy shares) that have NO
-    // further admitted parent edges — a dead end, i.e. where the walk
-    // actually exhausted. Cycle-guarded like `resolve_chain_candidates`.
+    // further admitted, non-person parent to traverse — a dead end, i.e.
+    // where the walk actually exhausted. Cycle-guarded like
+    // `resolve_chain_candidates`.
+    //
+    // EOP-DD-UBO-BASES-001 §5 R-A note: a node whose ONLY parents are
+    // natural persons is now a REACHABLE case (`OfficerAppointment`/
+    // `Employment` moved to `Traverse`, so `reconciled_control_edges` can
+    // legitimately carry a person-sourced edge into `node`), not just the
+    // formerly-vacuous "empty adjacency" case. The old comment here
+    // asserted the opposite ("if prior_candidates is empty, none of the
+    // admitted edges reach [a natural person]") — true pre-R-A (officer
+    // edges were invisible to this walk entirely), false for a
+    // `trust_role_strategy`/`foundation_council_strategy`-dispatched
+    // subject with a geometrically-legal officer edge and no trust-role
+    // edge: that strategy never sees the officer either (it reads only
+    // `TrustRole`-kind edges), so `prior_candidates` is empty while
+    // `reconciled_control_edges` now DOES carry the officer as a
+    // person-sourced parent of `node`. Classifying `node` as frontier
+    // whenever nothing further NON-person got pushed — not only when its
+    // parent list is empty/absent — is a strict generalisation: for every
+    // pre-R-A graph shape (no person-sourced Traverse edge existed at all)
+    // this produces the identical frontier; it only changes the new case.
     let mut visited: BTreeSet<EntityId> = BTreeSet::new();
     let mut frontier: BTreeSet<EntityId> = BTreeSet::new();
     let mut stack = vec![subject_entity_id];
@@ -1161,24 +1370,22 @@ pub fn pull_smo_on_exhaustion(
         if !visited.insert(node) {
             continue;
         }
-        match adj.get(&node) {
-            None => {
-                frontier.insert(node);
-            }
-            Some(parents) if parents.is_empty() => {
-                frontier.insert(node);
-            }
-            Some(parents) => {
-                for &parent in parents {
-                    // A natural-person parent would already be a candidate —
-                    // if prior_candidates is empty, none of the admitted
-                    // edges reach one (consistency guard, not expected to
-                    // trigger in well-formed input).
-                    if !natural_persons.contains(&PersonId(parent.0)) {
-                        stack.push(parent);
-                    }
+        let mut pushed_further = false;
+        if let Some(parents) = adj.get(&node) {
+            for &parent in parents {
+                // A natural-person parent is terminal for THIS walk (they'd
+                // already be a candidate via the primary strategy, for any
+                // strategy that shares this edge set) — never pushed
+                // further, but also never silently dropped: `node` is
+                // still frontier if this was its only kind of parent.
+                if !natural_persons.contains(&PersonId(parent.0)) {
+                    stack.push(parent);
+                    pushed_further = true;
                 }
             }
+        }
+        if !pushed_further {
+            frontier.insert(node);
         }
     }
 
@@ -1199,6 +1406,11 @@ pub fn pull_smo_on_exhaustion(
                     originating_event_id: e.originating_event_id,
                     pivot: None,
                     pierces: Vec::new(),
+                    bases: vec![AdmittingBasis {
+                        edge_kind: e.kind.clone(),
+                        edge_id: e.id,
+                        chain: vec![subject_entity_id, entity],
+                    }],
                 });
             }
         }
@@ -1656,17 +1868,25 @@ pub fn recover_determination_at(
     // Find the subject entity from the subject's own root id.
     let subject_entity = find_subject_entity(events)?;
 
-    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): the strategy gate (formerly
-    // `has_strategy()`) and the informational `det.strategy` label (below)
-    // are both now derived from the subject's `EntityType` — mirrors
+    // EOP-DD-UBO-DISPATCH-001 T4 (2026-08-28): the strategy GATE (formerly
+    // `has_strategy()`) is derived from the subject's `EntityType` — mirrors
     // `kyc_stream_ops.rs::UboDeterminationFreeze`'s live-path gate. Anything
-    // short of a live `Strategy(_)` (unknown type, or a terminal
+    // short of a live `Strategies(_)` (unknown type, or a terminal
     // `NotADeterminationSubject`) means recovery can't proceed.
+    //
+    // EOP-DD-UBO-BASES-001 §3: the dispatch table now maps a type to a SET
+    // of strategies, so it can no longer supply a single informational
+    // label — this function replays under the ONE `strategy` the caller
+    // explicitly passed (a narrower recovery than a live `freeze`, which
+    // runs every strategy in the set and unions the results), so the label
+    // is that strategy's own name, not an assumption about which dispatch
+    // set member the caller meant.
     let entity_type = type_registry.type_of(subject_entity)?;
-    let strategy_name = match crate::fold::control::dispatch_for_entity_type(&entity_type) {
-        crate::fold::control::DeterminationDispatch::Strategy(name) => name,
+    match crate::fold::control::dispatch_for_entity_type(&entity_type) {
+        crate::fold::control::DeterminationDispatch::Strategies(_) => {}
         crate::fold::control::DeterminationDispatch::NotADeterminationSubject => return None,
     };
+    let strategy_name = strategy.name();
 
     let mut candidates =
         strategy.resolve(&control, subject_entity, natural_persons, threshold_pct);

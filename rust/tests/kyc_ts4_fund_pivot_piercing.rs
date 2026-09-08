@@ -163,10 +163,17 @@ fn co_management_unions_with_per_pivot_paths() {
     );
 
     let officer_c = by_person[&officer_b];
+    // EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08): OfficerAppointment is now
+    // Traverse-admitted, so ManCo_B's own per-pivot control-chain walk finds
+    // the officer directly (ControlByOtherMeans) before any exhaustion pull
+    // is ever attempted — the per-pivot union property this test names
+    // still holds (both branches independently contribute), only the
+    // MECHANISM that surfaces ManCo_B's officer changed, not the union
+    // itself.
     assert_eq!(
         officer_c.prong,
-        Prong::SmoFallback,
-        "Ruling 2a: ManCo_B's branch independently exhausted and pulled its own officer"
+        Prong::ControlByOtherMeans,
+        "R-A: ManCo_B's own pivot walk finds the officer directly, no pull needed"
     );
     assert_eq!(
         officer_c.pivot.as_ref().expect("officer_b carries its pivot").pivot_entity,
@@ -177,10 +184,18 @@ fn co_management_unions_with_per_pivot_paths() {
 
 #[test]
 fn exhaustion_pulls_smo_of_pivot_entity() {
-    // Fund <-ManagementMandate- ManCo <-OfficerAppointment- Carol. No
-    // control-kind edge (Traverse-admitted) reaches any natural person —
-    // ManCo's own chain exhausts immediately, so Ruling 2a's per-pivot
-    // exhaustion pull fires, anchored at ManCo, not at the fund.
+    // Fund <-ManagementMandate- ManCo <-OfficerAppointment- Carol.
+    //
+    // EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08): at TS.4 landing time, no
+    // Traverse-admitted control-kind edge reached any natural person here,
+    // so ManCo's own chain exhausted immediately and Ruling 2a's per-pivot
+    // exhaustion pull fired, anchored at ManCo. R-A reclassifies
+    // OfficerAppointment to Traverse: ManCo's own control-chain walk now
+    // finds Carol DIRECTLY (ControlByOtherMeans) — the walk no longer
+    // exhausts at all, so the pull this test originally named never fires
+    // for this fixture. What survives is the anchoring property (still
+    // pivot-scoped, not fund-scoped), now demonstrated by direct admission
+    // rather than by the pull.
     let fund = eid(25);
     let manco = eid(26);
     let carol = PersonId(eid(27).0);
@@ -193,13 +208,18 @@ fn exhaustion_pulls_smo_of_pivot_entity() {
 
     let candidates = FundControlStrategy.resolve(&state, fund, &natural_persons, 25.0);
     println!("exhaustion_pulls_smo_of_pivot_entity: {candidates:#?}");
-    assert_eq!(candidates.len(), 1, "ManCo's own control chain exhausts; its officer is pulled");
+    assert_eq!(candidates.len(), 1, "ManCo's own control chain finds Carol directly");
     assert_eq!(candidates[0].person_id, carol);
-    assert_eq!(candidates[0].prong, Prong::SmoFallback);
+    assert_eq!(
+        candidates[0].prong,
+        Prong::ControlByOtherMeans,
+        "R-A: OfficerAppointment is Traverse-admitted; ManCo's own pivot walk finds Carol \
+         directly, no pull needed"
+    );
     assert_eq!(
         candidates[0].pivot.as_ref().expect("carries its pivot").pivot_entity,
         manco,
-        "exhaustion is anchored at ManCo (the pivot entity), never at the fund"
+        "resolution is still anchored at ManCo (the pivot entity), never at the fund"
     );
 }
 

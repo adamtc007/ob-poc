@@ -842,18 +842,26 @@ use crate::lexicon::{LexiconEntry, Precondition};
 /// that happens to read the same as "no strategy" would.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeterminationDispatch {
-    /// §2: this type resolves via the named `DeterminationStrategy`
-    /// (`kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute` dispatch
-    /// recognises exactly these 7 names post-T4: `ownership_prong_strategy`,
-    /// `control_prong_strategy`, `trust_role_strategy`, `fund_control_strategy`,
+    /// EOP-DD-UBO-BASES-001 §3 (revises DISPATCH-001 §2): this type
+    /// resolves via the SET of named `DeterminationStrategy`s that apply —
+    /// every prior row is a one-element set with the same member as before;
+    /// only `PrivateLimitedCompany`/`PublicListedCompany` widen to two
+    /// (`ownership_prong_strategy`, `control_prong_strategy` — the PSC
+    /// limbs apply together, not as alternatives selected by vehicle type,
+    /// §0/§1). `kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute`
+    /// dispatch recognises exactly these 7 names post-T4:
+    /// `ownership_prong_strategy`, `control_prong_strategy`,
+    /// `trust_role_strategy`, `fund_control_strategy`,
     /// `foundation_council_strategy`, `state_owned_strategy`,
     /// `cooperative_member_strategy`. `nominee_pierce_strategy` is retired as
     /// a dispatch TARGET — no `EntityType` produces it (§2 "Where nominee_
     /// pierce_strategy went. Nowhere — deliberately"); the struct and its
     /// freeze-dispatch arm stay, unreachable from here, keeping the
     /// unconditional pre-freeze unpierced-nominee guard (TS.4 §3 Ruling B)
-    /// and the traversal rule intact.
-    Strategy(&'static str),
+    /// and the traversal rule intact. Every strategy in the set runs and the
+    /// results union (§3) — a person found by more than one carries every
+    /// admitting basis (§4), not multiple candidates.
+    Strategies(&'static [&'static str]),
     /// §4 D2: `NaturalPerson`/`SoleTrader` — a person is never a
     /// determination subject; a sole trader collapses to the person. An
     /// explicit arm, never an omission a future type could silently inherit.
@@ -883,12 +891,24 @@ pub fn dispatch_for_entity_type(entity_type: &EntityType) -> DeterminationDispat
     match entity_type {
         // §2 rows 1-2, D2: terminal by design, not by omission.
         NaturalPerson | SoleTrader => NotADeterminationSubject,
-        // §2 rows 3-4: control follows equity.
-        PrivateLimitedCompany | PublicListedCompany => Strategy("ownership_prong_strategy"),
+        // EOP-DD-UBO-BASES-001 §3 (revises DISPATCH-001 §2 rows 3-4): the
+        // PSC limbs apply TOGETHER to a company, not as alternatives keyed
+        // by vehicle type — more than 25% of shares OR voting rights OR the
+        // right to appoint/remove a majority of the board OR significant
+        // influence/control by other means. `ownership_prong_strategy`
+        // covers the equity limb; `control_prong_strategy` covers the rest
+        // (board appointment, officer/employment-with-delegated-authority
+        // once §5 lands, dominant influence). The ONLY row this table
+        // changes relative to DISPATCH-001 — every other row is unchanged.
+        PrivateLimitedCompany | PublicListedCompany => {
+            Strategies(&["ownership_prong_strategy", "control_prong_strategy"])
+        }
         // §2 rows 5-8: control by designation/appointment, not equity.
         // `LlcUs` RULED 2026-08-27 (§3 Q1) — partners/appointed officers,
         // same mechanism as a partnership.
-        LlcUs | GeneralPartnership | LimitedPartnership | Llp => Strategy("control_prong_strategy"),
+        LlcUs | GeneralPartnership | LimitedPartnership | Llp => {
+            Strategies(&["control_prong_strategy"])
+        }
         // §2 rows 9-14: the directing mind sits outside the vehicle, under a
         // governing mandate — pivot and re-anchor there (TS.4 Ruling A).
         // `UnitTrust` (row 11) is trust-SHAPED but fund-DIRECTED: the
@@ -898,22 +918,22 @@ pub fn dispatch_for_entity_type(entity_type: &EntityType) -> DeterminationDispat
         // `UmbrellaWithSubFunds` RULED 2026-08-27 (§3 Q2) — a fund like any
         // other, directed by a ManCo exactly as its sub-funds are.
         OeicIcvc | Sicav | UnitTrust | FortyActFund | LpFund | UmbrellaWithSubFunds => {
-            Strategy("fund_control_strategy")
+            Strategies(&["fund_control_strategy"])
         }
         // §2 rows 15-16, 18, 20: role enumeration, no owners by construction.
         // `CharityNotForProfit` RULED 2026-08-27 (§3 Q3) — charities are
         // trusts, not foundation-shaped council governance.
         DiscretionaryTrust | FixedBareTrust | PensionScheme | CharityNotForProfit => {
-            Strategy("trust_role_strategy")
+            Strategies(&["trust_role_strategy"])
         }
         // §2 row 17: founder/council/beneficiaries — distinct from trust
         // role enumeration (Foundation has no settlor/trustee shape).
-        Foundation => Strategy("foundation_council_strategy"),
+        Foundation => Strategies(&["foundation_council_strategy"]),
         // §2 row 19: one member one vote; economic percentage is meaningless.
-        CooperativeMutual => Strategy("cooperative_member_strategy"),
+        CooperativeMutual => Strategies(&["cooperative_member_strategy"]),
         // §2 row 21: traversal terminates in a public body; record the stop
         // and fall to officials.
-        GovernmentDeptStatutoryCorporation => Strategy("state_owned_strategy"),
+        GovernmentDeptStatutoryCorporation => Strategies(&["state_owned_strategy"]),
     }
 }
 
@@ -993,7 +1013,7 @@ pub fn check_preconditions(
                         });
                     }
                     Some(t) => match dispatch_for_entity_type(&t) {
-                        DeterminationDispatch::Strategy(_) => {}
+                        DeterminationDispatch::Strategies(_) => {}
                         DeterminationDispatch::NotADeterminationSubject => {
                             return Err(KycError::PreconditionFailed {
                                 verb: lexicon_entry.fqn.clone(),
@@ -1287,6 +1307,32 @@ pub fn check_preconditions(
                     });
                 }
             }
+            Precondition::PercentageIsBounded => {
+                // EOP-DD-UBO-BASES-001 §6, finding #3 re-characterised
+                // (2026-09-08) — see the `Precondition` variant's doc.
+                // Vacuous unless `kind` is literally "economic_interest" —
+                // percentage belongs to shareholdings only (§1); a stray
+                // `percentage` value alongside a control-kind edge (voting
+                // rights, board appointment, etc.) is inert noise no
+                // strategy ever reads, not a claim this precondition has
+                // any basis to police.
+                if event.payload.get("kind").and_then(|k| k.as_str()) != Some("economic_interest")
+                {
+                    continue;
+                }
+                let Some(pct) = opt_f64(&event.payload, "percentage") else {
+                    continue;
+                };
+                if !(0.0..=100.0).contains(&pct) {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "percentage {pct} is out of bounds — must lie in [0, 100] \
+                             (EOP-DD-UBO-BASES-001 §6, finding #3)"
+                        ),
+                    });
+                }
+            }
         }
     }
     Ok(())
@@ -1308,6 +1354,11 @@ pub struct ReconciledEconomicEdge {
     pub from: EntityId,
     pub to: EntityId,
     pub percentage: f64,
+    /// EOP-DD-UBO-BASES-001 §4: the real edge kind (`EconomicInterest` or
+    /// `Containment` — `is_economic()`'s two members), not assumed —
+    /// carried through so a `ProngCandidate`'s `AdmittingBasis` records
+    /// what actually admitted it, not a guess.
+    pub kind: EdgeKind,
     /// The event that originally asserted this edge (deterministic; never random).
     pub originating_event_id: EventId,
 }
@@ -1333,6 +1384,7 @@ pub fn reconciled_economic_edges(state: &ControlState) -> Vec<ReconciledEconomic
                 from: e.from,
                 to: e.to,
                 percentage: pct,
+                kind: e.kind.clone(),
                 originating_event_id: e.originating_event_id,
             })
         })
@@ -1372,9 +1424,13 @@ pub enum ControlAdmission {
     /// discipline — not a silent halt). See `detect_statutory_stops`
     /// (`determination.rs`).
     Stop,
-    /// Never part of the control walk. May still be a terminal/population
-    /// source pulled by a strategy on exhaustion (§4a — `OfficerAppointment`),
-    /// never by admission.
+    /// Never part of the control walk (`EconomicInterest` — the ownership
+    /// prong's job; `Containment` — structural scoping). `OfficerAppointment`
+    /// moved OUT of this class to `Traverse` (EOP-DD-UBO-BASES-001 §5 R-A,
+    /// 2026-09-08) — an edge kind can still be a terminal/population source
+    /// pulled by `pull_smo_on_exhaustion` (§4a) without being `NotControl`;
+    /// the pull and this admission class are independent mechanisms, not a
+    /// pairing.
     NotControl,
     /// Substitute the underlying holder and continue (K-8). Not filtered by
     /// `reconciled_control_edges` — pierce-and-substitute is handled by the
@@ -1383,28 +1439,45 @@ pub enum ControlAdmission {
     Pierce,
 }
 
-/// The TS.3 §3/§4 admission ruling, per `EdgeKind`.
+/// The TS.3 §3/§4 admission ruling, per `EdgeKind` — REVISED by
+/// EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08; recorded in the state-of-play,
+/// not by editing the ratified TS.3 document itself — the second such
+/// revision to a TS.3 classification, after `ManagementMandate` on
+/// 2026-08-20).
 ///
 /// **This is a SAFETY guard, not a semantics ruling.** Before this function
 /// existed (as the boolean `is_admitted_as_control`, landed `c7ef69ca`), the
 /// filter was an EXCLUSION list — everything except
 /// `EconomicInterest`/`Nominee` passed — which silently admitted every
 /// *future* `EdgeKind` variant as generic control the moment it became
-/// assertable, with no domain ruling behind the admission. TS.3 closes the
+/// assertable, with no domain ruling behind the admission. TS.3 closed the
 /// semantics question the whitelist tranche deliberately left open,
 /// reconciling to V&S v0.6 §6.4's control-axis column rather than inventing:
 /// `ManagementMandate` and `MembershipRights` are named as control axes for
 /// funds and cooperatives respectively and move to `Traverse`;
 /// `StatutoryAuthority` routes to SMO/special-handling per §6.4's
 /// state-owned row, so it `Stop`s rather than being walked or silently
-/// dropped; `OfficerAppointment` stays out of the WALK (ruled 2026-08-21 —
-/// "may not be needed or relevant") but is available for the §4a pull on
-/// exhaustion; `Employment`/`Containment` stay out (obligation basis /
-/// structural scoping, not control, per §3); `EconomicInterest` is out
-/// because that's the ownership prong's job (`reconciled_economic_edges`);
-/// `Nominee` is `Pierce`, never a plain admission. The match is exhaustive
-/// with NO catch-all arm: adding a new `EdgeKind` variant anywhere in this
-/// enum is a compile error here, never a silent admission.
+/// dropped; `EconomicInterest` is out because that's the ownership prong's
+/// job (`reconciled_economic_edges`); `Containment` stays out (structural
+/// scoping, not control, per §3); `Nominee` is `Pierce`, never a plain
+/// admission.
+///
+/// **R-A (2026-09-08):** `OfficerAppointment` and `Employment` move from
+/// `NotControl` to `Traverse`. TS.3's original ruling (2026-08-21) held
+/// `OfficerAppointment` out of the walk as "may not be needed or relevant",
+/// available only for the §4a pull-on-exhaustion, never by admission —
+/// EOP-DD-UBO-BASES-001 §0 found that ruling under-identified: the office,
+/// and employment carrying delegated authority to run the business, are
+/// each an INDEPENDENTLY SUFFICIENT door to control (§1 — "control has
+/// several doors, and any one opens"), not a fallback-of-last-resort
+/// reserved for when nobody else is found. Adam's words: "employment with
+/// delegated authority is the thing." R-B (`pull_smo_on_exhaustion`'s own
+/// doc) records the companion consequence: the exhaustion pull must not be
+/// confused with — or suppressed by, or a suppressor of — this admission.
+///
+/// The match is exhaustive with NO catch-all arm: adding a new `EdgeKind`
+/// variant anywhere in this enum is a compile error here, never a silent
+/// admission.
 pub fn control_admission(kind: &EdgeKind) -> ControlAdmission {
     use ControlAdmission::*;
     match kind {
@@ -1415,12 +1488,11 @@ pub fn control_admission(kind: &EdgeKind) -> ControlAdmission {
         | EdgeKind::TrustRole(_)
         | EdgeKind::DominantInfluence
         | EdgeKind::ManagementMandate
-        | EdgeKind::MembershipRights => Traverse,
-        EdgeKind::StatutoryAuthority => Stop,
-        EdgeKind::EconomicInterest
+        | EdgeKind::MembershipRights
         | EdgeKind::OfficerAppointment
-        | EdgeKind::Employment
-        | EdgeKind::Containment => NotControl,
+        | EdgeKind::Employment => Traverse,
+        EdgeKind::StatutoryAuthority => Stop,
+        EdgeKind::EconomicInterest | EdgeKind::Containment => NotControl,
         EdgeKind::Nominee => Pierce,
     }
 }

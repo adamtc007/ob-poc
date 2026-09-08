@@ -111,8 +111,11 @@ fn every_entity_type_has_a_ruling() {
     );
     for t in ALL_ENTITY_TYPES {
         match ob_poc_kyc_substrate::dispatch_for_entity_type(t) {
-            DeterminationDispatch::Strategy(name) => {
-                assert!(!name.is_empty(), "{t:?} dispatched to an empty strategy name");
+            DeterminationDispatch::Strategies(names) => {
+                assert!(!names.is_empty(), "{t:?} dispatched to an empty strategy set");
+                for name in names {
+                    assert!(!name.is_empty(), "{t:?} dispatched to an empty strategy name");
+                }
             }
             DeterminationDispatch::NotADeterminationSubject => {}
         }
@@ -206,37 +209,50 @@ fn dispatch_is_exhaustive() {
     assert_eq!(results.len(), ALL_ENTITY_TYPES.len());
 }
 
-// ── mapping_matches_the_ratified_table ──────────────────────────────────────
+// ── dispatch_table_matches_the_ratified_set ─────────────────────────────────
 
+/// EOP-DD-UBO-BASES-001 §3/§7 `dispatch_table_matches_the_ratified_set` —
+/// supersedes DISPATCH-001's own `mapping_matches_the_ratified_table`
+/// (renamed here, same §4 D4 discipline: a second, independent copy of the
+/// table so a code drift is caught, not trusted from the function's own
+/// arms). Only ONE row changes from DISPATCH-001 §2's original single-
+/// strategy table — `PrivateLimitedCompany`/`PublicListedCompany` now name
+/// BOTH `ownership_prong_strategy` and `control_prong_strategy` (§3: the
+/// PSC limbs apply together). Every other row is unchanged, still a
+/// one-element set.
 #[test]
-fn mapping_matches_the_ratified_table() {
+fn dispatch_table_matches_the_ratified_set() {
     use EntityType::*;
-    // EOP-DD-UBO-DISPATCH-001 §2, verbatim — a second, independent copy so
-    // a code change that drifts from the ratified table is caught (§4 D4).
     let ratified: BTreeMap<EntityType, DeterminationDispatch> = BTreeMap::from([
         (NaturalPerson, DeterminationDispatch::NotADeterminationSubject),
         (SoleTrader, DeterminationDispatch::NotADeterminationSubject),
-        (PrivateLimitedCompany, DeterminationDispatch::Strategy("ownership_prong_strategy")),
-        (PublicListedCompany, DeterminationDispatch::Strategy("ownership_prong_strategy")),
-        (LlcUs, DeterminationDispatch::Strategy("control_prong_strategy")),
-        (GeneralPartnership, DeterminationDispatch::Strategy("control_prong_strategy")),
-        (LimitedPartnership, DeterminationDispatch::Strategy("control_prong_strategy")),
-        (Llp, DeterminationDispatch::Strategy("control_prong_strategy")),
-        (OeicIcvc, DeterminationDispatch::Strategy("fund_control_strategy")),
-        (Sicav, DeterminationDispatch::Strategy("fund_control_strategy")),
-        (UnitTrust, DeterminationDispatch::Strategy("fund_control_strategy")),
-        (FortyActFund, DeterminationDispatch::Strategy("fund_control_strategy")),
-        (LpFund, DeterminationDispatch::Strategy("fund_control_strategy")),
-        (UmbrellaWithSubFunds, DeterminationDispatch::Strategy("fund_control_strategy")),
-        (DiscretionaryTrust, DeterminationDispatch::Strategy("trust_role_strategy")),
-        (FixedBareTrust, DeterminationDispatch::Strategy("trust_role_strategy")),
-        (Foundation, DeterminationDispatch::Strategy("foundation_council_strategy")),
-        (PensionScheme, DeterminationDispatch::Strategy("trust_role_strategy")),
-        (CooperativeMutual, DeterminationDispatch::Strategy("cooperative_member_strategy")),
-        (CharityNotForProfit, DeterminationDispatch::Strategy("trust_role_strategy")),
+        (
+            PrivateLimitedCompany,
+            DeterminationDispatch::Strategies(&["ownership_prong_strategy", "control_prong_strategy"]),
+        ),
+        (
+            PublicListedCompany,
+            DeterminationDispatch::Strategies(&["ownership_prong_strategy", "control_prong_strategy"]),
+        ),
+        (LlcUs, DeterminationDispatch::Strategies(&["control_prong_strategy"])),
+        (GeneralPartnership, DeterminationDispatch::Strategies(&["control_prong_strategy"])),
+        (LimitedPartnership, DeterminationDispatch::Strategies(&["control_prong_strategy"])),
+        (Llp, DeterminationDispatch::Strategies(&["control_prong_strategy"])),
+        (OeicIcvc, DeterminationDispatch::Strategies(&["fund_control_strategy"])),
+        (Sicav, DeterminationDispatch::Strategies(&["fund_control_strategy"])),
+        (UnitTrust, DeterminationDispatch::Strategies(&["fund_control_strategy"])),
+        (FortyActFund, DeterminationDispatch::Strategies(&["fund_control_strategy"])),
+        (LpFund, DeterminationDispatch::Strategies(&["fund_control_strategy"])),
+        (UmbrellaWithSubFunds, DeterminationDispatch::Strategies(&["fund_control_strategy"])),
+        (DiscretionaryTrust, DeterminationDispatch::Strategies(&["trust_role_strategy"])),
+        (FixedBareTrust, DeterminationDispatch::Strategies(&["trust_role_strategy"])),
+        (Foundation, DeterminationDispatch::Strategies(&["foundation_council_strategy"])),
+        (PensionScheme, DeterminationDispatch::Strategies(&["trust_role_strategy"])),
+        (CooperativeMutual, DeterminationDispatch::Strategies(&["cooperative_member_strategy"])),
+        (CharityNotForProfit, DeterminationDispatch::Strategies(&["trust_role_strategy"])),
         (
             GovernmentDeptStatutoryCorporation,
-            DeterminationDispatch::Strategy("state_owned_strategy"),
+            DeterminationDispatch::Strategies(&["state_owned_strategy"]),
         ),
     ]);
     assert_eq!(ratified.len(), 21, "the ratified table itself must name all 21 types");
@@ -253,7 +269,7 @@ fn mapping_matches_the_ratified_table() {
     }
     assert!(
         mismatches.is_empty(),
-        "dispatch_for_entity_type drifted from EOP-DD-UBO-DISPATCH-001 §2: {mismatches:#?}"
+        "dispatch_for_entity_type drifted from EOP-DD-UBO-BASES-001 §3: {mismatches:#?}"
     );
 }
 
@@ -279,7 +295,7 @@ fn strategy_for(name: &str) -> &'static dyn DeterminationStrategy {
 fn llc_us_dispatches_to_control_prong_not_ownership_prong() {
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::LlcUs),
-        DeterminationDispatch::Strategy("control_prong_strategy"),
+        DeterminationDispatch::Strategies(&["control_prong_strategy"]),
     );
 
     let llc = eid(1);
@@ -318,11 +334,11 @@ fn llc_us_dispatches_to_control_prong_not_ownership_prong() {
 fn lp_fund_dispatches_to_fund_control_not_control_prong() {
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::LpFund),
-        DeterminationDispatch::Strategy("fund_control_strategy"),
+        DeterminationDispatch::Strategies(&["fund_control_strategy"]),
     );
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::LimitedPartnership),
-        DeterminationDispatch::Strategy("control_prong_strategy"),
+        DeterminationDispatch::Strategies(&["control_prong_strategy"]),
         "the plain (non-fund) LP stays on control_prong — only the fund-shaped sibling moves"
     );
 
@@ -372,7 +388,7 @@ fn lp_fund_dispatches_to_fund_control_not_control_prong() {
 fn unit_trust_dispatches_to_fund_control_not_trust_role() {
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::UnitTrust),
-        DeterminationDispatch::Strategy("fund_control_strategy"),
+        DeterminationDispatch::Strategies(&["fund_control_strategy"]),
     );
 
     let trust = eid(6);
@@ -412,7 +428,7 @@ fn unit_trust_dispatches_to_fund_control_not_trust_role() {
 fn umbrella_with_sub_funds_is_now_a_determination_subject() {
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::UmbrellaWithSubFunds),
-        DeterminationDispatch::Strategy("fund_control_strategy"),
+        DeterminationDispatch::Strategies(&["fund_control_strategy"]),
     );
 
     let umbrella = eid(10);
@@ -458,7 +474,7 @@ fn umbrella_with_sub_funds_is_now_a_determination_subject() {
 fn charity_dispatches_to_trust_role_not_foundation_council() {
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::CharityNotForProfit),
-        DeterminationDispatch::Strategy("trust_role_strategy"),
+        DeterminationDispatch::Strategies(&["trust_role_strategy"]),
     );
 
     let charity = eid(13);

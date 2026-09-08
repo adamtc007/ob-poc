@@ -69,3 +69,10 @@ path = "fuzz_targets/board_determination_invariants.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "board_basis_survival"
+path = "fuzz_targets/board_basis_survival.rs"
+test = false
+doc = false
+bench = false

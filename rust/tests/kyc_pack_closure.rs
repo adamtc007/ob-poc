@@ -780,19 +780,25 @@ fn fold_blind_verbs_are_exactly_known() {
 
 // ── K-G5: precondition + strategy coverage (the seventh tooth) ─────────────
 
-/// `"literal" => &Ident` arms inside freeze's `match strategy_name { ... }`
-/// dispatch block — bounded to that one match (unlike `fold_match_arms`,
-/// which is deliberately broad; this one must be exact since it pins a
-/// literal count, not just membership).
+/// `"literal" => &Ident` arms inside freeze's `strategy_for_name` dispatch
+/// helper — bounded to that one match (unlike `fold_match_arms`, which is
+/// deliberately broad; this one must be exact since it pins a literal
+/// count, not just membership).
+///
+/// EOP-DD-UBO-BASES-001 §3: freeze now dispatches to a SET of strategies
+/// (unioning the results), so the lookup was extracted to a local
+/// `strategy_for_name(name) -> Result<&dyn DeterminationStrategy>` helper
+/// called once per name in the loop — the marker/close below track that
+/// shape, not the pre-§3 single `let strategy = match strategy_name {`.
 fn freeze_strategy_arms() -> BTreeSet<String> {
-    let marker = "let strategy: &dyn DeterminationStrategy = match strategy_name {";
+    let marker = "fn strategy_for_name(name: &str) -> Result<&'static dyn DeterminationStrategy> {";
     let start = KYC_STREAM_OPS_SRC
         .find(marker)
-        .expect("freeze's strategy dispatch match must exist in kyc_stream_ops.rs");
+        .expect("freeze's strategy_for_name dispatch helper must exist in kyc_stream_ops.rs");
     let mut arms = BTreeSet::new();
     for line in KYC_STREAM_OPS_SRC[start + marker.len()..].lines() {
         let trimmed = line.trim();
-        if trimmed == "};" {
+        if trimmed == "})" {
             break;
         }
         if let Some(rest) = trimmed.strip_prefix('"') {
@@ -895,6 +901,10 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // a never-placed endpoint is untouched (stays Unevaluable/admit at
     // TypeGeometryPermits, R5/R6/CTN-2e), preserving the K-8 nominee-pierce
     // mechanism (its on-paper holder is never placed by design).
+    // 2026-09-08 (EOP-DD-UBO-BASES-001 §6, finding #3 re-characterised):
+    // PercentageIsBounded — a `connect` naming `kind: "economic_interest"`
+    // must carry `percentage` in [0, 100] when present; vacuous for every
+    // other kind and vacuous when absent.
     expected.insert(
         "kyc_ubo.assert.edge.connect".to_string(),
         vec![
@@ -903,6 +913,7 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
             Precondition::TypeGeometryPermits,
             Precondition::PiercedFromIsActiveNominee,
             Precondition::ConnectEndpointsNotWithdrawn,
+            Precondition::PercentageIsBounded,
         ],
     );
     expected.insert(
@@ -1446,8 +1457,9 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
 
     assert_eq!(
         ob_poc_kyc_substrate::dispatch_for_entity_type(&EntityType::PrivateLimitedCompany),
-        DeterminationDispatch::Strategy("ownership_prong_strategy"),
-        "sanity: PrivateLimitedCompany must be a live dispatch target for the admit case below"
+        DeterminationDispatch::Strategies(&["ownership_prong_strategy", "control_prong_strategy"]),
+        "sanity: PrivateLimitedCompany must be a live dispatch target for the admit case below \
+         (EOP-DD-UBO-BASES-001 §3: both limbs)"
     );
     assert!(
         check_preconditions(
@@ -1625,9 +1637,14 @@ fn edge_kind_strategy_admission_is_exactly_known() {
     // and `membership_rights` are named control axes for funds/cooperatives
     // respectively and move from excluded to admitted (`Traverse`,
     // `control_admission`, fold/control.rs). `broad_control` now pins the
-    // 11-kind Traverse set the full-walk strategies share; `cooperative_
+    // Traverse set the full-walk strategies share; `cooperative_
     // member_strategy` additionally gains `membership_rights` on top of its
     // own narrower 3-kind filter (TS.3 §3: the co-op control axis).
+    // EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08, recorded in the
+    // state-of-play, TS.3 itself unedited): `officer_appointment` and
+    // `employment` move from `NotControl` to `Traverse` — each an
+    // independently-sufficient door to control (§1), not a fallback
+    // reserved for `pull_smo_on_exhaustion`'s exhaustion pull. 11 -> 13.
     let broad_control: BTreeSet<&str> = [
         "voting_rights",
         "board_appointment",
@@ -1640,6 +1657,8 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         "dominant_influence",
         "management_mandate",
         "membership_rights",
+        "officer_appointment",
+        "employment",
     ]
     .into_iter()
     .collect();
@@ -1678,15 +1697,19 @@ fn edge_kind_strategy_admission_is_exactly_known() {
          pin, not a guess (TS.3 four-way classification)"
     );
 
-    // TS.3 §4: the admission function is now a four-way class
+    // TS.3 §4: the admission function is a four-way class
     // (`Traverse | Stop | NotControl | Pierce`), not a boolean. `nominee`
     // (Pierce) and `statutory_authority` (Stop — recorded via
     // `detect_statutory_stops`, not walked) are excluded from every
-    // strategy's WALK by design, same as before. `officer_appointment`
-    // (NotControl — pulled on exhaustion by `pull_smo_on_exhaustion`,
-    // §4a, never pushed by admission), `employment`, `containment` stay
-    // NotControl per §3's citations. This is a deliberate admission
-    // boundary, not a gap.
+    // control-axis strategy's WALK by design, same as before; `containment`
+    // (NotControl — structural scoping) likewise. `economic_interest` is
+    // walked, but only by `ownership_prong_strategy` (its own dedicated
+    // axis), so it IS in `all_traversed_by_someone` and correctly absent
+    // from this "untraversed by ANY strategy" set. EOP-DD-UBO-BASES-001 §5
+    // R-A (2026-09-08): `officer_appointment`/`employment` moved OUT of
+    // this set too — each is now an independently-sufficient door to
+    // control (§1), `Traverse`-admitted, not reserved for
+    // `pull_smo_on_exhaustion`'s exhaustion pull alone.
     let all_traversed_by_someone: BTreeSet<&str> =
         actual.values().flat_map(|s| s.iter().copied()).collect();
     let untraversed_by_anyone: BTreeSet<&str> = kinds
@@ -1696,14 +1719,11 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         .collect();
     assert_eq!(
         untraversed_by_anyone,
-        ["nominee", "officer_appointment", "statutory_authority", "employment", "containment"]
-            .into_iter()
-            .collect::<BTreeSet<_>>(),
-        "control_admission's non-Traverse set must be exactly these 5 kinds — `nominee` \
-         (Pierce, K-8), `statutory_authority` (Stop, TS.3 §3), `officer_appointment` \
-         (NotControl, pulled on exhaustion only), `employment`/`containment` (NotControl, \
-         obligation basis / structural scoping); if this set grew or shrank, that is a \
-         real admission-boundary change and must be reported, not silently re-absorbed"
+        ["nominee", "statutory_authority", "containment"].into_iter().collect::<BTreeSet<_>>(),
+        "control_admission's kinds untraversed by ANY strategy must be exactly these 3 — \
+         `nominee` (Pierce, K-8), `statutory_authority` (Stop, TS.3 §3), `containment` \
+         (NotControl, structural scoping); if this set grew or shrank, that is a real \
+         admission-boundary change and must be reported, not silently re-absorbed"
     );
 }
 
@@ -1843,14 +1863,18 @@ fn determination_is_unchanged_by_whitelisting() {
 /// rediscovered. TS.3 (RATIFIED 2026-08-21) closed the ratification
 /// question for `management_mandate`/`membership_rights` (now admitted —
 /// see `edge_kind_strategy_admission_is_exactly_known`,
-/// `fund_with_manco_now_resolves`, `cooperative_resolves_via_membership`);
-/// this test now covers the FOUR kinds TS.3 §3 keeps out of the walk on
-/// separate, distinct grounds: `officer_appointment` (NotControl — pulled
-/// on exhaustion only, `pull_smo_on_exhaustion`), `statutory_authority`
-/// (Stop, not a walk exclusion — see `statutory_authority_stops_with_
-/// reason`; still produces zero *candidates* from any strategy, which is
-/// what this test checks), `employment`/`containment` (NotControl,
-/// obligation basis / structural scoping per V&S citations).
+/// `fund_with_manco_now_resolves`, `cooperative_resolves_via_membership`).
+/// EOP-DD-UBO-BASES-001 §5 R-A (2026-09-08) closed it for
+/// `officer_appointment`/`employment` too — each is now `Traverse`, an
+/// independently-sufficient door (§1), no longer confined to
+/// `pull_smo_on_exhaustion`'s exhaustion-only pull; moved OUT of this
+/// test's excluded set (see `officer_is_a_door_not_a_fallback`,
+/// `kyc_bases_001_p0_red.rs`, for the positive-admission gate). This test
+/// now covers the TWO kinds TS.3 §3 keeps out of the walk on separate,
+/// distinct grounds: `statutory_authority` (Stop, not a walk exclusion —
+/// see `statutory_authority_stops_with_reason`; still produces zero
+/// *candidates* from any strategy, which is what this test checks),
+/// `containment` (NotControl, structural scoping per V&S citations).
 #[test]
 fn new_edge_kinds_are_not_traversed_as_control() {
     let subject_entity = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0004));
@@ -1861,9 +1885,7 @@ fn new_edge_kinds_are_not_traversed_as_control() {
     // the WALK (a `Stop` still produces zero candidates; it just also
     // records why, tested separately).
     let excluded_kinds: &[(&str, EdgeKind)] = &[
-        ("officer_appointment", EdgeKind::OfficerAppointment),
         ("statutory_authority", EdgeKind::StatutoryAuthority),
-        ("employment", EdgeKind::Employment),
         ("containment", EdgeKind::Containment),
     ];
 

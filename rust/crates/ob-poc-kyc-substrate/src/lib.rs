@@ -39,13 +39,14 @@ pub(crate) mod types;
 
 pub use determination::{
     compute_assurance, detect_pierces_in_chain, detect_statutory_stops, find_subject_entity,
-    freeze_determination, fund_pivot_resolve, pull_smo_on_exhaustion, recover_determination_at,
-    recover_determination_bitemporal, ControlProngStrategy, CooperativeMemberStrategy,
-    DelegationStatus, DeterminationAssurance, DeterminationInProgress, DeterminationPin,
-    DeterminationStrategy, FoundationCouncilStrategy, FrozenDetermination, FundControlStrategy,
-    FundPivotResult, NomineePierceStrategy, OwnershipProngStrategy, PierceRecord, PivotCycleRecord,
-    Prong, ProngCandidate, ProvisionalityReason, RecordedPivot, RecoveryPin, SmoPullRecord,
-    SmoResult, StateOwnedStrategy, TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
+    freeze_determination, fund_pivot_resolve, merge_candidates_by_person, pull_smo_on_exhaustion,
+    recover_determination_at, recover_determination_bitemporal, AdmittingBasis,
+    ControlProngStrategy, CooperativeMemberStrategy, DelegationStatus, DeterminationAssurance,
+    DeterminationInProgress, DeterminationPin, DeterminationStrategy, FoundationCouncilStrategy,
+    FrozenDetermination, FundControlStrategy, FundPivotResult, NomineePierceStrategy,
+    OwnershipProngStrategy, PierceRecord, PivotCycleRecord, Prong, ProngCandidate,
+    ProvisionalityReason, RecordedPivot, RecoveryPin, SmoPullRecord, SmoResult, StateOwnedStrategy,
+    TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
 };
 pub use error::KycError;
 pub use evaluation::{

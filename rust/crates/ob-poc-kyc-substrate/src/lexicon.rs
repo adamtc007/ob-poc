@@ -249,6 +249,21 @@ pub enum Precondition {
     /// point, fuzzable through one entry point regardless of which surface
     /// (if any, ever) drives it.
     NoUnpiercedNomineeEdges,
+
+    // ── EOP-DD-UBO-BASES-001 §6, finding #3 re-characterised (2026-09-08) ──
+    /// `connect`'s payload `percentage` field, when present, must lie in
+    /// `[0, 100]`. Finding #3 (fuzz-harness research, 2026-09-08) named
+    /// "control never multiplied along a chain" but the crashing candidate
+    /// was a SINGLE hop with a percentage of 972 — not a chain-arithmetic
+    /// bug, an unvalidated input: nothing anywhere in the write path ever
+    /// bounded `percentage` (`grep percentage` across this module returned
+    /// zero matches before this variant existed). `OwnershipProngStrategy`'s
+    /// DFS is correct; it faithfully propagates whatever the write path
+    /// let through. Same chokepoint and vacuous-when-absent convention as
+    /// `ConnectEndpointsNotWithdrawn` — a `connect` asserting a non-economic
+    /// control kind never carries `percentage` at all, and that call must
+    /// be unaffected.
+    PercentageIsBounded,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -480,12 +495,16 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // neither endpoint may be a currently-WITHDRAWN entity. A
             // never-registered endpoint is unaffected (stays Unevaluable/
             // admit at TypeGeometryPermits, R5/R6/CTN-2e unchanged).
+            // 2026-09-08 (EOP-DD-UBO-BASES-001 §6, finding #3
+            // re-characterised): PercentageIsBounded — `percentage`, when
+            // present, must lie in [0, 100].
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::NoDuplicateActiveEdge,
                 Precondition::TypeGeometryPermits,
                 Precondition::PiercedFromIsActiveNominee,
                 Precondition::ConnectEndpointsNotWithdrawn,
+                Precondition::PercentageIsBounded,
             ],
             AuthoritySpec::analyst(),
             vec![],

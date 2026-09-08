@@ -434,10 +434,32 @@ pub fn check_p2(tape: &mut Tape) {
 ///   may equal the `to`-entity of an unpierced `Nominee` edge
 ///   (`unpierced_nominee_edges`, the same set `freeze`'s
 ///   `NoUnpiercedNomineeEdges` precondition refuses on).
-/// - **Control never multiplied along a chain**: `effective_ownership_pct`,
-///   where present, must not exceed 100 — chain multiplication (product of
-///   <=100% hops) can only shrink a percentage, never grow it past the
-///   single-hop maximum.
+///
+/// **Finding #3, re-characterised and closed (EOP-DD-UBO-BASES-001 §6,
+/// 2026-09-08).** This property used to also assert
+/// `effective_ownership_pct <= 100`, under the name "control never
+/// multiplied along a chain". Execution proved that framing wrong on both
+/// counts: the crashing input (`fuzz/regressions/board_determination_
+/// invariants/finding_3_unbounded_percentage_input`) was a SINGLE hop, not
+/// a chain — `cumulative_pct(100.0) * edge_pct/100.0` is unchanged, not
+/// multiplied — and `effective_ownership_pct` is never `Some` on a
+/// control-axis candidate at all (K-3, structurally: every control
+/// strategy constructs `None`), so "control" was never involved either.
+/// The real defect was that `connect`'s `percentage` payload field had no
+/// bound anywhere in the write path — `Tape::percentage()` deliberately
+/// generates values outside `[0, 100]` to probe exactly this, and nothing
+/// downstream ever refused one. That is a WRITE-PATH precondition, not a
+/// fold/determination invariant: `Precondition::PercentageIsBounded` now
+/// closes it at `connect`'s lexicon entry (both live surfaces — see
+/// `tests/kyc_bases_001_percentage.rs`), the correct chokepoint. This
+/// fold-layer property intentionally does NOT re-assert a percentage
+/// bound: `gen_board_sequence` builds raw `IntentEvent`s directly, never
+/// through `check_preconditions`, so re-asserting the bound here would
+/// only be re-discovering "the fuzzer's own adversarial generator
+/// generates adversarial values" — not a property of the determination
+/// engine. `OwnershipProngStrategy`'s DFS is, and always was, correct
+/// arithmetic over whatever it is given; validating the input is someone
+/// else's job, and now has an owner.
 pub fn check_p3(tape: &mut Tape) {
     let seq = gen_board_sequence(tape, 20);
     if seq.steps.is_empty() {
@@ -456,23 +478,28 @@ pub fn check_p3(tape: &mut Tape) {
     };
 
     let dispatch = dispatch_for_entity_type(&subject_type);
-    let DeterminationDispatch::Strategy(name) = dispatch else {
+    let DeterminationDispatch::Strategies(names) = dispatch else {
         return; // NotADeterminationSubject IS the recorded "why" — nothing to resolve
-    };
-    let Some(strategy) = strategy_for_name(name) else {
-        panic!(
-            "P3 finding: dispatch_for_entity_type({subject_type:?}) named strategy {name:?}, \
-             which this harness (mirroring freeze's own live dispatch set) does not recognise \
-             — either a new strategy was added without updating both dispatch sites, or the \
-             two have drifted"
-        );
     };
 
     let natural_persons = natural_persons_from_events(refs);
     let threshold_pct = tape.percentage();
 
-    // Terminates: proven by this call returning at all.
-    let candidates = strategy.resolve(&control, subject_entity, &natural_persons, threshold_pct);
+    // EOP-DD-UBO-BASES-001 §3: mirrors freeze's own live orchestration —
+    // every strategy in the dispatch set runs and the results union.
+    // Terminates: proven by each call returning at all.
+    let mut candidates = Vec::new();
+    for name in names {
+        let Some(strategy) = strategy_for_name(name) else {
+            panic!(
+                "P3 finding: dispatch_for_entity_type({subject_type:?}) named strategy \
+                 {name:?}, which this harness (mirroring freeze's own live dispatch set) does \
+                 not recognise — either a new strategy was added without updating both \
+                 dispatch sites, or the two have drifted"
+            );
+        };
+        candidates.extend(strategy.resolve(&control, subject_entity, &natural_persons, threshold_pct));
+    }
 
     let unpierced_nominee_targets: std::collections::HashSet<_> = unpierced_nominee_edges(&control)
         .into_iter()
@@ -490,17 +517,155 @@ pub fn check_p3(tape: &mut Tape) {
             candidate.person_id
         );
 
-        // No multiplied control.
-        if let Some(pct) = candidate.effective_ownership_pct {
+        // The percentage-bound assertion formerly here (finding #3,
+        // "control never multiplied along a chain") was removed —
+        // EOP-DD-UBO-BASES-001 §6, see this function's doc. Bounding
+        // `percentage` is now the write path's job
+        // (`Precondition::PercentageIsBounded`), which this pure-fold
+        // property intentionally never exercises.
+    }
+}
+
+// ── Basis survival (EOP-DD-UBO-BASES-001 §4/§7) ──────────────────────────
+
+/// §4/§7 survival property, fuzz-exercised: a person admitted by N
+/// independent bases survives the removal of any N-1 of them, and the
+/// surviving candidate still names exactly the one basis left standing.
+/// `kyc_bases_001_p0_basis_set.rs::candidate_carries_every_admitting_basis`/
+/// `disconnect_removes_a_route_not_the_person` already prove this at the
+/// substrate level over a hand-written fixture; this is the same property
+/// exercised over FUZZER-GENERATED board shapes (mirroring `check_p3`'s
+/// freeze-orchestration dispatch, then `merge_candidates_by_person`), which
+/// can reach basis-plurality via paths a hand-written fixture would not
+/// think to construct.
+///
+/// A generated prefix that never reaches basis-plurality (no person
+/// admitted by >=2 independent edges) is not a counter-example — it simply
+/// has nothing to probe, so the property returns early rather than forcing
+/// one. When plurality IS reached, every OTHER basis is torn down via
+/// board-offered `disconnect` moves (respecting `check_preconditions` at
+/// each step, same chokepoint discipline as `check_r8`'s emptying loop) and
+/// the determination is re-run.
+pub fn check_p4_basis_survival(tape: &mut Tape) {
+    let seq = gen_board_sequence(tape, 20);
+    if seq.steps.is_empty() {
+        return;
+    }
+
+    let events = seq.events();
+    let split = 1 + tape.choice(seq.steps.len());
+    let mut history: Vec<IntentEvent> = events[..split].iter().map(|e| (*e).clone()).collect();
+
+    let refs: Vec<&IntentEvent> = history.iter().collect();
+    let control = fold_control(&refs);
+    let type_registry = fold_type_registry(&refs);
+
+    let subject_entity = EntityId(seq.subject.0);
+    let Some(subject_type) = type_registry.type_of(subject_entity) else {
+        return; // subject never typed at this prefix — nothing to determine
+    };
+    let DeterminationDispatch::Strategies(names) = dispatch_for_entity_type(&subject_type) else {
+        return; // NotADeterminationSubject — nothing to resolve
+    };
+
+    let natural_persons = natural_persons_from_events(&refs);
+    let threshold_pct = tape.percentage();
+
+    let mut candidates = Vec::new();
+    for name in names {
+        let Some(strategy) = strategy_for_name(name) else {
+            panic!(
+                "P4 basis-survival finding: dispatch_for_entity_type({subject_type:?}) named \
+                 strategy {name:?}, which this harness does not recognise"
+            );
+        };
+        candidates.extend(strategy.resolve(&control, subject_entity, &natural_persons, threshold_pct));
+    }
+    let merged = ob_poc_kyc_substrate::merge_candidates_by_person(candidates);
+
+    let Some(target) = merged.iter().find(|c| c.bases.len() >= 2) else {
+        return; // this generated board never reached basis-plurality
+    };
+    let target_person = target.person_id;
+    let keep_idx = tape.choice(target.bases.len());
+    let kept_basis_edge_id = target.bases[keep_idx].edge_id;
+    let to_remove: Vec<_> = target
+        .bases
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != keep_idx)
+        .map(|(_, b)| b.edge_id)
+        .collect();
+
+    let lexicon = assembly_lexicon();
+    let mut seq_num = history.len() as u64;
+    let mut cur_control = control;
+    let mut cur_type_registry = type_registry;
+
+    for edge_id in &to_remove {
+        let board = enumerate_placement_set(seq.subject, &cur_control, &cur_type_registry, &lexicon);
+        let Some(mv) = board.moves.iter().find(|m| {
+            m.verb_fqn.as_str() == "kyc_ubo.assert.edge.disconnect" && m.target.edge_id == Some(*edge_id)
+        }) else {
+            // The board no longer offers a legal disconnect for this basis
+            // edge at this point in the prefix (e.g. already superseded by
+            // a later generated step) — not a survival counter-example,
+            // just an unreachable probe for this particular random board.
+            return;
+        };
+        let event = IntentEvent::new(
+            seq.subject,
+            "kyc_ubo.assert.edge.disconnect",
+            ob_poc_kyc_substrate::Principal {
+                actor_id: uuid::Uuid::new_v4(),
+                role: "p4-basis-prober".to_string(),
+            },
+            ob_poc_kyc_substrate::AuthorityRef("p4-basis-prober-authority".to_string()),
+            mv.target.clone(),
+            serde_json::json!({}),
+            chrono::DateTime::from_timestamp(1_700_000_000 + seq_num as i64, 0).unwrap(),
+        )
+        .with_seq(seq_num);
+        if let Some(entry) = lexicon.entries.get("kyc_ubo.assert.edge.disconnect") {
             assert!(
-                pct <= 100.0 + 1e-6,
-                "P3 violated: resolved candidate {:?} carries effective_ownership_pct {pct} > \
-                 100 — control was multiplied upward along chain {:?}, not shrunk",
-                candidate.person_id,
-                candidate.ownership_chain
+                check_preconditions(entry, &cur_control, &cur_type_registry, &event).is_ok(),
+                "P4 basis-survival finding: board offered disconnect of basis edge {edge_id:?} \
+                 but check_preconditions refused it"
             );
         }
+        history.push(event);
+        seq_num += 1;
+        let all_refs: Vec<&IntentEvent> = history.iter().collect();
+        cur_control = fold_control(&all_refs);
+        cur_type_registry = fold_type_registry(&all_refs);
     }
+
+    let all_refs: Vec<&IntentEvent> = history.iter().collect();
+    let natural_persons_after = natural_persons_from_events(&all_refs);
+    let mut after = Vec::new();
+    for name in names {
+        let Some(strategy) = strategy_for_name(name) else {
+            return;
+        };
+        after.extend(strategy.resolve(&cur_control, subject_entity, &natural_persons_after, threshold_pct));
+    }
+    let after_merged = ob_poc_kyc_substrate::merge_candidates_by_person(after);
+
+    let survivor = after_merged.iter().find(|c| c.person_id == target_person);
+    assert!(
+        survivor.is_some(),
+        "P4 basis-survival violated: person {target_person:?} had {} independent bases; \
+         removing all but one (kept edge {kept_basis_edge_id:?}) must not remove the person \
+         entirely — got: {after_merged:#?}",
+        target.bases.len()
+    );
+    let survivor = survivor.expect("checked above");
+    assert!(
+        survivor.bases.iter().any(|b| b.edge_id == kept_basis_edge_id),
+        "P4 basis-survival violated: the surviving candidate must still name the kept basis \
+         {kept_basis_edge_id:?} — got bases: {:?}",
+        survivor.bases
+    );
 }
 
 #[cfg(test)]
@@ -525,6 +690,11 @@ mod sample_loops {
     #[test]
     fn p3_holds_over_sample() {
         run_sample(1500, 64, check_p3);
+    }
+
+    #[test]
+    fn p4_basis_survival_holds_over_sample() {
+        run_sample(1500, 64, check_p4_basis_survival);
     }
 
     /// FINDING #2 (EOP-VS-UBO-GAME-001 §3.4 P2, geometry closure) — CLOSED

@@ -196,6 +196,7 @@ fn untyped_endpoint_admits_provisionally() {
         originating_event_id: assert_event.id,
         pivot: None,
         pierces: Vec::new(),
+        bases: Vec::new(),
     };
     let _ = edge_id; // sanity: edge really landed
     let assurance = compute_assurance(&[candidate], &[], &control2, &type_registry);
@@ -235,6 +236,7 @@ fn uncited_type_admits_provisionally() {
         originating_event_id: assert_event.id,
         pivot: None,
         pierces: Vec::new(),
+        bases: Vec::new(),
     };
     let assurance = compute_assurance(&[candidate], &[], &control, &type_registry);
     assert!(
