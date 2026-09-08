@@ -886,6 +886,15 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     // from `UboEdgeConnect::execute`'s op-layer-only hand check — the
     // workbook path never ran it, a real R7 defect closed by this
     // promotion (K-8, §3.4 R7).
+    // 2026-09-08 (fuzz-harness geometry-closure finding #2, RULED by Adam
+    // 2026-09-07, scope confirmed 2026-09-08): ConnectEndpointsNotWithdrawn
+    // — neither endpoint of a `connect` may be currently WITHDRAWN; closes
+    // the window a withdrawn-then-retyped entity left permanently
+    // geometry-stale (no forward move could ever revisit an edge asserted
+    // in that window). Deliberately narrower than "must be registered" —
+    // a never-placed endpoint is untouched (stays Unevaluable/admit at
+    // TypeGeometryPermits, R5/R6/CTN-2e), preserving the K-8 nominee-pierce
+    // mechanism (its on-paper holder is never placed by design).
     expected.insert(
         "kyc_ubo.assert.edge.connect".to_string(),
         vec![
@@ -893,6 +902,7 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
             Precondition::NoDuplicateActiveEdge,
             Precondition::TypeGeometryPermits,
             Precondition::PiercedFromIsActiveNominee,
+            Precondition::ConnectEndpointsNotWithdrawn,
         ],
     );
     expected.insert(

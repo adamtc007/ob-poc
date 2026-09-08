@@ -178,6 +178,50 @@ pub enum Precondition {
     /// re-placeable population — `placement.rs`).
     NotCurrentlyPlaced,
 
+    // ── EOP-VS-UBO-GAME-001 §3.4, geometry-closure finding #2 (fuzz-harness
+    // tranche, 2026-09-08) — RULED by Adam 2026-09-07, scope confirmed
+    // 2026-09-08 ─────────────────────────────────────────────────────────────
+    /// `connect`'s payload `from_entity_id`/`to_entity_id` must neither name
+    /// an entity that is currently WITHDRAWN (`TypeRegistryState::is_withdrawn`).
+    /// Closes the window the fuzz harness found: `connect` to a WITHDRAWN
+    /// entity was legal (geometry checked against its type at that moment),
+    /// and `NotCurrentlyPlaced` then let that entity be re-placed with a
+    /// DIFFERENT type — `place` never touches `ControlState.edges`, and
+    /// `remove` only supersedes edges that existed at remove-time, so the
+    /// edge asserted in the window survived, permanently geometry-stale,
+    /// with no forward move able to revisit it.
+    ///
+    /// Ruling, for the record: `remove` takes a block OFF the board (§2).
+    /// Connecting to a block that is not on the board is incoherent — the
+    /// permissiveness was the anomaly, not the restriction. This closes the
+    /// window at the `connect` step rather than making `place` retroactively
+    /// sweep edges, which would give `place` the update semantics §8 Q1
+    /// deliberately ruled against. Does NOT forbid recording facts about a
+    /// withdrawn entity's EXISTING assertions — `evidence`/`retract` against
+    /// them are unaffected; only a NEW link touching an off-board block is
+    /// refused.
+    ///
+    /// SCOPE, confirmed 2026-09-08 (a broader "must be REGISTERED, not just
+    /// non-withdrawn" reading was drafted first, then narrowed after it broke
+    /// 10 tests unrelated to finding #2 — the K-8 nominee-pierce mechanism,
+    /// which structurally requires the on-paper nominee holder to stay
+    /// NEVER-placed (`NomineeHolding`'s pipe has no permitted target row
+    /// anywhere in the ratified TS.1 geometry table — once BOTH endpoints
+    /// have any real type, a nominee assertion is unconditionally refused),
+    /// and `kyc_ts5_geometry_enforcement.rs`'s `untyped_endpoint_admits_at_the_op`,
+    /// which pins the ratified R5/R6/CTN-2e rule that a NEVER-placed
+    /// endpoint must ADMIT provisionally). A never-registered entity is
+    /// UNCHANGED by this precondition — it still reaches `TypeGeometryPermits`
+    /// as `Unevaluable`/admit, same as before finding #2. Only an entity that
+    /// WAS on the board and is now withdrawn is refused — exactly finding
+    /// #2's mechanism, no wider.
+    ///
+    /// Vacuous when either payload field is absent — same convention as
+    /// `NoDuplicateActiveEdge`/`TypeGeometryPermits` above (a real `connect`
+    /// call always supplies both; absence only ever means an abstract
+    /// board-preview probe).
+    ConnectEndpointsNotWithdrawn,
+
     // ── 2026-09-07 audit item 2 — the K-8 pierce guard hoisted to the chokepoint ─
     /// §3.4 R7: a rule expressed only in one surface's code is not a rule.
     /// The event payload's `pierced_from` edge id (present only when a
@@ -431,11 +475,17 @@ pub fn assembly_lexicon() -> LexiconManifest {
             // hoisted from the op-layer-only hand check (was
             // `UboEdgeConnect::execute`'s own `pierced-from` scan, never run
             // by the workbook path).
+            // 2026-09-08 (fuzz-harness geometry-closure finding #2, RULED,
+            // scope confirmed 2026-09-08): ConnectEndpointsNotWithdrawn —
+            // neither endpoint may be a currently-WITHDRAWN entity. A
+            // never-registered endpoint is unaffected (stays Unevaluable/
+            // admit at TypeGeometryPermits, R5/R6/CTN-2e unchanged).
             vec![
                 Precondition::SubjectRegistered,
                 Precondition::NoDuplicateActiveEdge,
                 Precondition::TypeGeometryPermits,
                 Precondition::PiercedFromIsActiveNominee,
+                Precondition::ConnectEndpointsNotWithdrawn,
             ],
             AuthoritySpec::analyst(),
             vec![],

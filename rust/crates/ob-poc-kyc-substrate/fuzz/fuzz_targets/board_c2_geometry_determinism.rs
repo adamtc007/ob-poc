@@ -5,13 +5,16 @@
 //! probed here), geometry closure over the live type registry, and
 //! double-fold / fold-to-prefix determinism.
 //!
-//! **KNOWN, REPORTED FINDING (#2, not a harness bug):** geometry closure is
-//! violated by connecting to/from a withdrawn entity that is later
-//! re-placed with a different type — see `properties::check_p2`'s doc and
-//! the P4 close-out report for the mechanism and an 11-event minimized
-//! reproduction. This target is expected to find that violation quickly.
-//! Do not "fix" by loosening the assertion in `properties.rs` — report
-//! reproductions and let Adam rule on sequencing.
+//! **FINDING #2 CLOSED (2026-09-08):** geometry closure used to be
+//! violated by connecting to/from a withdrawn entity that was later
+//! re-placed with a different type. RULED by Adam 2026-09-07: forbid the
+//! connection — `Precondition::ConnectEndpointsNotWithdrawn` now refuses
+//! any `connect` naming a withdrawn endpoint (a never-placed endpoint is
+//! unaffected — R5/R6/CTN-2e, and the K-8 nominee mechanism, unchanged).
+//! See `properties::check_p2`'s
+//! doc for the mechanism and the committed regression corpus entry
+//! (`fuzz/regressions/board_c2_geometry_determinism/`) for a minimized
+//! reproduction that this target must no longer crash on.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

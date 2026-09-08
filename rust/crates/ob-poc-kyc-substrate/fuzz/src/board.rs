@@ -272,7 +272,16 @@ fn build_event(
 /// violation is caught at the earliest possible point, not just at the
 /// consuming fuzz target).
 pub fn gen_board_sequence(tape: &mut Tape, cap: usize) -> BoardSequence {
-    let subject = SubjectId(Uuid::new_v4());
+    // `deterministic_uuid`, not `Uuid::new_v4()` — this was the actual
+    // remaining non-determinism in the generator (found while chasing why
+    // the P2-tranche regression corpus entry stopped reproducing: the
+    // earlier reproducibility fix covered entity/edge ids minted mid-walk
+    // but missed the ONE id minted up front, before any tape byte is
+    // read). A single sequence has exactly one subject, so a fixed tag
+    // with no per-call counter is correct — the whole point is that this
+    // value must be the same every time `gen_board_sequence` runs, tape
+    // bytes being equal.
+    let subject = SubjectId(deterministic_uuid("subject", 0));
     let lexicon = assembly_lexicon();
     let mut steps: Vec<BoardStep> = Vec::new();
     let mut edge_pool: Vec<EdgeId> = Vec::new();

@@ -1251,7 +1251,42 @@ pub fn check_preconditions(
                     }
                 }
             }
-
+            Precondition::ConnectEndpointsNotWithdrawn => {
+                // EOP-VS-UBO-GAME-001 §3.4 geometry-closure finding #2,
+                // RULED 2026-09-07, scope confirmed 2026-09-08 — see the
+                // `Precondition` variant's doc. Vacuous when either endpoint
+                // is absent from the payload — same convention as
+                // `NoDuplicateActiveEdge`/`TypeGeometryPermits` above. A
+                // never-registered endpoint is NOT refused here — only a
+                // currently-WITHDRAWN one; `TypeGeometryPermits` still
+                // governs the never-registered case (Unevaluable/admit,
+                // R5/R6/CTN-2e, e.g. the K-8 nominee holder).
+                let (from, to) = (
+                    entity_id(&event.payload, "from_entity_id"),
+                    entity_id(&event.payload, "to_entity_id"),
+                );
+                let (Some(from), Some(to)) = (from, to) else {
+                    continue;
+                };
+                if type_registry.is_withdrawn(from) {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "entity {from:?} (from) is withdrawn — connecting to a block that \
+                             is not on the board is incoherent (§3.4 geometry-closure ruling)"
+                        ),
+                    });
+                }
+                if type_registry.is_withdrawn(to) {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "entity {to:?} (to) is withdrawn — connecting to a block that is \
+                             not on the board is incoherent (§3.4 geometry-closure ruling)"
+                        ),
+                    });
+                }
+            }
         }
     }
     Ok(())

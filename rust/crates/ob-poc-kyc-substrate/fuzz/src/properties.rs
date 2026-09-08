@@ -527,34 +527,45 @@ mod sample_loops {
         run_sample(1500, 64, check_p3);
     }
 
-    /// FINDING #2 (EOP-VS-UBO-GAME-001 §3.4 P2, geometry closure) — real,
-    /// reproducible, NOT a test bug. Left demonstrating (not `#[ignore]`d)
-    /// so it stays visible in `cargo test` output; do not "fix" by loosening
-    /// `check_p2`'s geometry-closure assertion — that assertion is exactly
-    /// `evaluate_type_geometry`/`Precondition::TypeGeometryPermits`'s own
-    /// production logic (`fold/control.rs`), re-run against the folded
-    /// board. See the module doc above `check_p2` and the P4 close-out
-    /// report for the full writeup and an 11-event byte-for-byte
-    /// reproduction (deterministic — `board::deterministic_uuid` makes
-    /// `gen_board_sequence` a pure function of its tape bytes).
+    /// FINDING #2 (EOP-VS-UBO-GAME-001 §3.4 P2, geometry closure) — CLOSED
+    /// 2026-09-08, RULED by Adam 2026-09-07: forbid the connection.
+    /// `Precondition::ConnectEndpointsNotWithdrawn`, attached to
+    /// `connect`'s lexicon entry and evaluated at the chokepoint
+    /// (`fold/control.rs::check_preconditions`), closes the window: a
+    /// WITHDRAWN entity can no longer be named as either endpoint of a NEW
+    /// link, so the stale-retype sequence this test used to find can no
+    /// longer be built. Scope confirmed 2026-09-08 — deliberately narrower
+    /// than "must be registered": a never-placed endpoint is untouched
+    /// (stays Unevaluable/admit at TypeGeometryPermits, R5/R6/CTN-2e), which
+    /// is what the K-8 nominee-pierce mechanism's on-paper holder structurally
+    /// requires. `placement.rs`'s geometry-gated enumeration needed no
+    /// separate change — it probes each candidate triple through the same
+    /// `check_preconditions` chokepoint (R7), so the board stopped OFFERING
+    /// the withdrawn-endpoint candidate as a structural consequence of the
+    /// precondition alone (R9/C2, proven in
+    /// `tests/placement.rs::connect_does_not_offer_a_withdrawn_endpoint`).
     ///
-    /// Mechanism: `connect`'s candidate enumeration does not exclude a
-    /// WITHDRAWN entity as an endpoint (`placement.rs`'s geometry-gated
-    /// loop filters only "has a type", never "is not withdrawn" — R5,
-    /// historical facts about withdrawn entities are legitimate). Geometry
-    /// is checked against that entity's type AT THAT MOMENT and is legal.
-    /// But if the SAME entity is later re-placed with a DIFFERENT type
-    /// (`NotCurrentlyPlaced` allows this once withdrawn — R8's own
-    /// re-placement path), `place`'s fold arm touches only
-    /// `registered`/`registered_entity_ids`/the type registry — it never
-    /// touches `ControlState.edges`. Only `remove` supersedes touching
-    /// edges, and only for edges that existed AT remove-time; an edge
-    /// asserted AFTER a remove but BEFORE the next re-place has no move in
-    /// the vocabulary that ever re-validates or supersedes it against the
-    /// entity's new type. The edge survives, `Asserted`, permanently
-    /// geometry-stale.
+    /// Left in place, GREEN, rather than deleted — the fuzz-harness
+    /// completion criterion is "the board and moves are fuzzable," not
+    /// "this specific violation is gone and forgotten"; this test now
+    /// stands as the permanent regression proof for the fix, run on every
+    /// `cargo test` and continuously by `fuzz_targets/board_c2_geometry_determinism.rs`.
+    /// Former mechanism (for the record — see the RED-gate write-path
+    /// proof in `tests/kyc_connect_withdrawn_endpoint.rs` for the
+    /// two-surface, both-directions version of the same fix):
+    /// `connect`'s candidate enumeration did not exclude a WITHDRAWN
+    /// entity as an endpoint; geometry was checked against that entity's
+    /// type AT THAT MOMENT and was legal; but if the SAME entity was later
+    /// re-placed with a DIFFERENT type (`NotCurrentlyPlaced` allows this
+    /// once withdrawn — R8's own re-placement path), `place`'s fold arm
+    /// never touched `ControlState.edges`, and `remove` only superseded
+    /// edges that existed AT remove-time — an edge asserted AFTER a remove
+    /// but BEFORE the next re-place had no move in the vocabulary that
+    /// ever re-validated or superseded it against the entity's new type.
     #[test]
-    fn finding_2_geometry_closure_violated_by_connect_to_withdrawn_then_retype() {
+    fn finding_2_geometry_closure_stale_retype_now_forbidden_by_connect_endpoints_actively_placed() {
         run_sample(1500, 64, check_p2);
     }
 }
+
+

@@ -13,9 +13,9 @@ use std::collections::BTreeMap;
 
 use ob_poc_kyc_substrate::{
     check_preconditions, enumerate_placement_set, assembly_lexicon, ControlState, EdgeId,
-    EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, LexiconManifest,
-    PlacementSet, ProofKind, ProofRecord, StructureClass, SubjectId, TargetBinding,
-    TypeRegistryState,
+    EdgeKind, EdgeState, EdgeStatus, EntityId, EntityType, EntityTypeRecord, EventId,
+    LexiconManifest, PlacementSet, ProofKind, ProofRecord, StructureClass, SubjectId,
+    TargetBinding, TypeRegistryState,
 };
 
 fn subject() -> SubjectId {
@@ -343,5 +343,79 @@ fn place_offers_entity_types() {
          (TS.0 §4 catalogue) — got {place_candidates}. `place` candidates are type-level, \
          not a pre-enumerated set of known entity ids (a brand-new entity has no id yet \
          for the board to enumerate)"
+    );
+}
+
+/// EOP-VS-UBO-GAME-001 §3.4, geometry-closure finding #2 (fuzz-harness
+/// tranche, 2026-09-08), P2 (R9/C2 — "the board offers only what the
+/// append will admit"): a withdrawn entity must not appear as a `connect`
+/// candidate endpoint. Before the fix, `enumerate_placement_set`'s
+/// geometry-gated loop only checked `type_registry.type_of(x).is_none()`
+/// (has a type), never `is_withdrawn` — this is the enumeration half of
+/// the same defect the RED gate in
+/// `tests/kyc_connect_withdrawn_endpoint.rs` proved at the write path.
+/// Structurally, this test now passes as a CONSEQUENCE of P1 alone (no
+/// separate enumeration change was needed): the geometry-gated loop probes
+/// each candidate triple through the SAME `check_preconditions` chokepoint
+/// the write path uses (R7), so attaching
+/// `Precondition::ConnectEndpointsNotWithdrawn` to `connect`'s lexicon
+/// entry narrows what the probe admits, and therefore what the board
+/// offers — one declared rule, enforced once, consulted by both the
+/// offering side and the admitting side.
+#[test]
+fn connect_does_not_offer_a_withdrawn_endpoint() {
+    let subj = subject();
+    let lexicon = assembly_lexicon();
+
+    let voter = EntityId(Uuid::new_v4());
+    let company = EntityId(Uuid::new_v4());
+
+    let mut state = ControlState {
+        registered: true,
+        ..Default::default()
+    };
+    state.registered_entity_ids.insert(voter);
+    state.registered_entity_ids.insert(company);
+
+    let mut type_registry = TypeRegistryState::default();
+    type_registry.types.insert(
+        voter,
+        EntityTypeRecord {
+            entity_type: EntityType::NaturalPerson,
+            originating_event_id: EventId::new(),
+            proofs: BTreeMap::new(),
+        },
+    );
+    type_registry.types.insert(
+        company,
+        EntityTypeRecord {
+            entity_type: EntityType::PrivateLimitedCompany,
+            originating_event_id: EventId::new(),
+            proofs: BTreeMap::new(),
+        },
+    );
+    // Withdraw the voter — geometrically it can still vote the company
+    // (NaturalPerson --VotingRights--> PrivateLimitedCompany is a legal
+    // pipe), so any candidate touching it here is caught by the
+    // withdrawal-affordance rule, not a geometry refusal.
+    type_registry.withdrawn_members.insert(voter, EventId::new());
+
+    let set = enumerate_placement_set(subj, &state, &type_registry, &lexicon);
+    let offending: Vec<&str> = set
+        .moves
+        .iter()
+        .filter(|m| m.verb_fqn.as_str() == "kyc_ubo.assert.edge.connect")
+        .filter(|m| {
+            m.proposed_edge
+                .as_ref()
+                .is_some_and(|e| e.from == voter || e.to == voter)
+        })
+        .map(|m| m.move_id.0.as_str())
+        .collect();
+    assert!(
+        offending.is_empty(),
+        "the board offered {} `connect` candidate(s) touching withdrawn entity {voter:?} — \
+         C2 violated (an offered move the append would refuse): {offending:?}",
+        offending.len()
     );
 }
