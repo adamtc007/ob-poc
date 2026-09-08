@@ -246,3 +246,112 @@ async fn op_admits_percentage_in_range() {
     cleanup(&pool, subject).await;
     assert!(result.is_ok(), "a 30% economic_interest connect must still be admitted — got: {result:?}");
 }
+
+// ── Closure tranche P3a (2026-09-08): the bound was kind-scoped to the
+// literal string "economic_interest", so a percentage on any OTHER kind
+// (voting_rights, board_appointment, ...) was vacuously admitted, unbounded
+// — the audit's item 7, "voting_rights@972 admitted." §1/K-3 actually imply
+// the STRONGER rule: `percentage` is meaningful only on kinds that carry
+// quantity (a shareholding or unit-holding), refused outright everywhere
+// else, and bounded [0,100] on the kinds that do carry it. ─────────────────
+
+/// RED before P3a, GREEN after: `voting_rights` carries quantity (the PSC
+/// >25%-of-votes limb reads a percentage on this kind in principle), so it
+/// belongs in the "bounded" set, not the "no percentage at all" set —
+/// 972% must be refused exactly as economic_interest@972 already is.
+#[tokio::test]
+async fn op_refuses_voting_rights_percentage_above_100() {
+    let pool = connect_pool().await;
+    let (subject, voter, company) = placed_fixture(&pool).await;
+
+    let result = {
+        let mut scope = TestScope::begin(&pool).await;
+        UboEdgeConnect
+            .execute(
+                &serde_json::json!({
+                    "subject-id": subject.0.to_string(),
+                    "from_entity_id": voter.to_string(),
+                    "to_entity_id": company.to_string(),
+                    "kind": "voting_rights",
+                    "percentage": 972.0_f64,
+                }),
+                &mut VerbExecutionContext::default(),
+                &mut scope,
+            )
+            .await
+    };
+    cleanup(&pool, subject).await;
+    assert!(
+        result.is_err(),
+        "P3a: voting_rights@972 must be refused (bounded [0,100], §1/K-3) — got ADMITTED: {result:?}"
+    );
+}
+
+/// RED before P3a, GREEN after: `dominant_influence` carries no quantity at
+/// all — no strategy ever reads a percentage off a contractual-control
+/// edge. Deliberately chosen over `statutory_authority`/`board_appointment`
+/// because THIS kind's `source_permits`/`target_permits` are wide open
+/// (`ContractualControl => true` for source; every corporate/partnership
+/// type for target) — geometry can never be the reason this is refused, so
+/// a pass here is unambiguously about the percentage bound, not a
+/// coincidental geometry refusal on an unrelated kind.
+#[tokio::test]
+async fn op_refuses_percentage_on_a_non_quantity_kind() {
+    let pool = connect_pool().await;
+    let (subject, voter, company) = placed_fixture(&pool).await;
+
+    let result = {
+        let mut scope = TestScope::begin(&pool).await;
+        UboEdgeConnect
+            .execute(
+                &serde_json::json!({
+                    "subject-id": subject.0.to_string(),
+                    "from_entity_id": voter.to_string(),
+                    "to_entity_id": company.to_string(),
+                    "kind": "dominant_influence",
+                    "percentage": 50.0_f64,
+                }),
+                &mut VerbExecutionContext::default(),
+                &mut scope,
+            )
+            .await
+    };
+    cleanup(&pool, subject).await;
+    assert!(
+        result.is_err(),
+        "P3a: a percentage on dominant_influence (no quantity) must be refused outright — \
+         got ADMITTED: {result:?}"
+    );
+}
+
+/// Sanity, must hold both before and after P3a: `voting_rights` with NO
+/// percentage argument at all is ordinary and must remain admitted — the
+/// widened bound must not become "voting_rights always needs a
+/// percentage," only "if present, it must make sense."
+#[tokio::test]
+async fn op_admits_voting_rights_without_percentage() {
+    let pool = connect_pool().await;
+    let (subject, voter, company) = placed_fixture(&pool).await;
+
+    let result = {
+        let mut scope = TestScope::begin(&pool).await;
+        let r = UboEdgeConnect
+            .execute(
+                &serde_json::json!({
+                    "subject-id": subject.0.to_string(),
+                    "from_entity_id": voter.to_string(),
+                    "to_entity_id": company.to_string(),
+                    "kind": "voting_rights",
+                }),
+                &mut VerbExecutionContext::default(),
+                &mut scope,
+            )
+            .await;
+        if r.is_ok() {
+            scope.commit().await;
+        }
+        r
+    };
+    cleanup(&pool, subject).await;
+    assert!(result.is_ok(), "voting_rights with no percentage must still be admitted — got: {result:?}");
+}

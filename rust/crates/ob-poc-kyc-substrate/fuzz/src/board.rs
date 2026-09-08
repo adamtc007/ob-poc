@@ -184,20 +184,20 @@ fn build_event(
                     "to_entity_id": proposed.to.0,
                     "kind": proposed.kind_wire,
                 });
-                if tape.bool() {
-                    // EOP-DD-UBO-BASES-001 §6: an `economic_interest` connect
-                    // must carry an in-range percentage to remain a LEGAL
-                    // offered move (C2) now that `PercentageIsBounded`
-                    // enforces one; a non-economic kind's percentage is
-                    // inert and unvalidated either way, so it keeps using
-                    // the adversarial generator (harmless noise, exercised
-                    // for its own sake).
-                    let pct = if proposed.kind_wire == "economic_interest" {
-                        tape.bounded_percentage()
-                    } else {
-                        tape.percentage()
-                    };
-                    payload["percentage"] = serde_json::json!(pct);
+                // EOP-DD-UBO-BASES-001 §6, closure tranche P3a (2026-09-08):
+                // `PercentageIsBounded` now REFUSES a percentage outright on
+                // any kind that carries no quantity — only
+                // `economic_interest`/`voting_rights` are bounded, not
+                // merely-ignored, for every other kind. Attaching an
+                // adversarial percentage there would make the board offer
+                // an ILLEGAL move (C2 violation) — this generator must
+                // match the precondition's scope, not just its old
+                // (unqualified) shape. Percentage is generated ONLY for the
+                // two quantity-carrying kinds, and bounded for both.
+                let carries_quantity =
+                    matches!(proposed.kind_wire.as_str(), "economic_interest" | "voting_rights");
+                if carries_quantity && tape.bool() {
+                    payload["percentage"] = serde_json::json!(tape.bounded_percentage());
                 }
                 (payload, Some(edge), None)
             }

@@ -79,6 +79,12 @@ const LEXICON_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/lexic
 const CONTROL_FOLD_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/fold/control.rs");
 const TYPE_REGISTRY_FOLD_SRC: &str =
     include_str!("../crates/ob-poc-kyc-substrate/src/fold/type_registry.rs");
+// EOP-DD-UBO-BASES-001 audit closure P3b (2026-09-08): the name→strategy
+// dispatch this scanner pins moved OUT of `kyc_stream_ops.rs` — it's now
+// `ob_poc_kyc_substrate::strategy_for_name`, the single chokepoint both the
+// live freeze op and `recover_determination_at` (replay) consume.
+const DETERMINATION_SRC: &str =
+    include_str!("../crates/ob-poc-kyc-substrate/src/determination.rs");
 
 // ── Declaration extraction ──────────────────────────────────────────────────
 
@@ -780,23 +786,27 @@ fn fold_blind_verbs_are_exactly_known() {
 
 // ── K-G5: precondition + strategy coverage (the seventh tooth) ─────────────
 
-/// `"literal" => &Ident` arms inside freeze's `strategy_for_name` dispatch
-/// helper — bounded to that one match (unlike `fold_match_arms`, which is
+/// `"literal" => &Ident` arms inside `ob_poc_kyc_substrate::strategy_for_name`
+/// — bounded to that one match (unlike `fold_match_arms`, which is
 /// deliberately broad; this one must be exact since it pins a literal
 /// count, not just membership).
 ///
-/// EOP-DD-UBO-BASES-001 §3: freeze now dispatches to a SET of strategies
-/// (unioning the results), so the lookup was extracted to a local
-/// `strategy_for_name(name) -> Result<&dyn DeterminationStrategy>` helper
-/// called once per name in the loop — the marker/close below track that
-/// shape, not the pre-§3 single `let strategy = match strategy_name {`.
+/// EOP-DD-UBO-BASES-001 §3: freeze dispatches to a SET of strategies
+/// (unioning the results), so the lookup lives in a single name→strategy
+/// helper called once per name in the loop. **P3b (2026-09-08 audit
+/// closure):** relocated from a `kyc_stream_ops.rs`-local `fn` to
+/// `ob_poc_kyc_substrate::strategy_for_name` (`determination.rs`) — the
+/// SAME chokepoint `recover_determination_at` now also consumes, closing
+/// audit item 8 (replay could not reproduce a two-limb freeze). The
+/// marker/close below track that new location's identical arm shape.
 fn freeze_strategy_arms() -> BTreeSet<String> {
-    let marker = "fn strategy_for_name(name: &str) -> Result<&'static dyn DeterminationStrategy> {";
-    let start = KYC_STREAM_OPS_SRC
+    let marker =
+        "pub fn strategy_for_name(name: &str) -> Option<&'static dyn DeterminationStrategy> {";
+    let start = DETERMINATION_SRC
         .find(marker)
-        .expect("freeze's strategy_for_name dispatch helper must exist in kyc_stream_ops.rs");
+        .expect("ob_poc_kyc_substrate::strategy_for_name must exist in determination.rs");
     let mut arms = BTreeSet::new();
-    for line in KYC_STREAM_OPS_SRC[start + marker.len()..].lines() {
+    for line in DETERMINATION_SRC[start + marker.len()..].lines() {
         let trimmed = line.trim();
         if trimmed == "})" {
             break;

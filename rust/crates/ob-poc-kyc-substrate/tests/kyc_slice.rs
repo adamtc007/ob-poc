@@ -765,14 +765,12 @@ fn ec5_replay_determinism_after_supersede() {
     // Compute the PRIOR determination by replaying up to seq=7.
     let lexicon_hash = dummy_hash();
     let ref_snap = Uuid::new_v4();
-    let strategy = OwnershipProngStrategy;
 
     // Snapshot the first-freeze event set as owned so we can keep borrowing later.
     let events_phase1: Vec<IntentEvent> = events.to_vec();
     let events_at_freeze1: Vec<&IntentEvent> = events_phase1.iter().collect();
     let prior_det = recover_determination_at(
         &events_at_freeze1,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -841,7 +839,6 @@ fn ec5_replay_determinism_after_supersede() {
     // the replay path — a stronger assertion than the one it replaces.
     let latest_det = recover_determination_at(
         &all_refs,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -857,7 +854,6 @@ fn ec5_replay_determinism_after_supersede() {
     let replay_events: Vec<&IntentEvent> = events_phase1.iter().collect();
     let replay_det = recover_determination_at(
         &replay_events,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -1055,7 +1051,6 @@ fn phase1_fold_determinism_stress_determination_hash() {
     let h = dummy_hash();
     // ref_snap is fixed outside all iterations — it contributes to the pin hash.
     let ref_snap = Uuid::parse_str("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").unwrap();
-    let strategy = OwnershipProngStrategy;
 
     // Build the event stream ONCE; clone it for each fold run.
     // The determinism invariant is: given the SAME events, folding N times yields
@@ -1084,7 +1079,6 @@ fn phase1_fold_determinism_stress_determination_hash() {
             let event_refs: Vec<&IntentEvent> = base_events.iter().collect();
             recover_determination_at(
                 &event_refs,
-                &strategy,
                 &natural_persons,
                 25.0,
                 test_pin("v1.0", dummy_hash(), ref_snap),
@@ -1453,7 +1447,6 @@ fn axes_diverge_on_correction() {
     );
 
     let refs: Vec<&IntentEvent> = events.iter().collect();
-    let strategy = OwnershipProngStrategy;
     let lexicon_hash = dummy_hash();
     let ref_snap = Uuid::new_v4();
 
@@ -1462,7 +1455,6 @@ fn axes_diverge_on_correction() {
     // both stand.
     let det_before = recover_determination_bitemporal(
         &refs,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -1475,7 +1467,6 @@ fn axes_diverge_on_correction() {
     // The correction is now in-window — only P2 stands.
     let det_after = recover_determination_bitemporal(
         &refs,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -1595,13 +1586,11 @@ fn bitemporal_matches_txtime_when_axes_align() {
     ];
 
     let refs: Vec<&IntentEvent> = events.iter().collect();
-    let strategy = OwnershipProngStrategy;
     let lexicon_hash = dummy_hash();
     let ref_snap = Uuid::new_v4();
 
     let det_txtime = recover_determination_at(
         &refs,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -1610,7 +1599,6 @@ fn bitemporal_matches_txtime_when_axes_align() {
 
     let det_bitemporal = recover_determination_bitemporal(
         &refs,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", lexicon_hash, ref_snap),
@@ -1689,14 +1677,12 @@ fn r4_legal_set_at_past_time_is_reproducible() {
     ];
 
     let refs: Vec<&IntentEvent> = events.iter().collect();
-    let strategy = OwnershipProngStrategy;
     let lexicon_hash = dummy_hash();
     let ref_snap = Uuid::new_v4();
 
     let replay = || {
         recover_determination_bitemporal(
             &refs,
-            &strategy,
             &natural_persons,
             25.0,
             test_pin("v1.0", lexicon_hash, ref_snap),
@@ -1771,11 +1757,9 @@ fn r4_legality_pins_its_ruleset() {
     ];
 
     let refs: Vec<&IntentEvent> = events.iter().collect();
-    let strategy = OwnershipProngStrategy;
 
     let det = recover_determination_at(
         &refs,
-        &strategy,
         &natural_persons,
         25.0,
         test_pin("v1.0", dummy_hash(), Uuid::new_v4()),
@@ -1789,9 +1773,16 @@ fn r4_legality_pins_its_ruleset() {
     );
     assert_eq!(
         det.pin.constructor_version.as_deref(),
-        Some("ownership_prong_strategy"),
-        "constructor_version must honestly name the strategy that actually resolved candidates, \
-         not leave it implicit in policy_version's ambiguous semantics"
+        // EOP-DD-UBO-BASES-001 audit closure P3b (2026-09-08): a company
+        // dispatches to BOTH strategies (§3) — replay now runs and names
+        // both, matching what a live freeze actually does, even though
+        // this fixture's control limb finds nothing (no control-kind edge
+        // in this board). The label honestly names what RAN, not just
+        // what found something — same discipline `strategy_names.join("+")`
+        // already applied on the live op path before this fix.
+        Some("ownership_prong_strategy+control_prong_strategy"),
+        "constructor_version must honestly name every strategy that actually RAN (the full \
+         dispatch set for this type, §3), not just the one that happened to find candidates"
     );
     assert!(
         det.pin.viewer.is_none(),
@@ -1810,5 +1801,143 @@ fn r4_legality_pins_its_ruleset() {
         det.pin, drifted_pin,
         "a pin with a different kit_version must not compare equal to the original — \
          drift must be visible, not silently absorbed"
+    );
+}
+
+// ── EOP-DD-UBO-BASES-001 audit closure P3b (2026-09-08, audit item 8) ────────
+//
+// `recover_determination_at` used to take a single caller-supplied
+// `&dyn DeterminationStrategy` and replay under exactly that one — but §3's
+// dispatch table maps a `PrivateLimitedCompany` to BOTH
+// `ownership_prong_strategy` AND `control_prong_strategy`, and a live
+// freeze runs both and unions the results. A board with a genuine
+// control-only candidate (found ONLY by the control limb) could never be
+// reproduced by the old single-strategy replay — it would recover a
+// STRICT SUBSET of what the freeze it claims to replay actually produced,
+// breaking K-18 reproducibility. This gate proves the fix: replay recovers
+// BOTH limbs' candidates from a single freeze event, with no strategy
+// argument for the caller to (mis)supply.
+#[test]
+fn replay_reproduces_a_two_limb_freeze() {
+    let subject = SubjectId(entity_subject().0);
+    let a = entity_subject(); // the company itself
+    let p1 = person_p1(); // resolves via OwnershipProng (40% direct)
+    let p2 = person_p2(); // resolves via ControlByOtherMeans (voting_rights, no pct)
+    let t1 = ts(2026, 1, 1);
+    let h = dummy_hash();
+
+    let events = [
+        te(
+            1,
+            subject,
+            "kyc_ubo.assert.subject.place",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "entity_type": "private_limited_company"}),
+            idem("place-a"),
+            t1,
+        ),
+        te(
+            2,
+            subject,
+            "kyc_ubo.assert.subject.place",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p1.0, "entity_type": "natural_person"}),
+            idem("place-p1"),
+            t1,
+        ),
+        te(
+            3,
+            subject,
+            "kyc_ubo.assert.subject.place",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p2.0, "entity_type": "natural_person"}),
+            idem("place-p2"),
+            t1,
+        ),
+        // P1 → A: 40% economic interest — the ownership limb.
+        te(
+            4,
+            subject,
+            "kyc_ubo.assert.edge.connect",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"kind": "economic_interest", "edge_id": eid("p1-a").0,
+                "from_entity_id": p1.0, "to_entity_id": a.0, "percentage": 40.0}),
+            idem("edge-p1-a"),
+            t1,
+        ),
+        // P2 → A: voting rights, no percentage — the control limb. Ownership
+        // strategy is blind to this edge kind entirely; only the control
+        // limb (added by BASES-001 §3 to the company row) finds P2.
+        te(
+            5,
+            subject,
+            "kyc_ubo.assert.edge.connect",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"kind": "voting_rights", "edge_id": eid("p2-a").0,
+                "from_entity_id": p2.0, "to_entity_id": a.0}),
+            idem("edge-p2-a"),
+            t1,
+        ),
+        te(
+            6,
+            subject,
+            "kyc_ubo.decide.determination.freeze",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("freeze1"),
+            t1,
+        ),
+    ];
+    let refs: Vec<&IntentEvent> = events.iter().collect();
+    let natural_persons: BTreeSet<PersonId> = [p1, p2].into_iter().collect();
+
+    let det = recover_determination_at(
+        &refs,
+        &natural_persons,
+        25.0,
+        test_pin("v1.0", h, Uuid::new_v4()),
+    )
+    .expect("replay must recover the two-limb determination");
+
+    let person_ids: BTreeSet<Uuid> = det.candidates.iter().map(|c| c.person_id.0).collect();
+    assert_eq!(
+        det.candidates.len(),
+        2,
+        "replay must reproduce BOTH limbs a live freeze would have run for a company \
+         (ownership_prong_strategy + control_prong_strategy, §3) — got {:?}",
+        det.candidates
+    );
+    assert!(person_ids.contains(&p1.0), "P1 (ownership limb) must be recovered: {:?}", det.candidates);
+    assert!(person_ids.contains(&p2.0), "P2 (control limb) must be recovered: {:?}", det.candidates);
+
+    let p2_cand = det.candidates.iter().find(|c| c.person_id == p2).unwrap();
+    assert_eq!(
+        p2_cand.prong,
+        Prong::ControlByOtherMeans,
+        "P2 must be recovered via the control limb, not silently dropped: {p2_cand:?}"
+    );
+    assert_eq!(
+        det.pin.constructor_version.as_deref(),
+        Some("ownership_prong_strategy+control_prong_strategy"),
+        "the pin must honestly name BOTH strategies replay actually ran, matching the live \
+         freeze op's own `strategy_names.join(\"+\")` label"
     );
 }

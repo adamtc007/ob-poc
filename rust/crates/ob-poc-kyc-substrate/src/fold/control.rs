@@ -1308,21 +1308,43 @@ pub fn check_preconditions(
                 }
             }
             Precondition::PercentageIsBounded => {
-                // EOP-DD-UBO-BASES-001 §6, finding #3 re-characterised
-                // (2026-09-08) — see the `Precondition` variant's doc.
-                // Vacuous unless `kind` is literally "economic_interest" —
-                // percentage belongs to shareholdings only (§1); a stray
-                // `percentage` value alongside a control-kind edge (voting
-                // rights, board appointment, etc.) is inert noise no
-                // strategy ever reads, not a claim this precondition has
-                // any basis to police.
-                if event.payload.get("kind").and_then(|k| k.as_str()) != Some("economic_interest")
-                {
-                    continue;
-                }
+                // EOP-DD-UBO-BASES-001 §6/§7 closure tranche P3a
+                // (2026-09-08, audit item 7) — widened from the original
+                // kind-scoped-to-"economic_interest"-only shape. §6's text
+                // is unqualified ("a Precondition bounding percentage to
+                // [0,100] on connect"); the original narrowing's own
+                // justification ("a non-economic connect never carries
+                // percentage at all") was FALSE — the fuzzer's own
+                // generator sends adversarial percentages on every kind,
+                // and `voting_rights` is a genuine quantity-carrying kind
+                // (the PSC "more than 25% of... voting rights" limb).
+                //
+                // Every OTHER wire kind carries no quantity a strategy
+                // ever reads (`Pipe::classify_economic_interest`'s three
+                // ratified buckets — non-voting shares, LP interest, unit
+                // issuance — are all sub-classifications of the
+                // "economic_interest" wire kind itself, keyed off the
+                // TARGET's type, not a distinct kind string; there is no
+                // separate wire value for any of them). So the bounded set
+                // is exactly {economic_interest, voting_rights}; a stray
+                // `percentage` on anything else is refused outright, not
+                // merely bounded — it should never have been asserted.
+                let kind_str = event.payload.get("kind").and_then(|k| k.as_str());
+                let carries_quantity =
+                    matches!(kind_str, Some("economic_interest") | Some("voting_rights"));
                 let Some(pct) = opt_f64(&event.payload, "percentage") else {
                     continue;
                 };
+                if !carries_quantity {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "percentage {pct} was asserted on kind {kind_str:?}, which carries \
+                             no quantity a determination strategy ever reads — refused outright, \
+                             not bounded (EOP-DD-UBO-BASES-001 §1/§6, closure tranche P3a)"
+                        ),
+                    });
+                }
                 if !(0.0..=100.0).contains(&pct) {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),

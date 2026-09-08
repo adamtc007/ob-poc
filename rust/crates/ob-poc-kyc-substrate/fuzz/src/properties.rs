@@ -9,40 +9,19 @@
 use ob_poc_kyc_substrate::{
     assembly_lexicon, check_preconditions, check_type_geometry, dispatch_for_entity_type,
     enumerate_placement_set, fold_control, fold_type_registry, natural_persons_from_events,
-    unpierced_nominee_edges, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
-    DeterminationDispatch, DeterminationStrategy, EdgeStatus, EntityId, FoundationCouncilStrategy,
-    FundControlStrategy, IntentEvent, LinkageSource, OwnershipProngStrategy, StateOwnedStrategy,
-    TrustRoleStrategy, ALL_ENTITY_TYPES, NONE_OF_THE_ABOVE,
+    strategy_for_name, unpierced_nominee_edges, ControlState, DeterminationDispatch, EdgeStatus,
+    EntityId, IntentEvent, LinkageSource, ALL_ENTITY_TYPES, NONE_OF_THE_ABOVE,
 };
 
 use crate::board::gen_board_sequence;
 use crate::Tape;
 
-static OWNERSHIP: OwnershipProngStrategy = OwnershipProngStrategy;
-static CONTROL: ControlProngStrategy = ControlProngStrategy;
-static TRUST: TrustRoleStrategy = TrustRoleStrategy;
-static FUND: FundControlStrategy = FundControlStrategy;
-static FOUNDATION: FoundationCouncilStrategy = FoundationCouncilStrategy;
-static STATE_OWNED: StateOwnedStrategy = StateOwnedStrategy;
-static COOPERATIVE: CooperativeMemberStrategy = CooperativeMemberStrategy;
-
-/// `dispatch_for_entity_type`'s `Strategy(name)` → the real strategy object
-/// `kyc_ubo.decide.determination.freeze` would dispatch to for that name
-/// (`kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute`, mirrored here
-/// so P3 exercises the SAME strategy freeze would have picked, not an
-/// arbitrary one).
-fn strategy_for_name(name: &str) -> Option<&'static dyn DeterminationStrategy> {
-    match name {
-        "ownership_prong_strategy" => Some(&OWNERSHIP),
-        "control_prong_strategy" => Some(&CONTROL),
-        "trust_role_strategy" => Some(&TRUST),
-        "fund_control_strategy" => Some(&FUND),
-        "foundation_council_strategy" => Some(&FOUNDATION),
-        "state_owned_strategy" => Some(&STATE_OWNED),
-        "cooperative_member_strategy" => Some(&COOPERATIVE),
-        _ => None,
-    }
-}
+// EOP-DD-UBO-BASES-001 audit closure P3b (2026-09-08): the hand-rolled
+// name→strategy match this file used to carry (a THIRD independent copy,
+// alongside `kyc_stream_ops.rs`'s and `recover_determination_at`'s own)
+// is gone — `ob_poc_kyc_substrate::strategy_for_name` is now the single
+// chokepoint all three consume, so this harness can never silently drift
+// out of sync with what a live freeze actually dispatches to.
 
 fn all_active_entity_ids(control: &ControlState) -> Vec<EntityId> {
     control
@@ -581,10 +560,90 @@ pub fn check_p4_basis_survival(tape: &mut Tape) {
         };
         candidates.extend(strategy.resolve(&control, subject_entity, &natural_persons, threshold_pct));
     }
-    let merged = ob_poc_kyc_substrate::merge_candidates_by_person(candidates);
+    let mut merged = ob_poc_kyc_substrate::merge_candidates_by_person(candidates);
+
+    let lexicon = assembly_lexicon();
+    let mut seq_num = history.len() as u64;
+    let mut cur_control = control;
+    let mut cur_type_registry = type_registry;
+
+    // EOP-DD-UBO-BASES-001 audit closure P3d (2026-09-08, audit item 10):
+    // the uniform-random `gen_board_sequence` reaches basis-plurality (a
+    // person admitted via 2+ independent bases into the SAME subject)
+    // vanishingly rarely by chance — the audit measured 8/5000 seeds
+    // (0.16%). Rather than change the shared generator (used by R8/P2/P3
+    // too, out of this property's scope), bias LOCALLY: if this board
+    // didn't reach plurality on its own, actively drive ONE additional
+    // legal `connect` — a SECOND, DIFFERENT admissible edge kind from an
+    // entity that ALREADY has an active edge into the subject — through
+    // the real board (`enumerate_placement_set` + `check_preconditions`,
+    // same chokepoint discipline as the removal loop below). This can only
+    // ADD a legitimately-admitted edge the board itself offers; it never
+    // fabricates one, so a survival counter-example found this way is as
+    // real as one the generator found unassisted.
+    if !merged.iter().any(|c| c.bases.len() >= 2) {
+        let already_connected_targets: std::collections::BTreeSet<EntityId> = cur_control
+            .edges
+            .values()
+            .filter(|e| e.is_active() && e.to == subject_entity)
+            .map(|e| e.from)
+            .collect();
+        let board = enumerate_placement_set(seq.subject, &cur_control, &cur_type_registry, &lexicon);
+        let boost = board.moves.iter().find(|m| {
+            m.verb_fqn.as_str() == "kyc_ubo.assert.edge.connect"
+                && m.proposed_edge.as_ref().is_some_and(|pe| {
+                    pe.to == subject_entity && already_connected_targets.contains(&pe.from)
+                })
+        });
+        if let Some(mv) = boost {
+            let pe = mv.proposed_edge.as_ref().expect("matched above");
+            let mut payload = serde_json::json!({
+                "kind": pe.kind_wire, "from_entity_id": pe.from.0, "to_entity_id": pe.to.0,
+            });
+            if pe.kind_wire == "economic_interest" {
+                payload["percentage"] = serde_json::json!(tape.percentage().clamp(0.0, 100.0));
+            }
+            let event = IntentEvent::new(
+                seq.subject,
+                "kyc_ubo.assert.edge.connect",
+                ob_poc_kyc_substrate::Principal {
+                    actor_id: uuid::Uuid::new_v4(),
+                    role: "p4-basis-prober".to_string(),
+                },
+                ob_poc_kyc_substrate::AuthorityRef("p4-basis-prober-authority".to_string()),
+                mv.target.clone(),
+                payload,
+                chrono::DateTime::from_timestamp(1_700_000_000 + seq_num as i64, 0).unwrap(),
+            )
+            .with_seq(seq_num);
+            if let Some(entry) = lexicon.entries.get("kyc_ubo.assert.edge.connect") {
+                if check_preconditions(entry, &cur_control, &cur_type_registry, &event).is_ok() {
+                    history.push(event);
+                    seq_num += 1;
+                    let all_refs: Vec<&IntentEvent> = history.iter().collect();
+                    cur_control = fold_control(&all_refs);
+                    cur_type_registry = fold_type_registry(&all_refs);
+
+                    let boosted_persons = natural_persons_from_events(&all_refs);
+                    let mut boosted = Vec::new();
+                    for name in names {
+                        if let Some(strategy) = strategy_for_name(name) {
+                            boosted.extend(strategy.resolve(
+                                &cur_control,
+                                subject_entity,
+                                &boosted_persons,
+                                threshold_pct,
+                            ));
+                        }
+                    }
+                    merged = ob_poc_kyc_substrate::merge_candidates_by_person(boosted);
+                }
+            }
+        }
+    }
 
     let Some(target) = merged.iter().find(|c| c.bases.len() >= 2) else {
-        return; // this generated board never reached basis-plurality
+        return; // even after the bias attempt, this board never reached basis-plurality
     };
     let target_person = target.person_id;
     let keep_idx = tape.choice(target.bases.len());
@@ -596,11 +655,6 @@ pub fn check_p4_basis_survival(tape: &mut Tape) {
         .filter(|(i, _)| *i != keep_idx)
         .map(|(_, b)| b.edge_id)
         .collect();
-
-    let lexicon = assembly_lexicon();
-    let mut seq_num = history.len() as u64;
-    let mut cur_control = control;
-    let mut cur_type_registry = type_registry;
 
     for edge_id in &to_remove {
         let board = enumerate_placement_set(seq.subject, &cur_control, &cur_type_registry, &lexicon);
@@ -695,6 +749,142 @@ mod sample_loops {
     #[test]
     fn p4_basis_survival_holds_over_sample() {
         run_sample(1500, 64, check_p4_basis_survival);
+    }
+
+    /// EOP-DD-UBO-BASES-001 audit closure P3d (2026-09-08, audit item 10)
+    /// measurement: how often does `check_p4_basis_survival` actually reach
+    /// its assertion branch (basis-plurality found), with the P3d bias in
+    /// place vs without it? Mirrors the pre-assertion portion of the real
+    /// property function (same generator, same dispatch, same merge) with
+    /// a `bias: bool` toggle so both rates are measured against the exact
+    /// same 5000-seed sample, not two different runs.
+    fn reach_rate(n: u64, bias: bool) -> (u64, u64) {
+        let mut plurality_reached = 0u64;
+        let mut any_candidate = 0u64;
+        for seed in 0..n {
+            let bytes: Vec<u8> = (0..64)
+                .flat_map(|i| (seed.wrapping_mul(2654435761).wrapping_add(i as u64)).to_le_bytes())
+                .collect();
+            let mut tape = Tape::new(&bytes);
+
+            let seq = gen_board_sequence(&mut tape, 20);
+            if seq.steps.is_empty() {
+                continue;
+            }
+            let events = seq.events();
+            let split = 1 + tape.choice(seq.steps.len());
+            let mut history: Vec<IntentEvent> =
+                events[..split].iter().map(|e| (*e).clone()).collect();
+            let refs: Vec<&IntentEvent> = history.iter().collect();
+            let mut control = fold_control(&refs);
+            let mut type_registry = fold_type_registry(&refs);
+            let subject_entity = EntityId(seq.subject.0);
+            let Some(subject_type) = type_registry.type_of(subject_entity) else { continue };
+            let DeterminationDispatch::Strategies(names) =
+                dispatch_for_entity_type(&subject_type)
+            else {
+                continue;
+            };
+            let natural_persons = natural_persons_from_events(&refs);
+            let threshold_pct = tape.percentage();
+
+            let resolve = |control: &ControlState,
+                           type_registry: &ob_poc_kyc_substrate::TypeRegistryState,
+                           persons: &std::collections::BTreeSet<ob_poc_kyc_substrate::PersonId>| {
+                let _ = type_registry;
+                let mut cands = Vec::new();
+                for name in names {
+                    if let Some(strategy) = strategy_for_name(name) {
+                        cands.extend(strategy.resolve(control, subject_entity, persons, threshold_pct));
+                    }
+                }
+                ob_poc_kyc_substrate::merge_candidates_by_person(cands)
+            };
+
+            let mut merged = resolve(&control, &type_registry, &natural_persons);
+
+            if bias && !merged.iter().any(|c| c.bases.len() >= 2) {
+                let already: std::collections::BTreeSet<EntityId> = control
+                    .edges
+                    .values()
+                    .filter(|e| e.is_active() && e.to == subject_entity)
+                    .map(|e| e.from)
+                    .collect();
+                let lexicon = assembly_lexicon();
+                let board = enumerate_placement_set(seq.subject, &control, &type_registry, &lexicon);
+                if let Some(mv) = board.moves.iter().find(|m| {
+                    m.verb_fqn.as_str() == "kyc_ubo.assert.edge.connect"
+                        && m.proposed_edge.as_ref().is_some_and(|pe| {
+                            pe.to == subject_entity && already.contains(&pe.from)
+                        })
+                }) {
+                    let pe = mv.proposed_edge.as_ref().unwrap();
+                    let mut payload = serde_json::json!({
+                        "kind": pe.kind_wire, "from_entity_id": pe.from.0, "to_entity_id": pe.to.0,
+                    });
+                    if pe.kind_wire == "economic_interest" {
+                        payload["percentage"] = serde_json::json!(tape.percentage().clamp(0.0, 100.0));
+                    }
+                    let event = IntentEvent::new(
+                        seq.subject,
+                        "kyc_ubo.assert.edge.connect",
+                        ob_poc_kyc_substrate::Principal {
+                            actor_id: uuid::Uuid::new_v4(),
+                            role: "measure".to_string(),
+                        },
+                        ob_poc_kyc_substrate::AuthorityRef("measure".to_string()),
+                        mv.target.clone(),
+                        payload,
+                        chrono::DateTime::from_timestamp(1_700_000_000 + history.len() as i64, 0)
+                            .unwrap(),
+                    )
+                    .with_seq(history.len() as u64);
+                    if let Some(entry) = lexicon.entries.get("kyc_ubo.assert.edge.connect") {
+                        if check_preconditions(entry, &control, &type_registry, &event).is_ok() {
+                            history.push(event);
+                            let all_refs: Vec<&IntentEvent> = history.iter().collect();
+                            control = fold_control(&all_refs);
+                            type_registry = fold_type_registry(&all_refs);
+                            let persons = natural_persons_from_events(&all_refs);
+                            merged = resolve(&control, &type_registry, &persons);
+                        }
+                    }
+                }
+            }
+
+            if !merged.is_empty() {
+                any_candidate += 1;
+            }
+            if merged.iter().any(|c| c.bases.len() >= 2) {
+                plurality_reached += 1;
+            }
+        }
+        (plurality_reached, any_candidate)
+    }
+
+    #[test]
+    fn p3d_measure_reach_rate_before_and_after_bias() {
+        // 1500 — the SAME sample size `p4_basis_survival_holds_over_sample`
+        // (and every other sample-loop gate in this module) already runs
+        // clean at; a larger n surfaces an unrelated pre-existing C2
+        // generator finding (board.rs:353) at a seed beyond this range —
+        // out of P3d's scope (bias measurement, not a new bug hunt),
+        // reported separately rather than chased here.
+        const N: u64 = 1500;
+        let (before_plurality, before_any) = reach_rate(N, false);
+        let (after_plurality, after_any) = reach_rate(N, true);
+        println!(
+            "P3d reach-rate measurement over {N} seeds:\n\
+             before bias: plurality={before_plurality}/{N} ({:.2}%), any_candidate={before_any}/{N}\n\
+             after  bias: plurality={after_plurality}/{N} ({:.2}%), any_candidate={after_any}/{N}",
+            before_plurality as f64 * 100.0 / N as f64,
+            after_plurality as f64 * 100.0 / N as f64,
+        );
+        assert!(
+            after_plurality > before_plurality,
+            "P3d bias must increase the assertion-branch reach rate: before={before_plurality} \
+             after={after_plurality}"
+        );
     }
 
     /// FINDING #2 (EOP-VS-UBO-GAME-001 §3.4 P2, geometry closure) — CLOSED

@@ -37,6 +37,10 @@ The fuzz-harness research of 2026-09-08 asked whether a person with several inde
 
 **R-B — The SMO fallback survives as a separate step**, distinct from officer-as-controller. It fires when no basis of any kind admitted a person. It does not fire to *replace* a person admitted by an officer basis, and an officer basis does not suppress it when nothing else was found either.
 
+**R-C — Everywhere is a door. RULED 2026-09-08.** R-A applies to every control-walk strategy, not to companies alone. An appointed officer of a partnership, an LLP, an LLC or a state body is a candidate exactly as a company's is. Adam's words: *"everywhere is a door — frankly — the role is the door, then a switch opens the door or not."* This ratifies by name what §5's mechanism (a shared `control_admission`) already did, and corrects §3/§7, which claimed only companies change: the dispatch *table* changes one row; the *admission* change reaches every strategy that walks control, and that is intended.
+
+**What R-C clarifies about the determination itself.** The board records that a person holds a role — the door exists. Proof confirms the role is real. **Policy decides whether that role, on this board, meets the control threshold — the switch.** So the determination **names every door with its proof status; it does not decide which doors open.** Naming an officer as a candidate is not asserting they control; it is recording that the door exists and leaving the threshold to the inspect game. This is the reports-versus-judges split applied to control.
+
 ## §3 Dispatch returns a set — the revised table
 
 DISPATCH-001 §2 mapped each type to **one** strategy. It now maps each type to **the set of strategies that apply**. The table changes shape, not content: every prior row survives, and companies gain the control limb they were missing.

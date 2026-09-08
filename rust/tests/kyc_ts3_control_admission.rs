@@ -219,9 +219,12 @@ fn statutory_authority_stops_with_reason() {
 // PERSON already resolving via a different basis (independent doors,
 // independent people — `merge_candidates_by_person` only unions bases
 // for the SAME person). Renamed to state the surviving property
-// accurately; see `kyc_bases_001_p0_smo_gate.rs`
-// (`smo_fallback_fires_only_on_total_exhaustion`) for the "officer is a
-// door, not a fallback" positive gate this test's old name promised.
+// accurately — THIS test (not a file elsewhere; a prior version of this
+// comment pointed to `kyc_bases_001_p0_smo_gate.rs`, which does not exist,
+// found and corrected in the EOP-DD-UBO-BASES-001 audit closure tranche,
+// 2026-09-08) IS the "officer is a door, not a fallback" positive gate
+// this test's old name promised. See `employment_is_a_door_not_a_fallback`
+// below for the sibling gate over R-A's other admitted kind.
 #[test]
 fn officer_is_an_independent_door_not_gated_on_exhaustion() {
     let subject = eid(8);
@@ -278,6 +281,83 @@ fn officer_is_an_independent_door_not_gated_on_exhaustion() {
         pull_smo_on_exhaustion(&exhausted, subject, &natural_persons, &direct).is_none(),
         "the pull must not fire once the primary walk already found the officer directly"
     );
+}
+
+// ── EOP-DD-UBO-BASES-001 closure tranche P3c (2026-09-08, audit item 9) ──────
+//
+// The positive covering gate for `EdgeKind::Employment` as its own
+// independently-sufficient door — the mirror of
+// `officer_is_an_independent_door_not_gated_on_exhaustion` above, but for
+// R-A's SECOND admitted kind. Before this test, nothing anywhere positively
+// drove `EdgeKind::Employment` admitting a candidate: `admission_is_exhaustive`
+// and the wire-value closure tooth only pin COUNTS (13 traverse kinds, 2
+// not-control), and `containment_never_traversed`'s own doc comment claimed
+// this coverage existed "alongside `officer_is_an_independent_door...`"
+// above — it did not; that test only ever constructs `OfficerAppointment`
+// edges. Adam's actual words, quoted in the law: "employment with delegated
+// authority is the thing" — this is that thing, driven.
+#[test]
+fn employment_is_a_door_not_a_fallback() {
+    let subject = eid(50);
+    let alice = PersonId(eid(51).0); // resolves via VotingRights
+    let dana = PersonId(eid(52).0); // an employee with delegated authority — a door of her own
+
+    // (a) Ownership/control already resolves via VotingRights. Adding a
+    // Employment edge for Dana at the SAME subject must add Dana as her OWN
+    // independent candidate; Alice's candidate must be unaffected.
+    let mut resolving = ControlState { structure_class: None, ..Default::default() };
+    let voting = edge(60, EdgeKind::VotingRights, EntityId(alice.0), subject, 60);
+    resolving.edges.insert(voting.id, voting);
+    let natural_persons: BTreeSet<PersonId> = [alice, dana].into_iter().collect();
+
+    let candidates_without_employee =
+        ControlProngStrategy.resolve(&resolving, subject, &natural_persons, 25.0);
+    assert_eq!(candidates_without_employee.len(), 1);
+    assert_eq!(candidates_without_employee[0].person_id, alice);
+
+    let employment = edge(61, EdgeKind::Employment, EntityId(dana.0), subject, 61);
+    resolving.edges.insert(employment.id, employment);
+    let candidates_with_employee =
+        ControlProngStrategy.resolve(&resolving, subject, &natural_persons, 25.0);
+    assert_eq!(
+        candidates_with_employee.len(),
+        2,
+        "R-A: employment-with-delegated-authority is an independent door, not gated on \
+         exhaustion: {candidates_with_employee:#?}"
+    );
+    assert!(candidates_with_employee.iter().any(|c| c.person_id == alice));
+    assert!(candidates_with_employee
+        .iter()
+        .any(|c| c.person_id == dana && c.prong == Prong::ControlByOtherMeans));
+    assert!(
+        pull_smo_on_exhaustion(&resolving, subject, &natural_persons, &candidates_with_employee)
+            .is_none(),
+        "the pull must not fire when prior_candidates is non-empty"
+    );
+
+    // (b) Contrast: with NO VotingRights edge, the SAME employment edge
+    // alone resolves DIRECTLY (Traverse) — never via the SMO pull, never
+    // labelled SmoFallback.
+    let mut exhausted = ControlState { structure_class: None, ..Default::default() };
+    let employment2 = edge(62, EdgeKind::Employment, EntityId(dana.0), subject, 62);
+    exhausted.edges.insert(employment2.id, employment2);
+    let direct = ControlProngStrategy.resolve(&exhausted, subject, &natural_persons, 25.0);
+    assert_eq!(
+        direct.len(),
+        1,
+        "R-A: employment resolves directly, no pull needed: {direct:#?}"
+    );
+    assert_eq!(direct[0].person_id, dana);
+    assert_eq!(
+        direct[0].prong,
+        Prong::ControlByOtherMeans,
+        "R-A: direct admission via Employment, not the separate SmoFallback prong"
+    );
+    assert!(
+        pull_smo_on_exhaustion(&exhausted, subject, &natural_persons, &direct).is_none(),
+        "the pull must not fire once the primary walk already found the employee directly"
+    );
+    assert_eq!(control_admission(&EdgeKind::Employment), ControlAdmission::Traverse);
 }
 
 // ── §7 gate: smo_fallback_is_recorded_never_silent ───────────────────────────
@@ -362,11 +442,15 @@ fn smo_fallback_is_recorded_never_silent() {
 // "EmploymentDelegatedAuthority") to `Traverse` — "employment with
 // delegated authority is the thing" — leaving `Containment` as the sole
 // survivor of this test's original two-kind property (structural scoping,
-// not a control basis, per V&S citations). Renamed accordingly; a
-// positive covering gate for Employment-as-a-door lives alongside
+// not a control basis, per V&S citations). Renamed accordingly; the
+// positive covering gate for Employment-as-a-door is
+// `employment_is_a_door_not_a_fallback`, immediately below
 // `officer_is_an_independent_door_not_gated_on_exhaustion` above (same
 // `Traverse` admission, same mechanism, `EdgeKind::OfficerAppointment` and
-// `EdgeKind::Employment` are siblings in the `control_admission` match).
+// `EdgeKind::Employment` are siblings in the `control_admission` match) —
+// added in the EOP-DD-UBO-BASES-001 audit closure tranche (2026-09-08);
+// this comment previously claimed that gate already existed here when it
+// did not (audit item 9).
 #[test]
 fn containment_never_traversed() {
     // Property: adding the edge, in ANY quantity, changes no determination.

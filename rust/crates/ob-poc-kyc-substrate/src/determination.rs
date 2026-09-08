@@ -25,8 +25,9 @@ use uuid::Uuid;
 use crate::error::KycError;
 use crate::event::IntentEvent;
 use crate::fold::control::{
-    reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
-    EdgeKind, ReconciledEconomicEdge, TrustRoleKind,
+    evaluate_type_geometry, reconciled_control_edges, reconciled_economic_edges,
+    reconciled_trust_edges, ControlState, EdgeKind, GeometryEvaluation, ReconciledEconomicEdge,
+    TrustRoleKind,
 };
 use crate::types::{EdgeId, EntityId, EventId, Hash, PersonId, Principal};
 
@@ -1155,6 +1156,31 @@ impl DeterminationStrategy for NomineePierceStrategy {
     }
 }
 
+/// EOP-DD-UBO-BASES-001 audit closure P3b (2026-09-08): the single
+/// name→strategy chokepoint, previously hand-rolled independently in
+/// `kyc_stream_ops.rs::UboDeterminationFreeze::execute` (the live path) —
+/// duplicated logic this crate's own discipline warns against ("one
+/// chokepoint, reused, not two implementations to keep in sync", the same
+/// principle `evaluate_type_geometry` follows). Now the SOLE mapping;
+/// `strategy_for_name` in the app crate can delegate here instead of
+/// carrying its own copy of this match. Total over the 8 strategy names
+/// `dispatch_for_entity_type` ever emits; `None` for anything else (the
+/// caller decides how to report an unknown name — this crate stays
+/// error-type-agnostic here, mirroring `strategy.name()`'s own convention).
+pub fn strategy_for_name(name: &str) -> Option<&'static dyn DeterminationStrategy> {
+    Some(match name {
+        "ownership_prong_strategy" => &OwnershipProngStrategy,
+        "control_prong_strategy" => &ControlProngStrategy,
+        "trust_role_strategy" => &TrustRoleStrategy,
+        "fund_control_strategy" => &FundControlStrategy,
+        "foundation_council_strategy" => &FoundationCouncilStrategy,
+        "state_owned_strategy" => &StateOwnedStrategy,
+        "cooperative_member_strategy" => &CooperativeMemberStrategy,
+        "nominee_pierce_strategy" => &NomineePierceStrategy,
+        _ => return None,
+    })
+}
+
 // ── SMO fallback (K-5: never silent) ────────────────────────────────────────
 
 /// If ownership + control fold yields no persons, the SMO fallback fires.
@@ -1480,6 +1506,21 @@ pub enum ProvisionalityReason {
     /// admitted anyway (CTN-2e: record freely, conclude carefully) — this
     /// reason makes that admission legible rather than silent.
     GeometryUnevaluable { entity: EntityId, edge_kind_label: String },
+    /// EOP-DD-UBO-BASES-001 audit closure P1 (2026-09-08): unlike
+    /// `GeometryUnevaluable` ("could not check" — an endpoint was untyped
+    /// or the pipe classification didn't resolve), this means the geometry
+    /// WAS checked against the board's FINAL types and came back
+    /// `GeometryEvaluation::Refused` — a triple the ratified matrix
+    /// (`target_permits`/`source_permits`) affirmatively forbids. This can
+    /// happen because `TypeGeometryPermits` is a write-time check: a
+    /// connect made while an endpoint was still untyped admits under R5/R6
+    /// (CTN-2e), and a later `place` can retype that endpoint into
+    /// something the edge was never legitimate for — the connect-before-
+    /// place window (audit finding C3). R-C: "the determination names
+    /// every door with its proof status; it does not decide which open" —
+    /// a geometry-forbidden door is not a door, but freeze does not
+    /// refuse; it NAMES the contradiction and lets policy rule.
+    GeometryRefused { entity: EntityId, edge_kind_label: String },
 }
 
 /// One proof as reported in an assurance profile: kind and date only — no
@@ -1617,6 +1658,38 @@ pub fn compute_assurance(
         let pipe_resolved = crate::geometry::pipe_of(&edge.kind, to_type).pipe.is_some();
         if !from_typed || !to_typed || !pipe_resolved {
             reasons.insert(ProvisionalityReason::GeometryUnevaluable {
+                entity: edge.to,
+                edge_kind_label: format!("{:?}", edge.kind),
+            });
+        }
+    }
+
+    // EOP-DD-UBO-BASES-001 audit closure P1 (2026-09-08, finding C3): the
+    // write-time `TypeGeometryPermits` check (R5/R6) only ever sees the
+    // types known AT ASSERTION TIME — an edge admitted while an endpoint
+    // was untyped (`Unevaluable`) is never re-checked once that endpoint
+    // is later placed with a type the matrix forbids for it. Re-run the
+    // SAME chokepoint (`evaluate_type_geometry`) here, at determination
+    // time, against the board's FINAL types — a triple now evaluating
+    // `Refused` is named (`GeometryRefused`), never silently absorbed into
+    // a clean assurance. This is deliberately a SEPARATE loop from the
+    // `GeometryUnevaluable` one above: an edge can be simultaneously
+    // resolvable (typed both ends, pipe classifies — `pipe_resolved` true,
+    // no `GeometryUnevaluable`) and geometry-forbidden for the FINAL types
+    // (`GeometryRefused`) — the two reasons are not mutually exclusive and
+    // must not be collapsed into one flag (§2a's own discipline, extended).
+    for edge in control_state.edges.values() {
+        if !edge.is_active() {
+            continue;
+        }
+        if !(touched.contains(&edge.from) || touched.contains(&edge.to)) {
+            continue;
+        }
+        if matches!(
+            evaluate_type_geometry(edge.from, edge.to, &edge.kind, type_registry),
+            GeometryEvaluation::Refused(_)
+        ) {
+            reasons.insert(ProvisionalityReason::GeometryRefused {
                 entity: edge.to,
                 edge_kind_label: format!("{:?}", edge.kind),
             });
@@ -1847,9 +1920,21 @@ pub struct RecoveryPin<'a> {
 /// Replay the determination from an event stream filtered to `up_to_seq`
 /// (point-in-time recovery, K-16/K-18/K-33).  Returns the `FrozenDetermination`
 /// that existed at that sequence if a freeze event appears in the window.
+///
+/// EOP-DD-UBO-BASES-001 audit closure P3b (2026-09-08, audit item 8): no
+/// longer takes a caller-supplied `strategy`. It used to replay under
+/// exactly ONE strategy, which could not reproduce a live company freeze
+/// (a company dispatches to BOTH `ownership_prong_strategy` and
+/// `control_prong_strategy`, §3) and would silently pick a DIFFERENT
+/// answer than the freeze it claims to recover, on any board where the
+/// control limb found something the ownership limb didn't — K-18's whole
+/// point is bit-identical reproduction. This now derives the SAME
+/// dispatch set `kyc_stream_ops.rs::UboDeterminationFreeze` uses
+/// (`dispatch_for_entity_type` + `strategy_for_name`), runs every member,
+/// and merges: one chokepoint, reused by both the live freeze and this
+/// replay, not two implementations to keep in sync.
 pub fn recover_determination_at(
     events: &[&IntentEvent],
-    strategy: &dyn DeterminationStrategy,
     natural_persons: &BTreeSet<PersonId>,
     threshold_pct: f64,
     pin: RecoveryPin<'_>,
@@ -1874,31 +1959,44 @@ pub fn recover_determination_at(
     // short of a live `Strategies(_)` (unknown type, or a terminal
     // `NotADeterminationSubject`) means recovery can't proceed.
     //
-    // EOP-DD-UBO-BASES-001 §3: the dispatch table now maps a type to a SET
-    // of strategies, so it can no longer supply a single informational
-    // label — this function replays under the ONE `strategy` the caller
-    // explicitly passed (a narrower recovery than a live `freeze`, which
-    // runs every strategy in the set and unions the results), so the label
-    // is that strategy's own name, not an assumption about which dispatch
-    // set member the caller meant.
+    // EOP-DD-UBO-BASES-001 §3/P3b: the dispatch table maps a type to a SET
+    // of strategies — every member in that set runs and the results union,
+    // reproducing exactly what a live freeze does (`kyc_stream_ops.rs`).
     let entity_type = type_registry.type_of(subject_entity)?;
-    match crate::fold::control::dispatch_for_entity_type(&entity_type) {
-        crate::fold::control::DeterminationDispatch::Strategies(_) => {}
-        crate::fold::control::DeterminationDispatch::NotADeterminationSubject => return None,
-    };
-    let strategy_name = strategy.name();
+    let strategy_names: &'static [&'static str] =
+        match crate::fold::control::dispatch_for_entity_type(&entity_type) {
+            crate::fold::control::DeterminationDispatch::Strategies(names) => names,
+            crate::fold::control::DeterminationDispatch::NotADeterminationSubject => return None,
+        };
+    let strategy_name = strategy_names.join("+");
 
-    let mut candidates =
-        strategy.resolve(&control, subject_entity, natural_persons, threshold_pct);
+    let mut candidates: Vec<ProngCandidate> = Vec::new();
+    for name in strategy_names {
+        // A name `dispatch_for_entity_type` emits but `strategy_for_name`
+        // doesn't recognise is a programmer error (the two tables must
+        // stay in lockstep — same discipline as the live freeze path,
+        // which surfaces this as a hard `anyhow!` error instead; replay
+        // has no error channel, so refusing to recover is the equivalent
+        // fail-closed response).
+        let strategy = strategy_for_name(name)?;
+        candidates.extend(strategy.resolve(&control, subject_entity, natural_persons, threshold_pct));
+    }
+    candidates.sort_by_key(|c| c.person_id.0);
+    let mut candidates = merge_candidates_by_person(candidates);
 
     // TS.3 §3: record any statutory-authority stop at the subject.
     let stops = detect_statutory_stops(&control, subject_entity);
 
     // TS.3 §4a: pull the officer/SMO population on exhaustion — ONLY fires
-    // when the strategy's own walk produced nothing (never pushes).
+    // when the dispatch set's own walk produced nothing (never pushes).
+    // Re-merge after the pull, same as the live freeze path — a pulled
+    // candidate can share a person with one already found (rare, but the
+    // live path doesn't assume otherwise, so replay must not either).
     let smo_pull = match pull_smo_on_exhaustion(&control, subject_entity, natural_persons, &candidates) {
         Some((pulled, record)) => {
             candidates.extend(pulled);
+            candidates.sort_by_key(|c| c.person_id.0);
+            candidates = merge_candidates_by_person(candidates);
             Some(record)
         }
         None => None,
@@ -1980,7 +2078,6 @@ pub fn recover_determination_at(
 #[allow(clippy::too_many_arguments)]
 pub fn recover_determination_bitemporal(
     events: &[&IntentEvent],
-    strategy: &dyn DeterminationStrategy,
     natural_persons: &BTreeSet<PersonId>,
     threshold_pct: f64,
     pin: RecoveryPin<'_>,
@@ -1993,7 +2090,7 @@ pub fn recover_determination_bitemporal(
         .filter(|e| e.as_of <= valid_at && e.committed_at <= known_at)
         .collect();
 
-    recover_determination_at(&filtered, strategy, natural_persons, threshold_pct, pin)
+    recover_determination_at(&filtered, natural_persons, threshold_pct, pin)
 }
 
 /// Find the subject's own `EntityId`. Shared by `recover_determination_at`

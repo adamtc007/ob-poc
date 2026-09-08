@@ -27,7 +27,7 @@ use libfuzzer_sys::fuzz_target;
 use ob_poc_kyc_substrate::{
     check_preconditions, fold_control, fold_type_registry,
     natural_persons_from_events, assembly_lexicon, recover_determination_at, Hash, LexiconManifest,
-    OwnershipProngStrategy, RecoveryPin,
+    RecoveryPin,
 };
 use ob_poc_kyc_substrate_fuzz::{gen_events, Tape};
 use uuid::Uuid;
@@ -64,7 +64,6 @@ fuzz_target!(|data: &[u8]| {
     // `fold_control` internally — a real `panic!` if the invariant ever
     // breaks, which libFuzzer reports as a crash like any other.
     let natural_persons = natural_persons_from_events(&refs);
-    let strategy = OwnershipProngStrategy;
     let threshold_pct = tape.percentage();
     let pin = RecoveryPin {
         policy_version: "fuzz",
@@ -73,5 +72,5 @@ fuzz_target!(|data: &[u8]| {
         import_run_ids: BTreeSet::new(),
         viewer: None,
     };
-    let _ = recover_determination_at(&refs, &strategy, &natural_persons, threshold_pct, pin);
+    let _ = recover_determination_at(&refs, &natural_persons, threshold_pct, pin);
 });

@@ -46,7 +46,7 @@ pub use determination::{
     FrozenDetermination, FundControlStrategy, FundPivotResult, NomineePierceStrategy,
     OwnershipProngStrategy, PierceRecord, PivotCycleRecord, Prong, ProngCandidate,
     ProvisionalityReason, RecordedPivot, RecoveryPin, SmoPullRecord, SmoResult, StateOwnedStrategy,
-    TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
+    strategy_for_name, TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
 };
 pub use error::KycError;
 pub use evaluation::{
