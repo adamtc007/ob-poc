@@ -9,6 +9,7 @@
 //!  5. Asserts structural properties of the result.
 
 use dsl_ast::AtomBag;
+use dsl_atoms::KindCatalogue;
 use dsl_bpmn_frontend::assemble;
 use dsl_diagnostics::DiagnosticBag;
 use dsl_lowering::lower;
@@ -26,7 +27,8 @@ fn compile_example(source: &str) -> (dsl_lowering::JourneySpec, DiagnosticBag) {
         diag.push(d.clone());
     }
 
-    let bag = AtomBag::from_source_file(source_file, &mut diag);
+    let bag = AtomBag::from_source_file(source_file, &KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
     let graph = assemble(&bag, &mut diag);
     let spec = lower(&graph, "test-process");
     (spec, diag)

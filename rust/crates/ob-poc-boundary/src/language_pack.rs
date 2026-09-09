@@ -541,6 +541,8 @@ mod tests {
             mutation_enabled: false,
             hitl_required: true,
             evidence_refs_required: vec!["screening_id".to_string()],
+            node_prefix: None,
+            slot_path: None,
         });
 
         let readiness =
@@ -569,6 +571,8 @@ mod tests {
             mutation_enabled: false,
             hitl_required: true,
             evidence_refs_required: vec!["screening_id".to_string()],
+            node_prefix: None,
+            slot_path: None,
         });
 
         let pack = build_update_status_language_pack(

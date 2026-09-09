@@ -205,6 +205,7 @@ async fn compute_live_legal_verb_set(
         point_in_time: None,
         entity_kind: Some(target_entity_type.to_string()),
         entity_confidence: Some(1.0),
+        entity_kind_aliases: Default::default(),
         discovery: DiscoveryContext::default(),
     };
     let response = client

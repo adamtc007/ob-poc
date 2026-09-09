@@ -7,9 +7,10 @@ description = "Scenario runner and test helpers for the bpmn-runtime crate (Tran
 
 [dependencies]
 bpmn-runtime = { path = "../bpmn-runtime" }
-dsl-ast = { path = "../dsl-ast" }
-dsl-diagnostics = { path = "../dsl-diagnostics" }
-dsl-parser = { path = "../dsl-parser" }
+dsl-atoms.workspace = true
+dsl-ast.workspace = true
+dsl-diagnostics.workspace = true
+dsl-parser.workspace = true
 dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
 dsl-lowering = { path = "../dsl-lowering" }
 dsl-resolution = { path = "../dsl-resolution" }

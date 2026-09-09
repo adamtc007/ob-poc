@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use dsl_ast::{AtomBag, TypedAtom};
-use dsl_atoms::{AtomKindClass, StructuralKind};
+use dsl_atoms::{builtin, KindCatalogue, KindRole};
 use dsl_core::{
     ArgConfig, ConfirmPolicyConfig, CrudConfig, DomainConfig, DurableConfig, GraphQueryConfig,
     PolicyConfig, ReturnsConfig, ThreeAxisDeclaration, TransitionArgs, VerbBehavior, VerbConfig,
@@ -73,7 +73,11 @@ pub fn load_verbs_from_dsl_dir(dir: &Path, diagnostics: &mut DiagnosticBag) -> V
         }
 
         let mut bag_diag = DiagnosticBag::new();
-        let bag = AtomBag::from_source_file(source_file, &mut bag_diag);
+        // Unknown-kind errors already carry a diagnostic (dsl-ast); treat
+        // that file as contributing no verbs and keep loading the rest of
+        // the directory, matching the pre-DSL-T1 tolerant per-file degrade.
+        let bag = AtomBag::from_source_file(source_file, &KindCatalogue::builtin(), &mut bag_diag)
+            .unwrap_or_default();
         for d in bag_diag.diagnostics {
             diagnostics.push(d);
         }
@@ -123,14 +127,10 @@ fn extract_domains_from_bag(
     diagnostics: &mut DiagnosticBag,
 ) {
     for atom in bag.structural_atoms() {
-        match &atom.kind_class {
-            AtomKindClass::Structural(StructuralKind::Verb) => {
-                extract_verb_atom(atom, domains, diagnostics);
-            }
-            AtomKindClass::Structural(StructuralKind::UtteranceBinding) => {
-                extract_utterance_binding(atom, domains);
-            }
-            _ => {}
+        if atom.kind_class.is(KindRole::Structural, builtin::VERB) {
+            extract_verb_atom(atom, domains, diagnostics);
+        } else if atom.kind_class.is(KindRole::Structural, builtin::UTTERANCE_BINDING) {
+            extract_utterance_binding(atom, domains);
         }
     }
 }

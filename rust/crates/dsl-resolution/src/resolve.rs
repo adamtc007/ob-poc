@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 
 use dsl_ast::{AtomBag, TypedAtom};
-use dsl_atoms::{AtomKindClass, DeclarativeKind, StructuralKind};
+use dsl_atoms::{builtin, KindRole};
 use dsl_diagnostics::{
     Diagnostic, DiagnosticBag, INVALID_PARAMETER_NAME, UNKNOWN_LOOP_VARIABLE,
     UNKNOWN_PACK_REFERENCE, UNKNOWN_TEMPLATE_PARAMETER, UNRESOLVED_NAME_REF,
@@ -28,20 +28,20 @@ use crate::pack_registry::{DecisionPack, PackParam, PackRegistry};
 /// 3. `(governance-status ...)` atoms have their `:atom` name-ref checked.
 pub fn resolve(bag: &AtomBag, registry: &mut PackRegistry, diagnostics: &mut DiagnosticBag) {
     // 1. Decision-pack atoms
-    for atom in bag.atoms_of_structural_kind(StructuralKind::DecisionPack) {
+    for atom in bag.atoms_of_structural_kind(builtin::DECISION_PACK) {
         resolve_decision_pack(atom, registry, diagnostics);
     }
 
     // 2. Provenance atoms
     for atom in bag.declarative_atoms() {
-        if atom.kind_class == AtomKindClass::Declarative(DeclarativeKind::Provenance) {
+        if atom.kind_class.is(KindRole::Declarative, builtin::PROVENANCE) {
             resolve_provenance(atom, bag, registry, diagnostics);
         }
     }
 
     // 3. Governance-status atoms
     for atom in bag.declarative_atoms() {
-        if atom.kind_class == AtomKindClass::Declarative(DeclarativeKind::GovernanceStatus) {
+        if atom.kind_class.is(KindRole::Declarative, builtin::GOVERNANCE_STATUS) {
             resolve_governance_status(atom, bag, diagnostics);
         }
     }
@@ -375,7 +375,8 @@ mod tests {
         for d in parse_diag.diagnostics {
             diag.push(d);
         }
-        let bag = AtomBag::from_source_file(sf, &mut diag);
+        let bag = AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+            .expect("all kinds known");
         let mut registry = PackRegistry::new();
         resolve(&bag, &mut registry, &mut diag);
         (registry, diag)

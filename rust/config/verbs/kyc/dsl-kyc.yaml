@@ -63,7 +63,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: edge
           tags: [ubo, control, economic, ownership, determination, stream-backed, dsl-kyc]
@@ -141,7 +141,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: control_edge
           tags: [ubo, evidence, determination, stream-backed, dsl-kyc]
@@ -216,7 +216,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: control_edge
           tags: [ubo, evidence, determination, stream-backed, dsl-kyc]
@@ -266,7 +266,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: edge
           tags: [ubo, supersede, determination, stream-backed, dsl-kyc]
@@ -357,7 +357,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: kyc_subject
           tags: [kyc, subject, placement, stream-backed, dsl-kyc]
@@ -420,7 +420,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: group_member
           tags: [kyc, subject, membership, placement, stream-backed, dsl-kyc]
@@ -460,7 +460,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: enquiry_record
           tags: [kyc, subject, diligence, ts1, stream-backed, dsl-kyc]
@@ -515,7 +515,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: { stream: kyc_intent_events }
           scope: global
           noun: determination
           tags: [ubo, freeze, pin, determination, stream-backed, dsl-kyc]

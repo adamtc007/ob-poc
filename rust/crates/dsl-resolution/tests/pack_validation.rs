@@ -25,7 +25,8 @@ fn conjunctive_gate_parses_and_validates() {
     for d in parse_diag.diagnostics {
         diag.push(d);
     }
-    let bag = dsl_ast::AtomBag::from_source_file(sf, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
 
     let mut registry = PackRegistry::new();
     dsl_resolution::resolve(&bag, &mut registry, &mut diag);
@@ -131,7 +132,8 @@ fn example_12_validates_end_to_end() {
     let pack_source = include_str!("../../../dsl-source/packs/conjunctive-gate.dsl");
     let (sf, _) = dsl_parser::parse(pack_source);
     let mut diag = DiagnosticBag::new();
-    let bag = dsl_ast::AtomBag::from_source_file(sf, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
     let mut registry = PackRegistry::new();
     dsl_resolution::resolve(&bag, &mut registry, &mut diag);
     assert!(registry.lookup("conjunctive-gate", "1.0.0").is_some());
@@ -189,7 +191,8 @@ fn template_subst_in_gateway_does_not_panic() {
     for d in parse_diag.diagnostics {
         diag.push(d);
     }
-    let bag = dsl_ast::AtomBag::from_source_file(sf, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
     let mut registry = PackRegistry::new();
     // Should not panic.
     dsl_resolution::resolve(&bag, &mut registry, &mut diag);
@@ -220,7 +223,8 @@ fn load_single_pack(filename: &str) -> PackRegistry {
     for d in parse_diag.diagnostics {
         diag.push(d);
     }
-    let bag = dsl_ast::AtomBag::from_source_file(sf, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
     let mut registry = PackRegistry::new();
     dsl_resolution::resolve(&bag, &mut registry, &mut diag);
     assert!(
@@ -427,7 +431,8 @@ fn instantiate_all_packs_compiles() {
         for d in parse_diag.diagnostics {
             diag.push(d);
         }
-        let bag = dsl_ast::AtomBag::from_source_file(sf, &mut diag);
+        let bag = dsl_ast::AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+            .expect("all kinds known");
         let mut registry = PackRegistry::new();
         dsl_resolution::resolve(&bag, &mut registry, &mut diag);
         assert!(

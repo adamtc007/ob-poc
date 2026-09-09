@@ -732,7 +732,7 @@ mod tests {
             }),
             evidence: Some(EvidenceInput {
                 evidence_gaps: vec![],
-                kyc_precondition_failures: vec![],
+                precondition_failures: vec![],
                 satisfied_obligation_ids: vec!["obligation-1".to_string()],
                 open_obligation_ids: vec![],
             }),
@@ -747,7 +747,7 @@ mod tests {
             snapshot: Some(SnapshotInput {
                 sem_reg_snapshot_id: Some(Uuid::nil()),
                 session_snapshot_id: None,
-                kyc_manifest_hash: None,
+                lexicon_manifest_hash: None,
                 entity_row_versions: vec![(entity, "cbu".to_string(), 1)],
                 versions: ob_poc_control_plane::snapshot::PinnedVersionSet::default(),
             }),

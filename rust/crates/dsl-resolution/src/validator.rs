@@ -1,7 +1,7 @@
 //! REPL-facing validate function — full pipeline: parse → bag → resolve → assemble.
 
 use dsl_ast::AtomBag;
-use dsl_atoms::{AtomKindClass, DeclarativeKind};
+use dsl_atoms::{builtin, KindCatalogue, KindRole};
 use dsl_diagnostics::{Diagnostic, DiagnosticBag, DiagnosticSeverity};
 
 use crate::pack_registry::PackRegistry;
@@ -82,8 +82,11 @@ pub fn validate_bpmn(
         diag.push(d);
     }
 
-    // Build atom bag
-    let bag = AtomBag::from_source_file(source_file, &mut diag);
+    // Build atom bag. Unknown kinds already pushed a diagnostic naming the
+    // catalogue (dsl-ast); degrade to an empty bag rather than aborting the
+    // whole validate call, matching the pre-DSL-T1 infallible behaviour.
+    let bag = AtomBag::from_source_file(source_file, &KindCatalogue::builtin(), &mut diag)
+        .unwrap_or_default();
 
     // Resolve (validates packs, provenance, governance; indexes packs)
     resolve(&bag, registry, &mut diag);
@@ -117,7 +120,7 @@ fn extract_provenance_summary(bag: &AtomBag, _registry: &PackRegistry) -> Proven
     let mut covered: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for atom in bag.declarative_atoms() {
-        if atom.kind_class != AtomKindClass::Declarative(DeclarativeKind::Provenance) {
+        if !atom.kind_class.is(KindRole::Declarative, builtin::PROVENANCE) {
             continue;
         }
         let covers = extract_string_list(&atom.raw, "covers");

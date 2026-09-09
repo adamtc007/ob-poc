@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use dsl_ast::AtomBag;
-use dsl_atoms::StructuralKind;
+use dsl_atoms::builtin;
 use dsl_diagnostics::{Diagnostic, DiagnosticBag, UNDECLARED_MERGE, UNRESOLVED_NAME_REF};
 use dsl_parser::RawValue;
 
@@ -94,7 +94,7 @@ pub fn assemble(bag: &AtomBag, diagnostics: &mut DiagnosticBag) -> RailwayGraph 
 /// (e.g. `(flow verification-failed-boundary -> manual-verify)`) resolve
 /// without "unresolved name ref" errors.
 fn prescan_boundary_event_names(bag: &AtomBag, graph: &mut RailwayGraph) {
-    for atom in bag.atoms_of_structural_kind(StructuralKind::BoundaryAttachment) {
+    for atom in bag.atoms_of_structural_kind(builtin::BOUNDARY_ATTACHMENT) {
         // atom.name = host node; second positional (empty-key slot) = event name
         let event_name = match positional_slot_symbol(&atom.raw.slots) {
             Some(s) => s,
@@ -115,7 +115,7 @@ fn prescan_boundary_event_names(bag: &AtomBag, graph: &mut RailwayGraph) {
 // ---------------------------------------------------------------------------
 
 fn index_nodes(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut DiagnosticBag) {
-    for atom in bag.atoms_of_structural_kind(StructuralKind::Node) {
+    for atom in bag.atoms_of_structural_kind(builtin::NODE) {
         let name = match &atom.name {
             Some(n) => n.clone(),
             None => {
@@ -175,7 +175,7 @@ fn index_nodes(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut Diagno
 // ---------------------------------------------------------------------------
 
 fn index_gateways(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut DiagnosticBag) {
-    for atom in bag.atoms_of_structural_kind(StructuralKind::Gateway) {
+    for atom in bag.atoms_of_structural_kind(builtin::GATEWAY) {
         let name = match &atom.name {
             Some(n) => n.clone(),
             None => {
@@ -227,7 +227,7 @@ fn index_gateways(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut Dia
 // ---------------------------------------------------------------------------
 
 fn index_parallel_joins(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut DiagnosticBag) {
-    for atom in bag.atoms_of_structural_kind(StructuralKind::ParallelJoin) {
+    for atom in bag.atoms_of_structural_kind(builtin::PARALLEL_JOIN) {
         let name = match &atom.name {
             Some(n) => n.clone(),
             None => {
@@ -299,7 +299,7 @@ fn index_parallel_joins(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &m
 // ---------------------------------------------------------------------------
 
 fn build_edges(bag: &AtomBag, graph: &mut RailwayGraph, diagnostics: &mut DiagnosticBag) {
-    for atom in bag.atoms_of_structural_kind(StructuralKind::Flow) {
+    for atom in bag.atoms_of_structural_kind(builtin::FLOW) {
         // Extract source from "source" slot
         let source = match slot_symbol_or_name(&atom.raw.slots, "source") {
             Some(s) => s,
@@ -368,7 +368,7 @@ fn index_boundary_attachments(
     graph: &mut RailwayGraph,
     diagnostics: &mut DiagnosticBag,
 ) {
-    for atom in bag.atoms_of_structural_kind(StructuralKind::BoundaryAttachment) {
+    for atom in bag.atoms_of_structural_kind(builtin::BOUNDARY_ATTACHMENT) {
         // Host node is in atom.name (first symbol after kind is consumed as name)
         let host_node = match &atom.name {
             Some(n) => n.clone(),

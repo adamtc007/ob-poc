@@ -25,7 +25,7 @@ semantic-decision-contracts.workspace = true
 [dev-dependencies]
 # dsl-parser: T1 round-trip equivalence gate (parse(render(event)) ≡ event).
 # Pure crate, dev-only — does not touch the no-sqlx/no-DB production dep list.
-dsl-parser = { path = "../dsl-parser" }
+dsl-parser.workspace = true
 
 [lints.rust]
 unreachable_pub = "deny"

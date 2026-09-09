@@ -1354,6 +1354,7 @@ async fn handle_resolve_context(
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: DiscoveryContext::default(),
     };
 
@@ -1473,6 +1474,7 @@ async fn handle_apply_view(
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: DiscoveryContext::default(),
     };
 
@@ -2297,6 +2299,7 @@ async fn handle_identify_gaps(
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: DiscoveryContext::default(),
     };
 

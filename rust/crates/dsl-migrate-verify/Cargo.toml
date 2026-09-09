@@ -13,9 +13,10 @@ path = "src/bin/verify.rs"
 
 [dependencies]
 dsl-migrate     = { path = "../dsl-migrate" }
-dsl-parser      = { path = "../dsl-parser" }
-dsl-ast         = { path = "../dsl-ast" }
-dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-parser.workspace = true
+dsl-atoms.workspace = true
+dsl-ast.workspace = true
+dsl-diagnostics.workspace = true
 dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
 dsl-lowering    = { path = "../dsl-lowering" }
 dsl-resolution  = { path = "../dsl-resolution" }

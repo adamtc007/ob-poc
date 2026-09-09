@@ -666,6 +666,7 @@ pub(crate) async fn ctx_resolve(
         point_in_time,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: DiscoveryContext::default(),
     };
 

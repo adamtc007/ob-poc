@@ -257,6 +257,8 @@ mod tests {
                 mutation_enabled,
                 hitl_required: true,
                 evidence_refs_required: vec!["case_id".to_string()],
+                node_prefix: None,
+                slot_path: None,
             }],
             discovery_probes: vec![],
             projection_catalog: vec![],

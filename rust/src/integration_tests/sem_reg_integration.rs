@@ -325,6 +325,7 @@ mod integration {
             point_in_time: None,
             entity_kind: None,
             entity_confidence: None,
+            entity_kind_aliases: Default::default(),
             discovery: DiscoveryContext::default(),
         };
         let response = resolve_context_via_sem_os(&db.pool, &actor, request).await?;
@@ -1055,6 +1056,7 @@ mod integration {
             point_in_time: None,
             entity_kind: None,
             entity_confidence: None,
+            entity_kind_aliases: Default::default(),
             discovery: DiscoveryContext::default(),
         };
 

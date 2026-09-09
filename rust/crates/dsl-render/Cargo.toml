@@ -6,10 +6,10 @@ rust-version = "1.95"
 description = "Read-only SVG renderer for bpmn-lite DSL railway graphs"
 
 [dependencies]
-dsl-atoms = { path = "../dsl-atoms" }
-dsl-diagnostics = { path = "../dsl-diagnostics" }
-dsl-parser = { path = "../dsl-parser" }
-dsl-ast = { path = "../dsl-ast" }
+dsl-atoms.workspace = true
+dsl-diagnostics.workspace = true
+dsl-parser.workspace = true
+dsl-ast.workspace = true
 dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
 dsl-lowering = { path = "../dsl-lowering" }
 serde = { version = "1.0", features = ["derive"] }

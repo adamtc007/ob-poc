@@ -432,6 +432,7 @@ fn build_request(case: &DiscoveryCase) -> ContextResolutionRequest {
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: DiscoveryContext {
             selected_domain_id: case.selected_domain.clone(),
             selected_family_id: case.selected_family.clone(),

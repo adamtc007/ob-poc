@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use dsl_ast::AtomBag;
-use dsl_atoms::{AtomKindClass, DeclarativeKind};
+use dsl_atoms::{builtin, KindCatalogue, KindRole};
 use dsl_bpmn_frontend::RailwayGraph;
 use dsl_parser::RawValue;
 
@@ -47,7 +47,7 @@ pub fn render_dsl(source: &str, opts: &RenderOptions) -> anyhow::Result<String> 
     // Parse
     let (sf, _parse_diag) = dsl_parser::parse(source);
     let mut diag = dsl_diagnostics::DiagnosticBag::new();
-    let bag = AtomBag::from_source_file(sf, &mut diag);
+    let bag = AtomBag::from_source_file(sf, &KindCatalogue::builtin(), &mut diag)?;
 
     // Extract provenance coverage for badge annotations
     let provenance_coverage = if opts.include_provenance_badges {
@@ -161,10 +161,7 @@ pub fn extract_provenance_coverage(bag: &AtomBag) -> HashMap<String, String> {
     let mut coverage: HashMap<String, String> = HashMap::new();
 
     for atom in bag.declarative_atoms() {
-        if !matches!(
-            atom.kind_class,
-            AtomKindClass::Declarative(DeclarativeKind::Provenance)
-        ) {
+        if !atom.kind_class.is(KindRole::Declarative, builtin::PROVENANCE) {
             continue;
         }
 
@@ -245,7 +242,8 @@ mod tests {
 "#;
         let (sf, _) = dsl_parser::parse(source);
         let mut diag = dsl_diagnostics::DiagnosticBag::new();
-        let bag = AtomBag::from_source_file(sf, &mut diag);
+        let bag = AtomBag::from_source_file(sf, &KindCatalogue::builtin(), &mut diag)
+            .expect("all kinds known");
         let cov = extract_provenance_coverage(&bag);
         assert_eq!(cov.get("gw1").map(|s| s.as_str()), Some("my-pack"));
     }

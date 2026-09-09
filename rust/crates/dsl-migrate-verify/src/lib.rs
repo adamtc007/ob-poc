@@ -63,7 +63,23 @@ pub async fn verify_dsl_source(source: &str, process_name: &str) -> VerifyResult
     }
 
     // ── Stage 2: Assemble + validate ────────────────────────────────────────
-    let bag = dsl_ast::AtomBag::from_source_file(source_file, &mut diag);
+    let bag = match dsl_ast::AtomBag::from_source_file(
+        source_file,
+        &dsl_atoms::KindCatalogue::builtin(),
+        &mut diag,
+    ) {
+        Ok(bag) => bag,
+        Err(unknown) => {
+            diagnostics.push(format!("unknown atom kind: {unknown}"));
+            return VerifyResult {
+                parsed: true,
+                validated: false,
+                lowered: false,
+                started: false,
+                diagnostics,
+            };
+        }
+    };
     let graph = dsl_bpmn_frontend::assemble(&bag, &mut diag);
     if diag.has_errors() {
         for e in diag.errors() {
@@ -129,7 +145,12 @@ pub fn compile_to_spec(source: &str, process_name: &str) -> anyhow::Result<Journ
         anyhow::bail!("parse errors: {}", msgs.join("; "));
     }
 
-    let bag = dsl_ast::AtomBag::from_source_file(source_file, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(
+        source_file,
+        &dsl_atoms::KindCatalogue::builtin(),
+        &mut diag,
+    )
+    .map_err(|unknown| anyhow::anyhow!("unknown atom kind: {unknown}"))?;
     let graph = dsl_bpmn_frontend::assemble(&bag, &mut diag);
     if diag.has_errors() {
         let msgs: Vec<_> = diag.errors().map(|e| e.message.as_str()).collect();

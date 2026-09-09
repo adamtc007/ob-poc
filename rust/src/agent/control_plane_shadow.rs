@@ -575,7 +575,7 @@ pub(crate) fn has_unpinned_entities(
 /// (see `entity_facts.rs`'s own module doc: "T9.2's `SnapshotPins` need
 /// `row_version` from the same rows"), so this reads no new data at all.
 ///
-/// `sem_reg_snapshot_id` / `session_snapshot_id` / `kyc_manifest_hash` /
+/// `sem_reg_snapshot_id` / `session_snapshot_id` / `lexicon_manifest_hash` /
 /// `versions` (the `PinnedVersionSet`) all stay at their `Option::None` /
 /// `Default` values — not a placeholder, but this call site's honest
 /// answer: `snapshot.rs`'s own module doc says plainly "No production
@@ -750,7 +750,7 @@ pub(crate) fn build_entity_binding_input(
 /// - G6 (evidence, T9.1d): `evidence_gaps` maps directly from
 ///   `envelope.evidence_gaps` (SemOS's own real governance/evidence
 ///   computation, already run to build the envelope) — no new source. The
-///   KYC-specific fields (`kyc_precondition_failures`,
+///   KYC-specific fields (`precondition_failures`,
 ///   `*_obligation_ids`) stay empty: no KYC-substrate adapter is wired at
 ///   this call site, and most verbs dispatched through Path A are not
 ///   KYC-domain verbs at all. This makes the resulting `EvidenceOutcome`
@@ -800,7 +800,7 @@ pub(crate) fn build_entity_binding_input(
 /// - G13 (decision snapshot, T9.6): built by
 ///   [`build_decision_snapshot_input`] from the same batched entity-facts
 ///   rows G2 already fetches (`EntityFactsRow.row_version`, no second
-///   query). `sem_reg_snapshot_id`/`session_snapshot_id`/`kyc_manifest_hash`/
+///   query). `sem_reg_snapshot_id`/`session_snapshot_id`/`lexicon_manifest_hash`/
 ///   `versions` all stay at their defaults — no production source exists
 ///   for those yet (`snapshot.rs`'s own module doc). `None` only when the
 ///   batched facts fetch itself errored (same posture as G2/G8).
@@ -895,7 +895,7 @@ pub(crate) fn build_evaluation_context(
             // scope) — most Path A dispatches are not KYC-domain verbs at
             // all. Leaving these empty is honest: it means "not observed
             // here", not "confirmed absent".
-            kyc_precondition_failures: Vec::new(),
+            precondition_failures: Vec::new(),
             satisfied_obligation_ids: Vec::new(),
             open_obligation_ids: Vec::new(),
         }),
@@ -2293,7 +2293,7 @@ domains:
         assert!(input.entity_row_versions.is_empty());
         assert!(input.sem_reg_snapshot_id.is_none());
         assert!(input.session_snapshot_id.is_none());
-        assert!(input.kyc_manifest_hash.is_none());
+        assert!(input.lexicon_manifest_hash.is_none());
     }
 
     #[test]

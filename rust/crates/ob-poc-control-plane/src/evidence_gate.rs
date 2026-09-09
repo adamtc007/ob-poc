@@ -54,7 +54,7 @@ pub mod tests_support {
 }
 
 /// Pre-computed input for the evidence gate. `evidence_gaps` mirrors
-/// `SemOsContextEnvelope.evidence_gaps` (C-007); `kyc_precondition_failures`
+/// `SemOsContextEnvelope.evidence_gaps` (C-007); `precondition_failures`
 /// mirrors the `Err` arm of `check_control_preconditions` (C-041) or the
 /// store-side re-check under stream lock (C-042), stringified at the call
 /// site. `satisfied_obligation_ids` lists obligations already resolved
@@ -63,7 +63,7 @@ pub mod tests_support {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EvidenceInput {
     pub evidence_gaps: Vec<String>,
-    pub kyc_precondition_failures: Vec<KycPreconditionFailure>,
+    pub precondition_failures: Vec<PreconditionFailure>,
     pub satisfied_obligation_ids: Vec<String>,
     pub open_obligation_ids: Vec<String>,
 }
@@ -73,7 +73,7 @@ pub struct EvidenceInput {
 /// strategy-not-selected) without depending on `ob-poc-kyc-substrate`
 /// directly (§9.1: no execution-tier dependency).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum KycPreconditionFailure {
+pub enum PreconditionFailure {
     EvidenceNotCited,
     NotReconciled,
     StrategyNotSelected,
@@ -81,20 +81,20 @@ pub enum KycPreconditionFailure {
 
 pub(crate) fn decide(input: &EvidenceInput) -> EvidenceOutcome {
     if input
-        .kyc_precondition_failures
+        .precondition_failures
         .iter()
-        .any(|f| matches!(f, KycPreconditionFailure::NotReconciled))
+        .any(|f| matches!(f, PreconditionFailure::NotReconciled))
     {
         return EvidenceOutcome::ConflictingEvidence;
     }
     if input
-        .kyc_precondition_failures
+        .precondition_failures
         .iter()
-        .any(|f| matches!(f, KycPreconditionFailure::EvidenceNotCited))
+        .any(|f| matches!(f, PreconditionFailure::EvidenceNotCited))
     {
         return EvidenceOutcome::MissingRequiredEvidence;
     }
-    if !input.kyc_precondition_failures.is_empty() {
+    if !input.precondition_failures.is_empty() {
         // StrategyNotSelected and any future precondition class: treated as
         // missing evidence rather than fabricating a finer split the
         // underlying validator doesn't report.
@@ -141,7 +141,7 @@ mod tests {
     fn base_input() -> EvidenceInput {
         EvidenceInput {
             evidence_gaps: vec![],
-            kyc_precondition_failures: vec![],
+            precondition_failures: vec![],
             satisfied_obligation_ids: vec!["obligation-1".to_string()],
             open_obligation_ids: vec![],
         }
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn not_reconciled_is_conflicting_evidence() {
         let input = EvidenceInput {
-            kyc_precondition_failures: vec![KycPreconditionFailure::NotReconciled],
+            precondition_failures: vec![PreconditionFailure::NotReconciled],
             ..base_input()
         };
         assert_eq!(decide(&input), EvidenceOutcome::ConflictingEvidence);
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn evidence_not_cited_is_missing_required_evidence() {
         let input = EvidenceInput {
-            kyc_precondition_failures: vec![KycPreconditionFailure::EvidenceNotCited],
+            precondition_failures: vec![PreconditionFailure::EvidenceNotCited],
             ..base_input()
         };
         assert_eq!(decide(&input), EvidenceOutcome::MissingRequiredEvidence);

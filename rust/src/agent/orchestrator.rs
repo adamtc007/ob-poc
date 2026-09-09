@@ -3153,6 +3153,7 @@ async fn resolve_via_client(
         point_in_time: None,
         entity_kind: entity_kind.map(|s| s.to_string()),
         entity_confidence: ctx.pre_sage_entity_confidence,
+        entity_kind_aliases: Default::default(),
         discovery: sem_os_policy::context_resolution::DiscoveryContext {
             selected_domain_id: ctx.discovery_selected_domain.clone(),
             selected_family_id: ctx.discovery_selected_family.clone(),
@@ -3208,6 +3209,7 @@ pub(crate) async fn resolve_allowed_verbs(
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: sem_os_policy::context_resolution::DiscoveryContext {
             selected_domain_id: None,
             selected_family_id: constellation_family,

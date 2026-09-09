@@ -14,7 +14,7 @@
 //! evaluation" (`Failure`, fail-closed, same posture as every other gate in
 //! this crate) — refusing an empty-but-present pin set is explicitly not
 //! this gate's job (a session with no KYC entities bound legitimately has no
-//! `kyc_manifest_hash`, for example).
+//! `lexicon_manifest_hash`, for example).
 
 use uuid::Uuid;
 
@@ -49,7 +49,7 @@ pub struct PinnedVersionSet {
 pub struct SnapshotPins {
     sem_reg_snapshot_id: Option<Uuid>,
     session_snapshot_id: Option<Uuid>,
-    kyc_manifest_hash: Option<String>,
+    lexicon_manifest_hash: Option<String>,
     /// Entity id, kind, and observed row_version, for every bound entity
     /// where a version pin is available. An entity absent from this list
     /// has no comparable version pin (RR-5 Mode-1) and is STP-ineligible
@@ -76,14 +76,14 @@ impl SnapshotPins {
     fn new(
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
-        kyc_manifest_hash: Option<String>,
+        lexicon_manifest_hash: Option<String>,
         entity_row_versions: Vec<(Uuid, String, i64)>,
         versions: PinnedVersionSet,
     ) -> Self {
         Self {
             sem_reg_snapshot_id,
             session_snapshot_id,
-            kyc_manifest_hash,
+            lexicon_manifest_hash,
             entity_row_versions,
             versions,
         }
@@ -97,8 +97,8 @@ impl SnapshotPins {
         self.session_snapshot_id
     }
 
-    pub fn kyc_manifest_hash(&self) -> Option<&str> {
-        self.kyc_manifest_hash.as_deref()
+    pub fn lexicon_manifest_hash(&self) -> Option<&str> {
+        self.lexicon_manifest_hash.as_deref()
     }
 
     pub fn entity_row_version(&self, entity_id: Uuid) -> Option<i64> {
@@ -139,13 +139,13 @@ pub mod tests_support {
     pub fn pins(
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
-        kyc_manifest_hash: Option<String>,
+        lexicon_manifest_hash: Option<String>,
         entity_row_versions: Vec<(Uuid, String, i64)>,
     ) -> SnapshotPins {
         SnapshotPins::new(
             sem_reg_snapshot_id,
             session_snapshot_id,
-            kyc_manifest_hash,
+            lexicon_manifest_hash,
             entity_row_versions,
             PinnedVersionSet::default(),
         )
@@ -154,14 +154,14 @@ pub mod tests_support {
     pub fn pins_with_versions(
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
-        kyc_manifest_hash: Option<String>,
+        lexicon_manifest_hash: Option<String>,
         entity_row_versions: Vec<(Uuid, String, i64)>,
         versions: PinnedVersionSet,
     ) -> SnapshotPins {
         SnapshotPins::new(
             sem_reg_snapshot_id,
             session_snapshot_id,
-            kyc_manifest_hash,
+            lexicon_manifest_hash,
             entity_row_versions,
             versions,
         )
@@ -176,7 +176,7 @@ pub mod tests_support {
 pub struct SnapshotInput {
     pub sem_reg_snapshot_id: Option<Uuid>,
     pub session_snapshot_id: Option<Uuid>,
-    pub kyc_manifest_hash: Option<String>,
+    pub lexicon_manifest_hash: Option<String>,
     pub entity_row_versions: Vec<(Uuid, String, i64)>,
     pub versions: PinnedVersionSet,
 }
@@ -189,7 +189,7 @@ pub fn build_pins(input: &SnapshotInput) -> SnapshotPins {
     SnapshotPins::new(
         input.sem_reg_snapshot_id,
         input.session_snapshot_id,
-        input.kyc_manifest_hash.clone(),
+        input.lexicon_manifest_hash.clone(),
         input.entity_row_versions.clone(),
         input.versions.clone(),
     )
@@ -221,7 +221,7 @@ mod tests {
         let input = SnapshotInput {
             sem_reg_snapshot_id: Some(Uuid::nil()),
             session_snapshot_id: None,
-            kyc_manifest_hash: Some("hash-1".to_string()),
+            lexicon_manifest_hash: Some("hash-1".to_string()),
             entity_row_versions: vec![(entity, "cbu".to_string(), 5)],
             versions: PinnedVersionSet {
                 bus_catalogue_version: Some("v3".to_string()),
@@ -230,7 +230,7 @@ mod tests {
         };
         let pins = build_pins(&input);
         assert_eq!(pins.sem_reg_snapshot_id(), Some(Uuid::nil()));
-        assert_eq!(pins.kyc_manifest_hash(), Some("hash-1"));
+        assert_eq!(pins.lexicon_manifest_hash(), Some("hash-1"));
         assert_eq!(pins.entity_row_version(entity), Some(5));
         assert_eq!(pins.versions().bus_catalogue_version.as_deref(), Some("v3"));
     }
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn gate_evaluate_succeeds_even_with_empty_pins() {
         // A session with no KYC entities bound legitimately has no
-        // kyc_manifest_hash — an empty-but-present SnapshotInput must still
+        // lexicon_manifest_hash — an empty-but-present SnapshotInput must still
         // succeed (this gate pins whatever was read, it doesn't judge it).
         let ctx = crate::context::EvaluationContext {
             snapshot: Some(SnapshotInput::default()),

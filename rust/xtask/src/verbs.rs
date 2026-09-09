@@ -877,7 +877,7 @@ pub(crate) fn verbs_inventory(
                     name: verb_name.clone(),
                     description: verb_config.description.clone(),
                     tier: metadata.tier,
-                    source: metadata.source_of_truth,
+                    source: metadata.source_of_truth.clone(),
                     scope: metadata.scope.clone(),
                     noun: metadata.noun.clone(),
                     internal: metadata.internal,

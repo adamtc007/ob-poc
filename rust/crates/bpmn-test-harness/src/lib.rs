@@ -44,7 +44,12 @@ pub fn compile_dsl(source: &str) -> JourneySpec {
     for d in &parse_diag.diagnostics {
         diag.push(d.clone());
     }
-    let bag = dsl_ast::AtomBag::from_source_file(source_file, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(
+        source_file,
+        &dsl_atoms::KindCatalogue::builtin(),
+        &mut diag,
+    )
+    .expect("DSL compile errors: unknown atom kind");
     assert!(
         !diag.has_errors(),
         "DSL compile errors: {:?}",

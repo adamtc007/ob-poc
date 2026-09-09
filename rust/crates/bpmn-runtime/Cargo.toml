@@ -10,8 +10,8 @@ default = []
 postgres = ["dep:sqlx"]
 
 [dependencies]
-dsl-atoms = { path = "../dsl-atoms" }
-dsl-diagnostics = { path = "../dsl-diagnostics" }
+dsl-atoms.workspace = true
+dsl-diagnostics.workspace = true
 dsl-bpmn-frontend = { path = "../dsl-bpmn-frontend" }
 dsl-lowering = { path = "../dsl-lowering" }
 serde = { version = "1.0", features = ["derive"] }

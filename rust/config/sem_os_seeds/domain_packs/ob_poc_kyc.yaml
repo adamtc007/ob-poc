@@ -53,6 +53,12 @@ allowed_transitions:
     hitl_required: true
     evidence_refs_required:
       - case_id
+    # EOP-PLAN-CA-REUSE-001 DSL-T2/Prompt C (2026-09-09, FU-T2-02): the
+    # simulated advance target is now pack data, not a core default — declare
+    # it explicitly so the dry-run node/slot-path text is unchanged from
+    # before the bump ("kyc-case:discovery" / "kyc-case/workstream").
+    slot_path: kyc-case/workstream
+    node_prefix: kyc-case
   - transition_ref: kyc-case.discovery-to-assessment
     entity_type: kyc_case
     state_machine: kyc_case_lifecycle
@@ -64,6 +70,8 @@ allowed_transitions:
     hitl_required: true
     evidence_refs_required:
       - case_id
+    slot_path: kyc-case/workstream
+    node_prefix: kyc-case
 discovery_probes:
   - probe_id: kyc-case.read-state
     operation: read_state

@@ -605,7 +605,7 @@ fn check_cross_verb_standard_rules(
                         intent_verbs_by_noun
                             .entry(noun.clone())
                             .or_default()
-                            .push((full_name, metadata.source_of_truth));
+                            .push((full_name, metadata.source_of_truth.clone()));
                     }
                 }
             }

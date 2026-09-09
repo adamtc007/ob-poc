@@ -18,7 +18,8 @@ fn parse_and_resolve(src: &str) -> (PackRegistry, DiagnosticBag) {
     for d in parse_diag.diagnostics {
         diag.push(d);
     }
-    let bag = dsl_ast::AtomBag::from_source_file(sf, &mut diag);
+    let bag = dsl_ast::AtomBag::from_source_file(sf, &dsl_atoms::KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
     let mut registry = PackRegistry::new();
     dsl_resolution::resolve(&bag, &mut registry, &mut diag);
     (registry, diag)

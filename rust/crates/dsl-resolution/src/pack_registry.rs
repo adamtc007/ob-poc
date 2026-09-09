@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use dsl_ast::AtomBag;
+use dsl_atoms::KindCatalogue;
 use dsl_diagnostics::DiagnosticBag;
 
 // ---------------------------------------------------------------------------
@@ -112,7 +113,12 @@ pub fn load_packs_from_dir(
             for d in parse_diag.diagnostics {
                 diagnostics.push(d);
             }
-            let bag = AtomBag::from_source_file(source_file, diagnostics);
+            // Unknown-kind errors already carry a diagnostic (dsl-ast); treat
+            // that file as contributing an empty bag and keep loading the
+            // rest of the directory, matching the pre-DSL-T1 tolerant
+            // per-file degrade (`load_packs_from_dir`'s own doc comment).
+            let bag = AtomBag::from_source_file(source_file, &KindCatalogue::builtin(), diagnostics)
+                .unwrap_or_default();
             crate::resolve::resolve(&bag, registry, diagnostics);
         }
     }

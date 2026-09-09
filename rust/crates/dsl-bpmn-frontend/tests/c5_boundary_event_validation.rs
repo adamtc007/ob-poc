@@ -1,4 +1,5 @@
 use dsl_ast::AtomBag;
+use dsl_atoms::KindCatalogue;
 use dsl_bpmn_frontend::assemble;
 use dsl_diagnostics::DiagnosticBag;
 
@@ -22,7 +23,8 @@ fn test_boundary_event_no_outflow_fails_validation() {
         diag.push(d.clone());
     }
 
-    let bag = AtomBag::from_source_file(source_file, &mut diag);
+    let bag = AtomBag::from_source_file(source_file, &KindCatalogue::builtin(), &mut diag)
+        .expect("all kinds known");
     let _graph = assemble(&bag, &mut diag);
 
     let errs: Vec<_> = diag.errors().collect();

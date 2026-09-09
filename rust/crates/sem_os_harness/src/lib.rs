@@ -352,6 +352,7 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
         point_in_time: None,
         entity_kind: None,
         entity_confidence: None,
+        entity_kind_aliases: Default::default(),
         discovery: sem_os_policy::context_resolution::DiscoveryContext::default(),
     };
 
